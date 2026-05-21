@@ -1,5 +1,5 @@
-export function normalizeAnswerText(value: string) {
-  return replaceMechanicalTimeBoxes(value)
+export function normalizeAnswerText(value: unknown) {
+  return replaceMechanicalTimeBoxes(coerceAnswerText(value))
     .replace(/\r\n/g, "\n")
     .replace(/^\s{0,3}#{1,6}\s+/gm, "")
     .replace(/\*\*([^*\n]+)\*\*/g, "$1")
@@ -9,6 +9,25 @@ export function normalizeAnswerText(value: string) {
     .replace(/^\s*(\d+)\.\s+/gm, "$1. ")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+export function coerceAnswerText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (value === null || value === undefined) return "";
+  if (Array.isArray(value)) return value.map(coerceAnswerText).filter(Boolean).join("\n");
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    for (const key of ["text", "content", "answer", "message"]) {
+      const text = coerceAnswerText(record[key]);
+      if (text) return text;
+    }
+    try {
+      return JSON.stringify(value, null, 2);
+    } catch {
+      return "";
+    }
+  }
+  return String(value);
 }
 
 function replaceMechanicalTimeBoxes(value: string) {

@@ -1,5 +1,5 @@
 import { PlanKey, resolvePlan } from "@/lib/plans";
-import { normalizeAnswerText } from "@/lib/answerText";
+import { coerceAnswerText, normalizeAnswerText } from "@/lib/answerText";
 
 export type ChatRuntimeMessage = {
   role: "user" | "assistant";
@@ -20,7 +20,7 @@ type GenerateAnswerResult = {
 };
 
 type AnthropicMessageResponse = {
-  content?: { text?: string }[];
+  content?: unknown[];
   stop_reason?: string | null;
 };
 
@@ -225,7 +225,7 @@ async function requestAnthropicMessage(input: {
 }
 
 function extractAnthropicText(data: AnthropicMessageResponse) {
-  return data.content?.map((part) => part.text).filter(Boolean).join("\n").trim() || "";
+  return data.content?.map((part) => coerceAnswerText(part)).filter(Boolean).join("\n").trim() || "";
 }
 
 function readAnthropicRateLimitHeaders(headers: Headers): AnthropicRateLimitInfo {
@@ -269,7 +269,7 @@ function sanitizeMessageContent(value: unknown) {
   return value.replace(/\s+/g, " ").trim().slice(0, 2400);
 }
 
-function normalizeGeneratedAnswer(value: string) {
+function normalizeGeneratedAnswer(value: unknown) {
   return normalizeAnswerText(value);
 }
 

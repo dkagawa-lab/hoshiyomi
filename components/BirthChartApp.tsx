@@ -8,7 +8,7 @@ import { PricingPanel } from "@/components/PricingPanel";
 import { ensureClientUserId } from "@/lib/clientIdentity";
 import { findPrefecture, japanLocations, Municipality } from "@/lib/japanLocations";
 import { municipalityReadings } from "@/lib/municipalityReadings.generated";
-import { normalizeAnswerText } from "@/lib/answerText";
+import { coerceAnswerText, normalizeAnswerText } from "@/lib/answerText";
 import { isReaderStyleKey, ReaderStyleKey, readerStyles } from "@/lib/readerStyles";
 import {
   GenderKey,
@@ -214,8 +214,8 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
         setInput(emptyInput);
       }
     }
-    setMessages(readJson<Message[]>("hoshiyomi:messages", []));
-    setHistory(readJson<HistoryEntry[]>("hoshiyomi:history", []));
+    setMessages(normalizeStoredMessages(readJson<Message[]>("hoshiyomi:messages", [])));
+    setHistory(normalizeStoredHistory(readJson<HistoryEntry[]>("hoshiyomi:history", [])));
     const nextClientUserId = ensureClientUserId();
     setClientUserId(nextClientUserId);
     syncServerState(nextClientUserId);
@@ -392,7 +392,8 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
     const activeClientUserId = clientUserId || ensureClientUserId();
     if (!clientUserId) setClientUserId(activeClientUserId);
     const requestChart = chartWithProfile(chart, input, { romanticInterest: effectiveRomanticInterest });
-    const nextMessages: Message[] = [...messages, { role: "user", content: trimmedQuestion }];
+    const currentMessages = normalizeStoredMessages(messages);
+    const nextMessages: Message[] = [...currentMessages, { role: "user", content: trimmedQuestion }];
     const nextLoadingSequence = buildLoadingSequence(trimmedQuestion, activeReaderStyle.key);
     setMessages(nextMessages);
     setQuestion("");
@@ -425,7 +426,10 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
       if (!res.ok || data.error || !data.answer) {
         throw new Error(data.error || "星からの返答を受け取れませんでした。");
       }
-      const answer = data.answer;
+      const answer = normalizeAnswerText(data.answer);
+      if (!answer) {
+        throw new Error("星からの返答を受け取れませんでした。");
+      }
       if (stepTimer) clearTimeout(stepTimer);
       await revealAnswer(answer);
       const answeredMessages: Message[] = [...nextMessages, { role: "assistant", content: answer, readerStyle: activeReaderStyle.key }];
@@ -527,12 +531,14 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
       if (data.usage) applyServerUsage(data.usage);
       if (data.user) applyServerProfile(data.user);
       if (Array.isArray(data.messages)) {
-        setMessages(data.messages);
-        window.localStorage.setItem("hoshiyomi:messages", JSON.stringify(data.messages));
+        const normalizedMessages = normalizeStoredMessages(data.messages);
+        setMessages(normalizedMessages);
+        window.localStorage.setItem("hoshiyomi:messages", JSON.stringify(normalizedMessages));
       }
       if (Array.isArray(data.history)) {
-        setHistory(data.history);
-        window.localStorage.setItem("hoshiyomi:history", JSON.stringify(data.history));
+        const normalizedHistory = normalizeStoredHistory(data.history);
+        setHistory(normalizedHistory);
+        window.localStorage.setItem("hoshiyomi:history", JSON.stringify(normalizedHistory));
       }
     } catch {}
   }
@@ -1098,8 +1104,8 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
                               type="button"
                               onClick={() => {
                                 setMessages([
-                                  { role: "user", content: entry.question },
-                                  { role: "assistant", content: entry.answer, readerStyle: entry.readerStyle }
+                                  { role: "user", content: normalizeAssistantDisplayContent(entry.question) },
+                                  { role: "assistant", content: normalizeAssistantDisplayContent(entry.answer), readerStyle: entry.readerStyle }
                                 ]);
                                 window.setTimeout(() => scrollToLatestMessage("auto"), 60);
                               }}
@@ -1172,7 +1178,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
 
 function MessageBubble({ message, onFollowUp }: { message: Message; onFollowUp?: (question: string) => void }) {
   if (message.role === "user") {
-    return <div className="message user">{message.content}</div>;
+    return <div className="message user">{coerceAnswerText(message.content)}</div>;
   }
   const { body, followUps } = extractAssistantFollowUps(normalizeAssistantDisplayContent(message.content));
 
@@ -1196,7 +1202,7 @@ function MessageBubble({ message, onFollowUp }: { message: Message; onFollowUp?:
   );
 }
 
-function normalizeAssistantDisplayContent(value: string) {
+function normalizeAssistantDisplayContent(value: unknown) {
   return normalizeAnswerText(value);
 }
 
@@ -1273,6 +1279,50 @@ function readJson<T>(key: string, fallback: T): T {
   } catch {
     return fallback;
   }
+}
+
+function normalizeStoredMessages(value: unknown): Message[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const message = item as { content?: unknown; readerStyle?: unknown; role?: unknown };
+      if (message.role !== "user" && message.role !== "assistant") return null;
+      const content = normalizeAnswerText(message.content);
+      if (!content || content === "[object Object]") return null;
+      const readerStyle = typeof message.readerStyle === "string" && isReaderStyleKey(message.readerStyle) ? message.readerStyle : undefined;
+      const normalized: Message = {
+        role: message.role,
+        content
+      };
+      if (readerStyle) normalized.readerStyle = readerStyle;
+      return normalized;
+    })
+    .filter((message): message is Message => message !== null);
+}
+
+function normalizeStoredHistory(value: unknown): HistoryEntry[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item, index) => {
+      if (!item || typeof item !== "object") return null;
+      const entry = item as Record<string, unknown>;
+      const question = normalizeAnswerText(entry.question);
+      const answer = normalizeAnswerText(entry.answer);
+      if (!question || !answer || answer === "[object Object]") return null;
+      const readerStyle = typeof entry.readerStyle === "string" && isReaderStyleKey(entry.readerStyle) ? entry.readerStyle : undefined;
+      const normalized: HistoryEntry = {
+        id: typeof entry.id === "string" ? entry.id : `history-${index}`,
+        createdAt: typeof entry.createdAt === "string" ? entry.createdAt : new Date().toISOString(),
+        question,
+        answer,
+        chartName: typeof entry.chartName === "string" ? entry.chartName : "あなた",
+        birthDate: typeof entry.birthDate === "string" ? entry.birthDate : ""
+      };
+      if (readerStyle) normalized.readerStyle = readerStyle;
+      return normalized;
+    })
+    .filter((entry): entry is HistoryEntry => entry !== null);
 }
 
 function readStoredBirth() {
