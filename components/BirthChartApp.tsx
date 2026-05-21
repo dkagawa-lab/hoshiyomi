@@ -628,7 +628,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
             <input value={input.name} onChange={(e) => setInput({ ...input, name: e.target.value })} placeholder="任意で入力" />
           </div>
           <div className="field">
-            <label>性別（任意）</label>
+            <label>あなたの性別（任意）</label>
             <select
               value={input.gender ?? "unspecified"}
               onChange={(e) => {
@@ -867,7 +867,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
               </div>
               <div className="profile-select-grid">
                 <label>
-                  <span>性別（任意）</span>
+                  <span>あなたの性別（任意）</span>
                   <select
                     value={input.gender ?? "unspecified"}
                     onChange={(e) => {
