@@ -3017,6 +3017,16 @@ textarea:focus {
   line-height: 1.68;
 }
 
+.logout-button {
+  border-color: rgba(211, 138, 138, 0.28);
+  color: #f0c2b8;
+}
+
+.logout-message {
+  margin: -4px 0 0;
+  color: rgba(247, 241, 223, 0.74);
+}
+
 .referral-card {
   grid-column: 1 / -1;
   border-color: rgba(226, 190, 103, 0.24);

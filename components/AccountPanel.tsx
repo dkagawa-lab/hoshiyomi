@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { BirthInput } from "@/lib/astrology";
 import { ensureClientUserId } from "@/lib/clientIdentity";
+import { getSupabaseAuthClient } from "@/lib/authRegistrationClient";
 import { genderLabel, romanticInterestLabel } from "@/lib/profileOptions";
 import { addAddOnCredits, planQuotaLabel, planStatusLabel, PlanKey, readAddOnCredits, readFreeBonusRemaining, readPlanFromStorage, readPlanUsage, referralRewardCredits, resolvePlan, usageLimitsDisabled } from "@/lib/plans";
 
@@ -34,6 +35,8 @@ const initialAccountState: AccountState = {
 export function AccountPanel() {
   const [account, setAccount] = useState<AccountState>(initialAccountState);
   const [copiedReferral, setCopiedReferral] = useState(false);
+  const [logoutMessage, setLogoutMessage] = useState("");
+  const [logoutLoading, setLogoutLoading] = useState(false);
   const [referralInput, setReferralInput] = useState("");
   const [referralLoading, setReferralLoading] = useState(false);
   const [referralMessage, setReferralMessage] = useState("");
@@ -178,6 +181,25 @@ export function AccountPanel() {
     }
   }
 
+  async function logout() {
+    setLogoutLoading(true);
+    setLogoutMessage("");
+    try {
+      const supabase = getSupabaseAuthClient();
+      await supabase?.auth.signOut();
+    } catch {}
+    clearAccountSession();
+    const nextClientUserId = ensureClientUserId();
+    setAccount({
+      ...initialAccountState,
+      birth: readStoredBirth(),
+      clientUserId: nextClientUserId,
+      referralCode: ensureLocalReferralCode(nextClientUserId)
+    });
+    setLogoutLoading(false);
+    setLogoutMessage("ログアウトしました。保存済みの星の情報はこの端末に残っています。");
+  }
+
   return (
     <section className="account-page-grid">
       <div className="panel account-hero-card">
@@ -219,7 +241,13 @@ export function AccountPanel() {
           <Link className="button" href="/pricing">
             プランを見る
           </Link>
+          {account.member ? (
+            <button className="button subtle logout-button" disabled={logoutLoading} onClick={logout} type="button">
+              {logoutLoading ? "ログアウト中" : "ログアウト"}
+            </button>
+          ) : null}
         </div>
+        {logoutMessage ? <p className="small logout-message">{logoutMessage}</p> : null}
       </div>
 
       <div className="panel account-detail-card">
@@ -357,6 +385,26 @@ function resolveRegistrationMethod(clientUserId: string) {
   if (clientUserId.startsWith("line:")) return "LINE";
   if (clientUserId.startsWith("auth:")) return "メール / Google";
   return "端末保存";
+}
+
+function clearAccountSession() {
+  const keys = [
+    "hoshiyomi:member",
+    "hoshiyomi:clientUserId",
+    "hoshiyomi:plan",
+    "hoshiyomi:premium",
+    "hoshiyomi:freeBonusRemaining",
+    "hoshiyomi:addOnCredits",
+    "hoshiyomi:messages",
+    "hoshiyomi:history",
+    "hoshiyomi:referralRedeemedCode"
+  ];
+  for (const key of keys) {
+    try {
+      window.localStorage.removeItem(key);
+      window.sessionStorage.removeItem(key);
+    } catch {}
+  }
 }
 
 function readStoredBirth() {
