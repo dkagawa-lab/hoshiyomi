@@ -5,9 +5,14 @@ export function ensureClientUserId() {
   const saved = readClientStorage("localStorage") ?? readClientStorage("sessionStorage");
   if (saved) return saved;
   const nextId = typeof window.crypto?.randomUUID === "function" ? window.crypto.randomUUID() : `local-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  writeClientStorage("localStorage", nextId);
-  writeClientStorage("sessionStorage", nextId);
+  writeClientUserId(nextId);
   return nextId;
+}
+
+export function writeClientUserId(value: string) {
+  if (typeof window === "undefined") return;
+  writeClientStorage("localStorage", value);
+  writeClientStorage("sessionStorage", value);
 }
 
 function readClientStorage(storageName: "localStorage" | "sessionStorage") {

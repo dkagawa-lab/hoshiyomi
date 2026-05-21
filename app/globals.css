@@ -2785,6 +2785,55 @@ textarea:focus {
   margin-top: 14px;
 }
 
+.auth-register {
+  display: grid;
+  gap: 14px;
+}
+
+.auth-method-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.auth-email-form {
+  display: grid;
+  gap: 8px;
+}
+
+.auth-email-form > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.auth-provider-button {
+  width: 100%;
+  min-height: 50px;
+  font-weight: 700;
+}
+
+.auth-provider-button.line {
+  border-color: rgba(6, 199, 85, 0.42);
+  background: rgba(6, 199, 85, 0.12);
+  color: #dfffea;
+}
+
+.auth-dev-fallback {
+  display: grid;
+  gap: 10px;
+  border: 1px solid rgba(226, 190, 103, 0.16);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(226, 190, 103, 0.06);
+}
+
+.auth-dev-fallback p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.65;
+}
+
 .account-page-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
@@ -3157,6 +3206,7 @@ textarea:focus {
   }
 
   .grid,
+  .auth-email-form > div,
   .account-status-strip,
   .contact-layout,
   .contact-form-grid,
