@@ -1,5 +1,5 @@
 import { Chart } from "@/lib/astrology";
-import { PlanKey, registeredFreeBonusLimit, resolvePlan } from "@/lib/plans";
+import { PlanKey, referralRewardCredits, registeredFreeBonusLimit, resolvePlan } from "@/lib/plans";
 
 export type StoredUser = {
   id: string;
@@ -14,6 +14,8 @@ export type StoredUser = {
   is_member: boolean;
   free_bonus_remaining: number;
   add_on_credits: number;
+  referral_code: string | null;
+  referred_by_user_id: string | null;
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
 };
@@ -54,6 +56,7 @@ export type PublicUserSnapshot = {
   longitude: number | null;
   name: string | null;
   plan: PlanKey;
+  referralCode: string | null;
 };
 
 export type ContactInquiryInput = {
@@ -124,10 +127,11 @@ export async function upsertUserForChart(input: { chart: Chart; clientUserId: st
 export async function registerClientUser(clientUserId: string) {
   const existing = await getUserByClientUserId(clientUserId);
   if (existing) {
-    return updateUser(existing.id, {
+    const updated = await updateUser(existing.id, {
       is_member: true,
       free_bonus_remaining: existing.is_member ? existing.free_bonus_remaining : registeredFreeBonusLimit
     });
+    return ensureReferralCodeForUser(updated);
   }
   const users = await supabaseJson<StoredUser[]>("users?select=*", {
     method: "POST",
@@ -140,11 +144,12 @@ export async function registerClientUser(clientUserId: string) {
       add_on_credits: 0
     })
   });
-  return users[0];
+  return ensureReferralCodeForUser(users[0]);
 }
 
 export async function getUserSnapshotByClientUserId(clientUserId: string) {
-  const user = await getUserByClientUserId(clientUserId);
+  const existingUser = await getUserByClientUserId(clientUserId);
+  const user = existingUser?.is_member ? await ensureReferralCodeForUser(existingUser) : existingUser;
   if (!user) return null;
   const [usage, messages] = await Promise.all([getUsageSnapshot(user), listChatMessages(user.id)]);
   return {
@@ -262,6 +267,72 @@ export async function addCreditsByClientUserId(input: { clientUserId: string; cr
   return users[0];
 }
 
+export class ReferralCodeError extends Error {
+  status: number;
+
+  constructor(message: string, status = 400) {
+    super(message);
+    this.name = "ReferralCodeError";
+    this.status = status;
+  }
+}
+
+export function normalizeReferralCode(value: unknown) {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const body = normalized.startsWith("HSY") ? normalized.slice(3) : normalized;
+  if (!/^[A-Z0-9]{8}$/.test(body)) return null;
+  return `HSY-${body}`;
+}
+
+export async function redeemReferralCode(input: { clientUserId: string; code: string }) {
+  const code = normalizeReferralCode(input.code);
+  if (!code) throw new ReferralCodeError("紹介コードの形式が正しくありません。", 400);
+
+  const referrer = await getUserByReferralCode(code);
+  if (!referrer) throw new ReferralCodeError("紹介コードが見つかりませんでした。", 404);
+
+  const referred = await registerClientUser(input.clientUserId);
+  if (referrer.id === referred.id) {
+    throw new ReferralCodeError("自分の紹介コードは使用できません。", 400);
+  }
+
+  const existingRedemption = await getReferralRedemptionByReferredUserId(referred.id);
+  if (existingRedemption) {
+    throw new ReferralCodeError("紹介コードはすでに使用済みです。", 409);
+  }
+
+  try {
+    await supabaseJson("referral_redemptions", {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({
+        referral_code: code,
+        referrer_user_id: referrer.id,
+        referred_user_id: referred.id,
+        credits: referralRewardCredits
+      })
+    });
+  } catch {
+    throw new ReferralCodeError("紹介コードはすでに使用済みです。", 409);
+  }
+
+  await updateUser(referrer.id, {
+    add_on_credits: Math.max(0, Number(referrer.add_on_credits || 0)) + referralRewardCredits
+  });
+  const updatedReferred = await updateUser(referred.id, {
+    add_on_credits: Math.max(0, Number(referred.add_on_credits || 0)) + referralRewardCredits,
+    referred_by_user_id: referrer.id
+  });
+
+  return {
+    credits: referralRewardCredits,
+    referrerCode: code,
+    user: await ensureReferralCodeForUser(updatedReferred),
+    usage: await getUsageSnapshot(updatedReferred)
+  };
+}
+
 export async function insertContactInquiry(input: ContactInquiryInput) {
   const inquiries = await supabaseJson<{ id: string }[]>("contact_inquiries?select=id", {
     method: "POST",
@@ -283,6 +354,40 @@ export async function insertContactInquiry(input: ContactInquiryInput) {
 async function getUserByClientUserId(clientUserId: string) {
   const users = await supabaseJson<StoredUser[]>(`users?client_user_id=eq.${encodeURIComponent(clientUserId)}&select=*&limit=1`);
   return users[0] ?? null;
+}
+
+async function getUserByReferralCode(referralCode: string) {
+  const users = await supabaseJson<StoredUser[]>(`users?referral_code=eq.${encodeURIComponent(referralCode)}&select=*&limit=1`);
+  return users[0] ?? null;
+}
+
+async function getReferralRedemptionByReferredUserId(userId: string) {
+  const redemptions = await supabaseJson<{ id: string }[]>(`referral_redemptions?referred_user_id=eq.${encodeURIComponent(userId)}&select=id&limit=1`);
+  return redemptions[0] ?? null;
+}
+
+async function ensureReferralCodeForUser(user: StoredUser) {
+  if (!user || user.referral_code) return user;
+  try {
+    return await updateUser(user.id, { referral_code: await createUniqueReferralCode() });
+  } catch (error) {
+    console.warn("Referral code is not available yet", { message: error instanceof Error ? error.message : "Unknown error" });
+    return user;
+  }
+}
+
+async function createUniqueReferralCode() {
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const code = createReferralCodeCandidate();
+    if (!(await getUserByReferralCode(code))) return code;
+  }
+  throw new Error("Failed to create referral code");
+}
+
+function createReferralCodeCandidate() {
+  const source = typeof globalThis.crypto?.randomUUID === "function" ? globalThis.crypto.randomUUID() : `${Date.now()}${Math.random()}`;
+  const body = source.replace(/[^a-zA-Z0-9]/g, "").slice(0, 8).toUpperCase().padEnd(8, "0");
+  return `HSY-${body}`;
 }
 
 function buildStoredHistory(messages: StoredChatMessage[], user: StoredUser) {
@@ -315,7 +420,8 @@ function toPublicUserSnapshot(user: StoredUser): PublicUserSnapshot {
     latitude: user.latitude === null ? null : Number(user.latitude),
     longitude: user.longitude === null ? null : Number(user.longitude),
     name: user.name,
-    plan: resolvePlan(user.plan).key
+    plan: resolvePlan(user.plan).key,
+    referralCode: user.referral_code ?? null
   };
 }
 

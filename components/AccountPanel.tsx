@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { BirthInput } from "@/lib/astrology";
 import { ensureClientUserId } from "@/lib/clientIdentity";
 import { genderLabel, romanticInterestLabel } from "@/lib/profileOptions";
-import { planQuotaLabel, PlanKey, readAddOnCredits, readFreeBonusRemaining, readPlanFromStorage, readPlanUsage, resolvePlan, usageLimitsDisabled } from "@/lib/plans";
+import { addAddOnCredits, planQuotaLabel, PlanKey, readAddOnCredits, readFreeBonusRemaining, readPlanFromStorage, readPlanUsage, referralRewardCredits, resolvePlan, usageLimitsDisabled } from "@/lib/plans";
 
 type AccountState = {
   addOnCredits: number;
@@ -14,6 +14,7 @@ type AccountState = {
   freeBonusRemaining: number;
   member: boolean;
   plan: PlanKey;
+  referralCode: string;
   serverSynced: boolean;
   used: number;
 };
@@ -25,18 +26,27 @@ const initialAccountState: AccountState = {
   freeBonusRemaining: 0,
   member: false,
   plan: "free",
+  referralCode: "",
   serverSynced: false,
   used: 0
 };
 
 export function AccountPanel() {
   const [account, setAccount] = useState<AccountState>(initialAccountState);
+  const [copiedReferral, setCopiedReferral] = useState(false);
+  const [referralInput, setReferralInput] = useState("");
+  const [referralLoading, setReferralLoading] = useState(false);
+  const [referralMessage, setReferralMessage] = useState("");
+  const [shareOrigin, setShareOrigin] = useState("");
 
   useEffect(() => {
     const clientUserId = ensureClientUserId();
+    const params = new URLSearchParams(window.location.search);
     const localPlan = readPlanFromStorage();
     const localMember = readStorageValue("localStorage", "hoshiyomi:member") === "true" || readStorageValue("sessionStorage", "hoshiyomi:member") === "true";
     const localBirth = readStoredBirth();
+    setShareOrigin(window.location.origin);
+    setReferralInput(params.get("ref") || "");
     const localState: AccountState = {
       addOnCredits: readAddOnCredits(),
       birth: localBirth,
@@ -44,6 +54,7 @@ export function AccountPanel() {
       freeBonusRemaining: readFreeBonusRemaining(),
       member: localMember,
       plan: localPlan,
+      referralCode: ensureLocalReferralCode(clientUserId),
       serverSynced: false,
       used: readPlanUsage(localPlan)
     };
@@ -64,6 +75,7 @@ export function AccountPanel() {
         freeBonusRemaining: typeof data.usage?.freeBonusRemaining === "number" ? data.usage.freeBonusRemaining : current.freeBonusRemaining,
         member: typeof data.usage?.isMember === "boolean" ? data.usage.isMember : current.member,
         plan: serverPlan,
+        referralCode: typeof data.user?.referralCode === "string" ? data.user.referralCode : current.referralCode,
         serverSynced: Boolean(data.user || data.usage),
         used: typeof data.usage?.used === "number" ? data.usage.used : current.used
       }));
@@ -82,6 +94,74 @@ export function AccountPanel() {
       : { href: "/register?returnTo=/account", label: "無料会員登録する" }
     : { href: "/#app", label: "ホロスコープを作成する" };
   const nextStepLinks = buildAccountNextStepLinks(account);
+  const referralLink = account.referralCode && shareOrigin ? `${shareOrigin}/register?ref=${encodeURIComponent(account.referralCode)}&returnTo=/account` : "";
+
+  async function copyReferral() {
+    if (!account.referralCode) return;
+    const text = referralLink || account.referralCode;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedReferral(true);
+      window.setTimeout(() => setCopiedReferral(false), 1800);
+    } catch {
+      setReferralMessage("コピーできませんでした。紹介コードを手動で選択して共有してください。");
+    }
+  }
+
+  async function applyReferralCode() {
+    const code = referralInput.trim();
+    if (!code) {
+      setReferralMessage("紹介コードを入力してください。");
+      return;
+    }
+    if (normalizeLocalReferralCode(code) === normalizeLocalReferralCode(account.referralCode)) {
+      setReferralMessage("自分の紹介コードは使用できません。");
+      return;
+    }
+    if (readStorageValue("localStorage", "hoshiyomi:referralRedeemedCode")) {
+      setReferralMessage("紹介コードはすでに使用済みです。");
+      return;
+    }
+
+    setReferralLoading(true);
+    setReferralMessage("");
+    try {
+      const res = await fetch("/api/referral", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientUserId: account.clientUserId || ensureClientUserId(), code })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) {
+        throw new Error(data.error || "紹介コードを適用できませんでした。");
+      }
+      if (data.mode === "local") {
+        const nextCredits = addAddOnCredits(readAddOnCredits(), referralRewardCredits);
+        setAccount((current) => ({ ...current, addOnCredits: nextCredits, member: true }));
+        setReferralMessage(`紹介特典として${referralRewardCredits}回分の相談枠を追加しました。`);
+      } else {
+        setAccount((current) => ({
+          ...current,
+          addOnCredits: typeof data.usage?.addOnCredits === "number" ? data.usage.addOnCredits : current.addOnCredits + referralRewardCredits,
+          freeBonusRemaining: typeof data.usage?.freeBonusRemaining === "number" ? data.usage.freeBonusRemaining : current.freeBonusRemaining,
+          member: typeof data.usage?.isMember === "boolean" ? data.usage.isMember : true,
+          plan: isPlanKey(data.usage?.plan) ? data.usage.plan : current.plan,
+          referralCode: typeof data.user?.referralCode === "string" ? data.user.referralCode : current.referralCode,
+          serverSynced: true,
+          used: typeof data.usage?.used === "number" ? data.usage.used : current.used
+        }));
+        setReferralMessage(`紹介特典として、あなたと紹介した人に${referralRewardCredits}回分の相談枠を追加しました。`);
+      }
+      window.localStorage.setItem("hoshiyomi:member", "true");
+      window.sessionStorage.setItem("hoshiyomi:member", "true");
+      window.localStorage.setItem("hoshiyomi:referralRedeemedCode", code);
+      setReferralInput("");
+    } catch (error) {
+      setReferralMessage(error instanceof Error ? error.message : "紹介コードを適用できませんでした。");
+    } finally {
+      setReferralLoading(false);
+    }
+  }
 
   return (
     <section className="account-page-grid">
@@ -120,6 +200,39 @@ export function AccountPanel() {
           <Link className="button" href="/pricing">
             プランを見る
           </Link>
+        </div>
+      </div>
+
+      <div className="panel account-detail-card referral-card">
+        <div className="eyebrow">Invite Gift</div>
+        <h2>紹介コード</h2>
+        <p>
+          あなたの紹介コードを使って誰かが登録すると、紹介した人と紹介された人の両方に{referralRewardCredits}回分の相談枠をプレゼントします。
+        </p>
+        <div className="referral-code-box">
+          <span>あなたのコード</span>
+          <strong>{account.referralCode || "会員登録後に発行されます"}</strong>
+          {account.referralCode ? (
+            <button className="button" onClick={copyReferral} type="button">
+              {copiedReferral ? "コピーしました" : "共有リンクをコピー"}
+            </button>
+          ) : null}
+        </div>
+        {referralLink ? <p className="small referral-link-text">{referralLink}</p> : null}
+        <div className="referral-form">
+          <label htmlFor="referral-code-input">紹介コードを入力</label>
+          <div>
+            <input
+              id="referral-code-input"
+              onChange={(event) => setReferralInput(event.target.value)}
+              placeholder="例: HSY-ABCD1234"
+              value={referralInput}
+            />
+            <button className="button primary" disabled={referralLoading} onClick={applyReferralCode} type="button">
+              {referralLoading ? "確認中" : "特典を受け取る"}
+            </button>
+          </div>
+          {referralMessage ? <p className="small referral-message">{referralMessage}</p> : null}
         </div>
       </div>
 
@@ -235,6 +348,24 @@ function readStorageValue(storageName: "localStorage" | "sessionStorage", key: s
   } catch {
     return null;
   }
+}
+
+function ensureLocalReferralCode(clientUserId: string) {
+  const saved = readStorageValue("localStorage", "hoshiyomi:referralCode") ?? readStorageValue("sessionStorage", "hoshiyomi:referralCode");
+  if (saved) return saved;
+  const seed = clientUserId.replace(/[^a-zA-Z0-9]/g, "").slice(0, 8).toUpperCase().padEnd(8, "0");
+  const code = `HSY-${seed}`;
+  try {
+    window.localStorage.setItem("hoshiyomi:referralCode", code);
+    window.sessionStorage.setItem("hoshiyomi:referralCode", code);
+  } catch {}
+  return code;
+}
+
+function normalizeLocalReferralCode(value: string) {
+  const normalized = value.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const body = normalized.startsWith("HSY") ? normalized.slice(3) : normalized;
+  return body ? `HSY-${body}` : "";
 }
 
 function isPlanKey(value: unknown): value is PlanKey {

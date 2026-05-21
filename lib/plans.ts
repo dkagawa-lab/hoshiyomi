@@ -85,6 +85,7 @@ export const addOnPack = {
   ctaLabel: "100回追加する",
   description: "月の相談回数を使い切った後も、100回単位で続けて相談できます。"
 };
+export const referralRewardCredits = 30;
 
 export function usageLimitsDisabled() {
   return process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_DISABLE_USAGE_LIMITS === "true";

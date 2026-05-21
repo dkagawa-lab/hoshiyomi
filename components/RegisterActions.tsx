@@ -3,14 +3,16 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ensureClientUserId } from "@/lib/clientIdentity";
-import { ensureFreeBonusRemaining } from "@/lib/plans";
+import { addAddOnCredits, ensureFreeBonusRemaining, readAddOnCredits, referralRewardCredits } from "@/lib/plans";
 
 export function RegisterActions() {
   const router = useRouter();
+  const [referralCode, setReferralCode] = useState("");
   const [returnTo, setReturnTo] = useState("/account");
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    setReferralCode(params.get("ref") || "");
     setReturnTo(resolveReturnTo(params.get("returnTo")));
   }, []);
 
@@ -27,6 +29,9 @@ export function RegisterActions() {
         body: JSON.stringify({ birth, clientUserId })
       });
     } catch {}
+    if (referralCode.trim()) {
+      await applyReferralCode(clientUserId, referralCode);
+    }
     router.push(returnTo);
   }
 
@@ -35,6 +40,22 @@ export function RegisterActions() {
       {registerButtonLabel(returnTo)}
     </button>
   );
+}
+
+async function applyReferralCode(clientUserId: string, code: string) {
+  try {
+    const res = await fetch("/api/referral", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientUserId, code })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.error) return;
+    if (data.mode === "local") {
+      addAddOnCredits(readAddOnCredits(), referralRewardCredits);
+    }
+    window.localStorage.setItem("hoshiyomi:referralRedeemedCode", code);
+  } catch {}
 }
 
 function resolveReturnTo(value: string | null) {

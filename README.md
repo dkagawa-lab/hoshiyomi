@@ -8,6 +8,7 @@
 - 太陽、月、水星から海王星、ASC、MC、ハウス、主要アスペクトを表示
 - 無料会員登録後は初回10回まで相談でき、その後は1日3回。通常プランは月50回、プライベートプランは月200回で相談回数と占い師タイプを切り替え
 - 追加100回パックを1,500円で購入可能
+- 紹介コードを使った登録で、紹介した人・紹介された人の両方に30回分の相談枠を付与
 - `ANTHROPIC_API_KEY` があれば本番回答、無ければデモ回答
 - `ANTHROPIC_MODEL` または `ANTHROPIC_MODEL_FREE_TRIAL` / `ANTHROPIC_MODEL_FREE_AFTER_TRIAL` / `ANTHROPIC_MODEL_FREE` / `ANTHROPIC_MODEL_STANDARD` / `ANTHROPIC_MODEL_LUXURY` でプラン別に回答モデルを切り替え可能
 - `SUPABASE_URL` と `SUPABASE_SERVICE_ROLE_KEY` があれば、相談履歴・回数・追加枠をサーバー側で保存
@@ -37,6 +38,8 @@ npm run dev
 9. LINE DevelopersでWebhook URLを `/api/line/webhook` に設定
 
 Supabaseを設定していないローカル環境では、これまで通りブラウザ内の保存でデモ動作します。Supabaseを設定すると、相談API側で回数判定と履歴保存を行います。
+
+紹介コード機能を本番で使う場合は、最新の `supabase/schema.sql` をSupabase SQL Editorで実行してください。`users.referral_code` と `referral_redemptions` が作成されると、アカウント画面で紹介コードが発行されます。
 
 ## AI回答の本番設定
 

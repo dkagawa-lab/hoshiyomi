@@ -2843,6 +2843,13 @@ textarea:focus {
   gap: 14px;
 }
 
+.referral-card {
+  border-color: rgba(226, 190, 103, 0.24);
+  background:
+    linear-gradient(135deg, rgba(226, 190, 103, 0.08), transparent 44%),
+    rgba(8, 13, 28, 0.74);
+}
+
 .account-detail-card h2 {
   font-size: clamp(1.6rem, 3vw, 2.4rem);
 }
@@ -2867,6 +2874,63 @@ textarea:focus {
 .account-link-list a:hover {
   border-color: rgba(226, 190, 103, 0.42);
   background: rgba(226, 190, 103, 0.08);
+}
+
+.referral-code-box {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 12px;
+  align-items: center;
+  border: 1px solid rgba(226, 190, 103, 0.22);
+  border-radius: 8px;
+  padding: 14px;
+  background: rgba(5, 8, 18, 0.36);
+}
+
+.referral-code-box span {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.referral-code-box strong {
+  color: var(--gold);
+  font-family: var(--font-serif);
+  font-size: clamp(1.35rem, 3vw, 2rem);
+  letter-spacing: 0.08em;
+}
+
+.referral-link-text {
+  overflow-wrap: anywhere;
+}
+
+.referral-form {
+  display: grid;
+  gap: 8px;
+}
+
+.referral-form label {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.referral-form div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.referral-form input {
+  width: 100%;
+  border: 1px solid rgba(226, 190, 103, 0.18);
+  border-radius: 8px;
+  padding: 12px;
+  color: var(--text);
+  background: rgba(5, 8, 18, 0.52);
+}
+
+.referral-message {
+  color: var(--gold);
 }
 
 .small {
@@ -3106,6 +3170,8 @@ textarea:focus {
   .profile-select-grid,
   .love-preference-options,
   .reader-style-current,
+  .referral-code-box,
+  .referral-form div,
   .reader-style-group.private .reader-style-grid,
   .reader-style-grid,
   .transit-summary,

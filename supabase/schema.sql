@@ -13,6 +13,8 @@ create table if not exists users (
   is_member boolean not null default false,
   free_bonus_remaining integer not null default 0,
   add_on_credits integer not null default 0,
+  referral_code text,
+  referred_by_user_id uuid references users(id),
   stripe_customer_id text,
   stripe_subscription_id text,
   updated_at timestamptz not null default now(),
@@ -23,6 +25,8 @@ alter table users add column if not exists client_user_id text;
 alter table users add column if not exists is_member boolean not null default false;
 alter table users add column if not exists free_bonus_remaining integer not null default 0;
 alter table users add column if not exists add_on_credits integer not null default 0;
+alter table users add column if not exists referral_code text;
+alter table users add column if not exists referred_by_user_id uuid references users(id);
 alter table users add column if not exists stripe_customer_id text;
 alter table users add column if not exists stripe_subscription_id text;
 alter table users add column if not exists updated_at timestamptz not null default now();
@@ -34,6 +38,26 @@ create unique index if not exists users_client_user_id_idx
 create index if not exists users_stripe_customer_idx
   on users(stripe_customer_id)
   where stripe_customer_id is not null;
+
+create unique index if not exists users_referral_code_idx
+  on users(referral_code)
+  where referral_code is not null;
+
+create table if not exists referral_redemptions (
+  id uuid primary key default gen_random_uuid(),
+  referral_code text not null,
+  referrer_user_id uuid not null references users(id) on delete cascade,
+  referred_user_id uuid not null references users(id) on delete cascade,
+  credits integer not null default 30,
+  created_at timestamptz not null default now(),
+  unique(referred_user_id)
+);
+
+create index if not exists referral_redemptions_referrer_idx
+  on referral_redemptions(referrer_user_id, created_at desc);
+
+create index if not exists referral_redemptions_code_idx
+  on referral_redemptions(referral_code);
 
 create table if not exists chat_messages (
   id uuid primary key default gen_random_uuid(),
