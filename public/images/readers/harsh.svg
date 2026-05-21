@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" role="img" aria-label="榊リカ">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#140b16"/>
+      <stop offset="1" stop-color="#3b1325"/>
+    </linearGradient>
+    <linearGradient id="blade" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#f0cf7c"/>
+      <stop offset="1" stop-color="#b74848"/>
+    </linearGradient>
+  </defs>
+  <rect width="320" height="320" rx="28" fill="url(#bg)"/>
+  <path d="M160 32 203 100l78 16-54 59 10 79-77-34-77 34 10-79-54-59 78-16 43-68Z" fill="#0d0b13" stroke="url(#blade)" stroke-width="3"/>
+  <circle cx="160" cy="132" r="50" fill="#ddb36e"/>
+  <path d="M104 144c20-55 92-55 112 0-16 16-32 23-56 23s-40-7-56-23Z" fill="#170d18"/>
+  <path d="M89 269c10-55 43-82 71-82s61 27 71 82H89Z" fill="#160d18" stroke="url(#blade)" stroke-width="3"/>
+  <path d="M113 112h94M99 81l122 122M221 81 99 203" stroke="#f0cf7c" stroke-width="2.5" stroke-linecap="round" opacity=".7"/>
+  <circle cx="160" cy="132" r="7" fill="#b74848"/>
+  <path d="M58 277h204" stroke="#f0cf7c" stroke-width="1.5" opacity=".4"/>
+</svg>
