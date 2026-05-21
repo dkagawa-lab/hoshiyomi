@@ -10,7 +10,7 @@ export default function RegisterPage() {
         <div className="eyebrow">Free Membership</div>
         <h1 style={{ fontSize: "3.4rem" }}>あなたの星を記録する</h1>
         <p>
-          会員登録すると、出生図と鑑定履歴を保存し、最初の5回まで無料で相談できます。その後も無料プランでは1日3回、同じ星の文脈で相談できます。
+          会員登録すると、出生図と鑑定履歴を保存し、最初の10回まで無料で相談できます。その後も無料プランでは1日3回、同じ星の文脈で相談できます。
         </p>
         <div className="notice-box">
           <h2>登録前のご確認</h2>

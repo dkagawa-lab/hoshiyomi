@@ -33,7 +33,7 @@ export const servicePlans: ServicePlan[] = [
     answerLength: "500〜800字程度",
     answerPolicy: "出生図と現在の星から、まず見るべき要点を整理します。",
     readerSummary: "通常鑑定のみ",
-    regulations: ["登録すると初回5回まで相談できます", "特典後は1日3回まで相談できます", "占い師タイプは通常のみ", "回答は要点中心"],
+    regulations: ["登録すると初回10回まで相談できます", "特典後は1日3回まで相談できます", "占い師タイプは通常のみ", "回答は要点中心"],
     ctaLabel: "現在のプラン",
     maxTokens: 2400
   },
@@ -71,8 +71,10 @@ export const servicePlans: ServicePlan[] = [
 ];
 
 export const defaultPlanKey: PlanKey = "free";
-export const registeredFreeBonusLimit = 5;
+export const registeredFreeBonusLimit = 10;
+const previousRegisteredFreeBonusLimit = 5;
 export const freeBonusRemainingKey = "hoshiyomi:freeBonusRemaining";
+const freeBonusLimitVersionKey = "hoshiyomi:freeBonusLimitVersion";
 export const addOnCreditsKey = "hoshiyomi:addOnCredits";
 export const addOnPack = {
   key: "addon_100" as const,
@@ -127,7 +129,7 @@ export function readFreeBonusRemaining() {
   const raw = window.localStorage.getItem(freeBonusRemainingKey) ?? window.sessionStorage.getItem(freeBonusRemainingKey);
   const value = Number(raw);
   if (!Number.isFinite(value)) return 0;
-  return Math.max(0, Math.min(registeredFreeBonusLimit, value));
+  return migrateFreeBonusRemaining(value);
 }
 
 export function ensureFreeBonusRemaining() {
@@ -135,8 +137,7 @@ export function ensureFreeBonusRemaining() {
   const hasLocal = window.localStorage.getItem(freeBonusRemainingKey) !== null;
   const hasSession = window.sessionStorage.getItem(freeBonusRemainingKey) !== null;
   if (!hasLocal && !hasSession) {
-    window.localStorage.setItem(freeBonusRemainingKey, String(registeredFreeBonusLimit));
-    window.sessionStorage.setItem(freeBonusRemainingKey, String(registeredFreeBonusLimit));
+    writeFreeBonusRemaining(registeredFreeBonusLimit);
     return registeredFreeBonusLimit;
   }
   return readFreeBonusRemaining();
@@ -147,6 +148,17 @@ export function writeFreeBonusRemaining(remaining: number) {
   const value = String(Math.max(0, Math.min(registeredFreeBonusLimit, remaining)));
   window.localStorage.setItem(freeBonusRemainingKey, value);
   window.sessionStorage.setItem(freeBonusRemainingKey, value);
+  window.localStorage.setItem(freeBonusLimitVersionKey, String(registeredFreeBonusLimit));
+  window.sessionStorage.setItem(freeBonusLimitVersionKey, String(registeredFreeBonusLimit));
+}
+
+function migrateFreeBonusRemaining(remaining: number) {
+  const clamped = Math.max(0, Math.min(registeredFreeBonusLimit, remaining));
+  const savedVersion = Number(window.localStorage.getItem(freeBonusLimitVersionKey) ?? window.sessionStorage.getItem(freeBonusLimitVersionKey) ?? previousRegisteredFreeBonusLimit);
+  if (!Number.isFinite(savedVersion) || savedVersion >= registeredFreeBonusLimit) return clamped;
+  const migrated = Math.max(0, Math.min(registeredFreeBonusLimit, clamped + registeredFreeBonusLimit - savedVersion));
+  writeFreeBonusRemaining(migrated);
+  return migrated;
 }
 
 export function shouldUseFreeBonus(planKey: PlanKey, isMember: boolean, freeBonusRemaining: number) {

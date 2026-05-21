@@ -35,6 +35,7 @@ import {
   readFreeBonusRemaining,
   readPlanFromStorage,
   readPlanUsage,
+  registeredFreeBonusLimit,
   requiredPlanForReaderStyle,
   resolvePlan,
   shouldUseFreeBonus,
@@ -1671,7 +1672,7 @@ function LimitNotice({
   const title = freePlanExhausted ? "今日の無料相談はここまでです" : `${currentPlan.label}の${planPeriodLabel(currentPlan)}分を使い切りました`;
   const description = freePlanExhausted
     ? isMember && freeBonusRemaining <= 0
-      ? "登録特典の5回分は使い切りました。無料プランでは明日になるとまた3回相談できます。今すぐ続けたい場合は、通常プランで相談回数と鑑定タイプを広げられます。"
+      ? `登録特典の${registeredFreeBonusLimit}回分は使い切りました。無料プランでは明日になるとまた3回相談できます。今すぐ続けたい場合は、通常プランで相談回数と鑑定タイプを広げられます。`
       : "無料プランは1日3回まで相談できます。明日になるとまた3回相談できます。今すぐ続けたい場合は、通常プランで相談回数と鑑定タイプを広げられます。"
     : "続けて相談する場合は、上位プランで相談回数と回答の深さを広げられます。通常プラン以上では鑑定士タイプを選べます。";
   return (
@@ -1709,7 +1710,7 @@ function PaywallModal({
 }) {
   const freeMessage =
     isMember && freeBonusRemaining <= 0
-      ? "登録特典の5回分を使い切りました。明日になれば無料プランでもまた3回相談できます。今すぐ続けたい場合は、相談回数と鑑定タイプを広げられます。"
+      ? `登録特典の${registeredFreeBonusLimit}回分を使い切りました。明日になれば無料プランでもまた3回相談できます。今すぐ続けたい場合は、相談回数と鑑定タイプを広げられます。`
       : "今日の無料相談枠を使い切りました。明日また3回相談できます。今すぐ続きを読みたい場合だけ、下のプランから選べます。";
 
   return (

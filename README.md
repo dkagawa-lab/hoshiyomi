@@ -6,7 +6,7 @@
 
 - 生年月日・出生時刻・出生地からホロスコープを計算
 - 太陽、月、水星から海王星、ASC、MC、ハウス、主要アスペクトを表示
-- 無料会員登録後は初回5回まで相談でき、その後は1日3回。通常プランは月50回、プライベートプランは月200回で相談回数と占い師タイプを切り替え
+- 無料会員登録後は初回10回まで相談でき、その後は1日3回。通常プランは月50回、プライベートプランは月200回で相談回数と占い師タイプを切り替え
 - 追加100回パックを1,500円で購入可能
 - `ANTHROPIC_API_KEY` があれば本番回答、無ければデモ回答
 - `ANTHROPIC_MODEL` または `ANTHROPIC_MODEL_FREE_TRIAL` / `ANTHROPIC_MODEL_FREE_AFTER_TRIAL` / `ANTHROPIC_MODEL_FREE` / `ANTHROPIC_MODEL_STANDARD` / `ANTHROPIC_MODEL_LUXURY` でプラン別に回答モデルを切り替え可能
