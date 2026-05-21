@@ -864,7 +864,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
               </p>
               <div className="actions compact-actions">
                 <Link className="button primary" href="/consultation">
-                  この星のあなたについて詳しく相談する
+                  この星で相談する
                 </Link>
               </div>
             </section>
@@ -1161,10 +1161,10 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
                 </p>
                 <div className="actions">
                   <Link className="button primary" href="/register?returnTo=/consultation">
-                    会員登録して履歴を保存
+                    この星を記録して履歴を残す
                   </Link>
-                  <Link className="button" href="/account">
-                    登録情報を確認する
+                  <Link className="button" href="/login?returnTo=/consultation">
+                    登録済みの方はログイン
                   </Link>
                 </div>
               </div>
@@ -1174,7 +1174,10 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
         </div>
       ) : compact ? null : consultationOnly ? (
         <div className="panel reading-card">
-          <h2>先にホロスコープを作成してください</h2>
+          <h2 className="consultation-empty-title">
+            <span>先にホロスコープを</span>
+            <span>作成してください</span>
+          </h2>
           <p>相談を始めるには、生年月日と出生地からあなたの星を読み取る必要があります。</p>
           <div className="actions">
             <Link className="button primary" href="/m">

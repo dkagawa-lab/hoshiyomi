@@ -71,9 +71,15 @@ export function ReadingFlow() {
       <section className="reading-intro">
         <div>
           <div className="eyebrow">Your Natal Chart</div>
-          <h1>あなたの星を読み取りました。</h1>
-          <p className="lead">
-            まずは{chart.input.name || "あなた"}の生年月日と出生地をもとに、生まれた瞬間の星から性質の輪郭を見ていきます。ここで終わりではなく、この星の文脈に悩みや願いを重ねるほど、鑑定はあなた自身の言葉に近づいていきます。
+          <h1 className="reading-title">
+            <span>あなたの星を</span>
+            <span>読み取りました。</span>
+          </h1>
+          <p className="lead reading-lead">
+            <span>まずは{chart.input.name || "あなた"}の生年月日と出生地をもとに、</span>
+            <span>生まれた瞬間の星から性質の輪郭を見ていきます。</span>
+            <span>ここで終わりではなく、悩みや願いを重ねるほど、</span>
+            <span>鑑定はあなた自身の言葉に近づいていきます。</span>
           </p>
         </div>
       </section>
@@ -178,20 +184,20 @@ export function ReadingFlow() {
 
             {!unlocked ? (
               <div className="member-gate">
-                <h3>この先は会員登録をすることで見ることができます。</h3>
+                <h3>この星を記録すると、続きが読めます。</h3>
                 <p>
                   続きでは、現在の星の流れ、悩みの深い原因、短期・中期・長期の変化、次に取るべき行動まで読み解きます。
                   あなたの星を記録しておくことで、次回からも同じ文脈で続けて相談できます。
                 </p>
                 <div className="member-gate-actions">
                   <Link className="button primary" href="/register?returnTo=/reading">
-                    新規登録してこの先を見る
+                    この星を記録して続きを見る
                   </Link>
                   <Link className="button" href="/consultation">
-                    会員登録はしないで、この星のあなたについて占い師に相談する
+                    登録せずに相談へ進む
                   </Link>
-                  <Link className="button subtle" href="/account">
-                    登録情報を確認する
+                  <Link className="button subtle" href="/login?returnTo=/reading">
+                    登録済みの方はログイン
                   </Link>
                 </div>
                 <Link className="text-link" href="/terms">

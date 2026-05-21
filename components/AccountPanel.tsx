@@ -240,7 +240,7 @@ export function AccountPanel() {
           ) : null}
           {!account.member && !account.birth ? (
             <Link className="button" href="/m">
-              ホロスコープを作成する
+              まず星を読む
             </Link>
           ) : null}
           <Link className="button" href="/dashboard">

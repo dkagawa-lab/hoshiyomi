@@ -38,38 +38,69 @@ export default function Home() {
         <div className="copy">
           <div className="eyebrow">Your Private Astrologer</div>
           <h1>HOSHIYOMI</h1>
-          <p className="lead">
-            よくある占いは、決まった内容を、決まった言い回しで、一方的に伝えられるだけ。けれど本当に知りたいのは、「私の場合はどうなのか」ということ。
+          <p className="lead hero-copy-line">
+            <span>よくある占いは、決まった内容を、</span>
+            <span>決まった言い回しで、一方的に伝えられるだけ。</span>
+            <span>けれど本当に知りたいのは、</span>
+            <span>「私の場合はどうなのか」ということ。</span>
           </p>
-          <p className="lead">
-            あなたの運命を深く知るには、生まれ持った星を理解し、今この瞬間の星の流れと重ね、そして本当に聞きたいことまで受け止めてくれる専任の占い師が必要です。
+          <p className="lead hero-copy-line">
+            <span>あなたの運命を深く知るには、</span>
+            <span>生まれ持った星を理解し、</span>
+            <span>今この瞬間の星の流れと重ね、</span>
+            <span>本当に聞きたいことまで受け止める</span>
+            <span>専任の占い師が必要です。</span>
           </p>
-          <p className="lead">
-            HOSHIYOMIは、あなたの出生図と現在の星の位置をもとに、恋愛、仕事、相性、将来、不安、願いまで続けて相談できるパーソナル星読みです。
+          <p className="lead hero-copy-line">
+            <span>HOSHIYOMIは、あなたの出生図と</span>
+            <span>現在の星の位置をもとに、</span>
+            <span>恋愛、仕事、相性、将来、不安、願いまで</span>
+            <span>続けて相談できるパーソナル星読みです。</span>
           </p>
+          <div className="actions hero-actions">
+            <Link className="button primary" href="/m">
+              まず無料で星を読む
+            </Link>
+            <a className="button" href="#reading-flow">
+              相談までの流れを見る
+            </a>
+            <Link className="text-link hero-login-link" href="/login">
+              登録済みの方はログイン
+            </Link>
+          </div>
           <div className="hero-reason">
             <span>なぜ、当たると感じるのか</span>
-            <p>
-              ホロスコープは「12星座だけ」で見る占いではありません。太陽、月、惑星、ハウス、天体同士の角度を重ねることで、
-              その人が何に反応し、どこで迷い、どんな時に本来の力を出しやすいかを細かく読みます。
+            <p className="hero-copy-line">
+              <span>ホロスコープは「12星座だけ」で</span>
+              <span>見る占いではありません。</span>
+              <span>太陽、月、惑星、ハウス、</span>
+              <span>天体同士の角度を重ね、</span>
+              <span>その人が何に反応し、どこで迷い、</span>
+              <span>どんな時に力を出しやすいかを読みます。</span>
             </p>
-            <p>
-              「当たる」という感覚は、まだ言葉にできていなかった自分の癖や願いが、星の配置を通してはっきり見えてくることから生まれます。
+            <p className="hero-copy-line">
+              <span>「当たる」という感覚は、</span>
+              <span>まだ言葉にできていなかった</span>
+              <span>自分の癖や願いが、</span>
+              <span>星の配置を通して見えてくることから生まれます。</span>
             </p>
           </div>
-          <div className="actions">
-            <Link className="button primary" href="/m">
-              いますぐ無料で星を読む
-            </Link>
-            <a className="button" href="#about">
-              ホロスコープとは
-            </a>
-            <Link className="button" href="/register">
-              新規登録
-            </Link>
-            <Link className="button" href="/login">
-              ログイン
-            </Link>
+          <div className="journey-strip" id="reading-flow" aria-label="HOSHIYOMIの使い方">
+            <div>
+              <span>01</span>
+              <strong>星を読む</strong>
+              <p>生年月日と出生地から、まずあなたの出生図を作ります。</p>
+            </div>
+            <div>
+              <span>02</span>
+              <strong>本質を見る</strong>
+              <p>星の配置から、あなたの性質と今見えるテーマを確認します。</p>
+            </div>
+            <div>
+              <span>03</span>
+              <strong>相談する</strong>
+              <p>恋愛、仕事、相性、将来など、知りたいことを続けて聞けます。</p>
+            </div>
           </div>
         </div>
         <section className="sky-feature hero-sky-feature" aria-label="オリオン座の星野写真">
@@ -157,20 +188,24 @@ export default function Home() {
           </div>
           <div className="method-steps">
             <div>
-              <strong>天体位置を計算</strong>
+              <strong>星を読む</strong>
               <span>太陽、月、主要惑星、ASC、MC、ハウス、アスペクトを算出します。</span>
             </div>
             <div>
-              <strong>象徴を整理</strong>
+              <strong>本質を知る</strong>
               <span>恋愛、仕事、内面、成長テーマごとに配置の意味をまとめます。</span>
             </div>
             <div>
-              <strong>続きを相談</strong>
+              <strong>必要なら記録する</strong>
+              <span>星の文脈を保存すると、次回以降も同じ流れで相談できます。</span>
+            </div>
+            <div>
+              <strong>相談する</strong>
               <span>「彼との距離感は？」「転職するなら何を見ればいい？」のような悩みに、出生図の根拠つきで答えます。</span>
             </div>
             <div className="method-cta">
               <Link className="button primary" href="/m">
-                今すぐ占う
+                まず星を読む
               </Link>
             </div>
           </div>

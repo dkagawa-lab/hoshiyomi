@@ -278,6 +278,7 @@ p {
   max-width: 600px;
   margin: 10px 0 0;
   font-size: 1.08rem;
+  overflow-wrap: anywhere;
 }
 
 .hero-reason {
@@ -301,6 +302,24 @@ p {
   color: rgba(247, 241, 223, 0.78);
   font-size: 0.95rem;
   line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+
+.hero-copy-line,
+.reading-title,
+.reading-lead,
+.consultation-empty-title {
+  display: grid;
+  gap: 2px;
+}
+
+.hero-copy-line span,
+.reading-title span,
+.reading-lead span,
+.consultation-empty-title span {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .sky-feature {
@@ -947,6 +966,51 @@ p {
   flex-wrap: wrap;
   gap: 12px;
   margin-top: 28px;
+}
+
+.hero-actions {
+  align-items: center;
+}
+
+.hero-login-link {
+  min-height: 44px;
+  align-items: center;
+  display: inline-flex;
+}
+
+.journey-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.journey-strip div {
+  display: grid;
+  gap: 7px;
+  border: 1px solid rgba(226, 190, 103, 0.18);
+  border-radius: 8px;
+  padding: 14px;
+  background: rgba(5, 8, 18, 0.34);
+}
+
+.journey-strip span {
+  color: var(--gold);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+}
+
+.journey-strip strong {
+  color: var(--text);
+  font-size: 1.02rem;
+  font-weight: 500;
+}
+
+.journey-strip p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.6;
 }
 
 .compact-actions {
@@ -2306,6 +2370,13 @@ textarea:focus {
   padding: 36px 0 10px;
 }
 
+.reading-intro h1,
+.reading-intro p,
+.consultation-cta-card h2,
+.consultation-cta-card p {
+  overflow-wrap: anywhere;
+}
+
 .reading-layout {
   display: grid;
   grid-template-columns: minmax(320px, 0.85fr) minmax(0, 1.15fr);
@@ -2523,7 +2594,7 @@ textarea:focus {
 
 .member-gate-actions {
   display: grid;
-  width: fit-content;
+  width: min(100%, 460px);
   gap: 10px;
   margin-top: 8px;
 }
@@ -3331,8 +3402,16 @@ textarea:focus {
   }
 
   .copy {
+    min-width: 0;
     min-height: auto;
     padding: 26px 0 8px;
+  }
+
+  .lead,
+  .hero-reason p,
+  .reading-intro p,
+  .consultation-cta-card p {
+    word-break: break-all;
   }
 
   .hero {
@@ -3393,6 +3472,12 @@ textarea:focus {
     padding-top: 20px;
   }
 
+  .reading-intro h1 {
+    font-size: clamp(2.5rem, 12vw, 3.05rem);
+    line-height: 1.06;
+    word-break: break-all;
+  }
+
   .reader-style-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -3433,6 +3518,15 @@ textarea:focus {
 
   .actions .button {
     width: 100%;
+  }
+
+  .hero-actions .hero-login-link {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .journey-strip {
+    grid-template-columns: 1fr;
   }
 
   .completion-actions,
