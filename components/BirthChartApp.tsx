@@ -27,7 +27,6 @@ import {
   canUseReaderStyle,
   ensureFreeBonusRemaining,
   isPlanKey,
-  planPeriodLabel,
   planQuotaLabel,
   planQuotaRemaining,
   PlanKey,
@@ -171,6 +170,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
   const quotaDisabled = usageLimitsDisabled();
   const readerStyleLocksDisabled = quotaDisabled;
   const quotaLabel = quotaDisabled ? "開発環境: 相談回数の制限なし" : planQuotaLabel(currentPlan, used, member, freeBonusRemaining, addOnCredits);
+  const visibleQuotaLabel = !quotaDisabled && remainingQuota <= 0 ? "聞きたいことを入力して、内容を確認してから相談できます。" : quotaLabel;
   const birthDateParts = parseBirthDateParts(input.date);
   const birthDayOptions = useMemo(() => buildBirthDayOptions(birthDateParts.year, birthDateParts.month), [birthDateParts.year, birthDateParts.month]);
   const canViewMemory = plan !== "free" || member;
@@ -242,12 +242,6 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
       setReaderStyle("normal");
     }
   }, [plan, readerStyleLocksDisabled, selectedReaderStyle.key]);
-
-  useEffect(() => {
-    if (!quotaDisabled && consultationOnly && chart && currentPlan.key === "free" && remainingQuota <= 0) {
-      setShowPaywallModal(true);
-    }
-  }, [chart, consultationOnly, currentPlan.key, quotaDisabled, remainingQuota]);
 
   function scrollToLatestMessage(behavior: ScrollBehavior = "smooth") {
     window.requestAnimationFrame(() => {
@@ -380,15 +374,15 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
     if (!chart || !text.trim() || loading) return;
     const trimmedQuestion = text.trim();
     const resolvedIntent = resolveQuestionIntent(trimmedQuestion, questionIntent).key;
+    if (!quotaDisabled && remainingQuota <= 0) {
+      setShowPaywallModal(true);
+      return;
+    }
     const effectiveRomanticInterest = options?.romanticInterest ?? input.romanticInterest ?? "unspecified";
     if (!options?.bypassLovePreference && loveIntentKeys.has(resolvedIntent) && !hasRomanticInterest(effectiveRomanticInterest)) {
       setPendingLoveQuestion({ questionIntent: resolvedIntent, text: trimmedQuestion });
       setQuestion(trimmedQuestion);
       window.requestAnimationFrame(() => document.querySelector(".love-preference-panel")?.scrollIntoView({ behavior: "smooth", block: "center" }));
-      return;
-    }
-    if (!quotaDisabled && remainingQuota <= 0) {
-      setShowPaywallModal(true);
       return;
     }
     const activeClientUserId = clientUserId || ensureClientUserId();
@@ -426,6 +420,14 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
       });
       const data = await res.json().catch(() => ({}));
       if (data.usage) applyServerUsage(data.usage);
+      if (res.status === 402) {
+        if (stepTimer) clearTimeout(stepTimer);
+        setMessages(currentMessages);
+        setQuestion(trimmedQuestion);
+        setSelectedQuestionIntent(resolvedIntent);
+        setShowPaywallModal(true);
+        return;
+      }
       if (!res.ok || data.error || !data.answer) {
         throw new Error(data.error || "星からの返答を受け取れませんでした。");
       }
@@ -982,7 +984,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
               ) : null}
             </div>
             <p className="small plan-limit-line">
-              {quotaLabel}
+              {visibleQuotaLabel}
             </p>
             <div className="question-guide">
               <span>相談テーマを選ぶ</span>
@@ -1043,42 +1045,38 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
                 </div>
               </div>
             ) : null}
-            {!quotaDisabled && remainingQuota <= 0 ? (
-              <LimitNotice currentPlanKey={plan} freeBonusRemaining={freeBonusRemaining} isMember={member} onOpenPlans={() => setShowPaywallModal(true)} />
-            ) : (
-              <form
-                className="chat-form"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  ask(question, selectedQuestionIntent);
-                }}
-              >
-                <div className="chat-form-heading">
-                  <span>{question ? "この質問について相談しますか？" : "自由に相談を書く"}</span>
-                  <small>{question ? "内容を確認してから開始できます" : "候補にない悩みも、そのまま送れます"}</small>
+            <form
+              className="chat-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                ask(question, selectedQuestionIntent);
+              }}
+            >
+              <div className="chat-form-heading">
+                <span>{question ? "この質問について相談しますか？" : "自由に相談を書く"}</span>
+                <small>{question ? "内容を確認してから開始できます" : "候補にない悩みも、そのまま送れます"}</small>
+              </div>
+              {question ? (
+                <div className="selected-question-card">
+                  <span>選択中の相談</span>
+                  <p>{question}</p>
+                  <button className="text-button" onClick={() => { setQuestion(""); setSelectedQuestionIntent(undefined); }} type="button">
+                    内容を変更する
+                  </button>
                 </div>
-                {question ? (
-                  <div className="selected-question-card">
-                    <span>選択中の相談</span>
-                    <p>{question}</p>
-                    <button className="text-button" onClick={() => { setQuestion(""); setSelectedQuestionIntent(undefined); }} type="button">
-                      内容を変更する
-                    </button>
-                  </div>
-                ) : null}
-                <textarea
-                  value={question}
-                  onChange={(e) => {
-                    setQuestion(e.target.value);
-                    setSelectedQuestionIntent(undefined);
-                  }}
-                  placeholder="候補にないことでも大丈夫です。例: あの人との今後は？今の仕事を続けるべき？今年動くなら何を意識すればいい？"
-                />
-                <button className="button primary" type="submit" disabled={loading}>
-                  {question ? "この内容で相談する" : "相談する"}
-                </button>
-              </form>
-            )}
+              ) : null}
+              <textarea
+                value={question}
+                onChange={(e) => {
+                  setQuestion(e.target.value);
+                  setSelectedQuestionIntent(undefined);
+                }}
+                placeholder="候補にないことでも大丈夫です。例: あの人との今後は？今の仕事を続けるべき？今年動くなら何を意識すればいい？"
+              />
+              <button className="button primary" type="submit" disabled={loading}>
+                {question ? "この内容で相談する" : "相談する"}
+              </button>
+            </form>
           </section>
           ) : null}
 
@@ -1654,41 +1652,6 @@ function parseSavedLocation(city: string) {
     return { prefecture: location.prefecture, municipality: municipality.name };
   }
   return { prefecture: "東京都", municipality: "新宿区" };
-}
-
-function LimitNotice({
-  currentPlanKey,
-  freeBonusRemaining,
-  isMember,
-  onOpenPlans
-}: {
-  currentPlanKey: PlanKey;
-  freeBonusRemaining: number;
-  isMember: boolean;
-  onOpenPlans: () => void;
-}) {
-  const currentPlan = resolvePlan(currentPlanKey);
-  const freePlanExhausted = currentPlanKey === "free";
-  const title = freePlanExhausted ? "今日の無料相談はここまでです" : `${currentPlan.label}の${planPeriodLabel(currentPlan)}分を使い切りました`;
-  const description = freePlanExhausted
-    ? isMember && freeBonusRemaining <= 0
-      ? `登録特典の${registeredFreeBonusLimit}回分は使い切りました。無料プランでは明日になるとまた3回相談できます。今すぐ続けたい場合は、通常プランで相談回数と鑑定タイプを広げられます。`
-      : "無料プランは1日3回まで相談できます。明日になるとまた3回相談できます。今すぐ続けたい場合は、通常プランで相談回数と鑑定タイプを広げられます。"
-    : "続けて相談する場合は、上位プランで相談回数と回答の深さを広げられます。通常プラン以上では鑑定士タイプを選べます。";
-  return (
-    <div className="limit-notice-card">
-      <h3>{title}</h3>
-      <p>{description}</p>
-      <div className="actions compact-actions">
-        <button className="button primary" type="button" onClick={onOpenPlans}>
-          続きを相談する方法を見る
-        </button>
-        <Link className="button" href="/pricing">
-          プラン詳細ページへ
-        </Link>
-      </div>
-    </div>
-  );
 }
 
 function PaywallModal({
