@@ -109,6 +109,7 @@ export function AccountPanel() {
     : { href: "/m", label: "ホロスコープを作成する" };
   const nextStepLinks = buildAccountNextStepLinks(account);
   const referralLink = account.referralCode && shareOrigin ? `${shareOrigin}/register?ref=${encodeURIComponent(account.referralCode)}&returnTo=/account` : "";
+  const registrationMethod = resolveRegistrationMethod(account.clientUserId);
 
   async function copyReferral() {
     if (!account.referralCode) return;
@@ -189,6 +190,10 @@ export function AccountPanel() {
           <div>
             <span>登録状態</span>
             <strong>{account.member ? "会員登録済み" : "未登録"}</strong>
+          </div>
+          <div>
+            <span>登録方法</span>
+            <strong>{registrationMethod}</strong>
           </div>
           <div>
             <span>現在のプラン</span>
@@ -345,6 +350,13 @@ function AccountRow({ label, value }: { label: string; value: string }) {
       <strong>{value}</strong>
     </div>
   );
+}
+
+function resolveRegistrationMethod(clientUserId: string) {
+  if (!clientUserId) return "未確認";
+  if (clientUserId.startsWith("line:")) return "LINE";
+  if (clientUserId.startsWith("auth:")) return "メール / Google";
+  return "端末保存";
 }
 
 function readStoredBirth() {

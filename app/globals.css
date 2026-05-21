@@ -2960,7 +2960,7 @@ textarea:focus {
 
 .account-status-strip {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -2999,7 +2999,7 @@ textarea:focus {
   font-size: 1.04rem;
 }
 
-.account-status-strip div:nth-child(3) strong {
+.account-status-strip div:nth-child(4) strong {
   color: rgba(247, 241, 223, 0.86);
   font-size: 0.96rem;
 }
