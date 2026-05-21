@@ -21,6 +21,7 @@ export function getSupabaseAuthClient() {
       auth: {
         autoRefreshToken: true,
         detectSessionInUrl: true,
+        flowType: "pkce",
         persistSession: true
       }
     });
@@ -45,6 +46,15 @@ export function registerButtonLabel(returnTo: string) {
 
 export function buildAuthRedirectUrl(returnTo: string, referralCode = "") {
   const url = new URL("/auth/callback", window.location.origin);
+  url.searchParams.set("returnTo", resolveReturnTo(returnTo));
+  const code = referralCode.trim();
+  if (code) url.searchParams.set("ref", code);
+  return url.toString();
+}
+
+export function buildPasswordRedirectUrl(returnTo: string, referralCode = "", mode: "recovery" | "signup" = "signup") {
+  const url = new URL("/auth/password", window.location.origin);
+  url.searchParams.set("mode", mode);
   url.searchParams.set("returnTo", resolveReturnTo(returnTo));
   const code = referralCode.trim();
   if (code) url.searchParams.set("ref", code);

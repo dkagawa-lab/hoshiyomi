@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
   authorizeUrl.searchParams.set("client_id", channelId);
   authorizeUrl.searchParams.set("redirect_uri", redirectUri);
   authorizeUrl.searchParams.set("state", state);
-  authorizeUrl.searchParams.set("scope", "profile openid email");
+  authorizeUrl.searchParams.set("scope", "profile openid");
   authorizeUrl.searchParams.set("nonce", nonce);
 
   const res = NextResponse.redirect(authorizeUrl);
@@ -43,4 +43,3 @@ function resolveReturnTo(value: string | null) {
   const allowed = new Set(["/account", "/reading", "/consultation", "/dashboard", "/pricing"]);
   return value && allowed.has(value) ? value : "/account";
 }
-

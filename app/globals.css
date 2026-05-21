@@ -2818,6 +2818,57 @@ textarea:focus {
   color: #dfffea;
 }
 
+.auth-password-form,
+.auth-password-set-form,
+.forgot-password-form {
+  display: grid;
+  gap: 10px;
+  border: 1px solid rgba(226, 190, 103, 0.14);
+  border-radius: 8px;
+  padding: 14px;
+  background: rgba(5, 8, 18, 0.26);
+}
+
+.auth-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.auth-section-heading strong {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.auth-section-heading a {
+  color: var(--gold);
+  font-size: 0.86rem;
+  text-decoration: none;
+}
+
+.auth-section-heading a:hover {
+  text-decoration: underline;
+}
+
+.auth-password-fields,
+.forgot-password-form > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+  gap: 10px;
+}
+
+.auth-password-page,
+.forgot-password-page {
+  max-width: 720px;
+}
+
+.auth-password-page h1,
+.forgot-password-page h1 {
+  font-size: clamp(2.4rem, 5vw, 3.6rem);
+  line-height: 1.02;
+}
+
 .auth-dev-fallback {
   display: grid;
   gap: 10px;
@@ -3287,6 +3338,8 @@ textarea:focus {
 
   .grid,
   .auth-email-form > div,
+  .auth-password-fields,
+  .forgot-password-form > div,
   .account-status-strip,
   .contact-layout,
   .contact-form-grid,

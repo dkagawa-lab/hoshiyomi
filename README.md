@@ -12,7 +12,7 @@
 - `ANTHROPIC_API_KEY` があれば本番回答、無ければデモ回答
 - `ANTHROPIC_MODEL` または `ANTHROPIC_MODEL_FREE_TRIAL` / `ANTHROPIC_MODEL_FREE_AFTER_TRIAL` / `ANTHROPIC_MODEL_FREE` / `ANTHROPIC_MODEL_STANDARD` / `ANTHROPIC_MODEL_LUXURY` でプラン別に回答モデルを切り替え可能
 - `SUPABASE_URL` と `SUPABASE_SERVICE_ROLE_KEY` があれば、相談履歴・回数・追加枠をサーバー側で保存
-- `NEXT_PUBLIC_SUPABASE_URL` と `NEXT_PUBLIC_SUPABASE_ANON_KEY` があれば、メールリンク・Googleで実際の会員登録/ログインが可能
+- `NEXT_PUBLIC_SUPABASE_URL` と `NEXT_PUBLIC_SUPABASE_ANON_KEY` があれば、メール登録、パスワード設定、パスワード再設定、Googleで実際の会員登録/ログインが可能
 - Supabase接続時は、問い合わせフォームの内容も `contact_inquiries` に保存
 - `STRIPE_SECRET_KEY` とPrice IDがあればStripe Checkoutへ遷移し、Webhookでプラン・追加100回をDBへ反映
 - LINE webhookの受け口と、LINE Loginの登録入口を用意
@@ -56,6 +56,15 @@ SUPABASE_SERVICE_ROLE_KEY=
 ```
 
 Google登録を使う場合は、SupabaseのAuthentication ProvidersでGoogleを有効化し、Google Cloud側のOAuthクライアントにSupabaseのCallback URLを登録します。登録完了後は、HOSHIYOMI側で `auth:<Supabase user id>` を既存の利用枠・鑑定履歴・紹介コードに紐づけます。
+
+Supabase AuthのRedirect URLsには、少なくとも以下を追加します。
+
+```text
+https://hoshiyomi4u.com/auth/callback
+https://hoshiyomi4u.com/auth/password
+http://localhost:3001/auth/callback
+http://localhost:3001/auth/password
+```
 
 LINE登録を使う場合は、LINE DevelopersでLINE Loginチャネルを作成し、以下を設定します。
 
