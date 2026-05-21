@@ -3,7 +3,7 @@ import type { Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Hoshiyomi",
+  title: "HOSHIYOMI",
   description: "出生図から読む、パーソナル星読み"
 };
 

@@ -9,7 +9,7 @@ export default function PrivacyPage() {
       <section className="detail-hero">
         <div className="eyebrow">Privacy Policy</div>
         <h1>プライバシーポリシー</h1>
-        <p className="lead">Hoshiyomiで扱う出生情報、相談内容、決済に関する情報の取り扱い方針です。公開前に事業者情報と連絡先を差し替えてください。</p>
+        <p className="lead">HOSHIYOMIで扱う出生情報、相談内容、決済に関する情報の取り扱い方針です。公開前に事業者情報と連絡先を差し替えてください。</p>
       </section>
 
       <section className="detail-section legal-doc">

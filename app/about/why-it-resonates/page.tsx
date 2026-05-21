@@ -35,7 +35,7 @@ export default function WhyItResonatesPage() {
         </div>
         <p>
           当たる、というよりも「自分の輪郭が、はっきりしてくる」。それが、星を読むということなのかもしれません。
-          Hoshiyomiでは、星の配置を断定ではなく、自己理解と選択のための地図として扱います。
+          HOSHIYOMIでは、星の配置を断定ではなく、自己理解と選択のための地図として扱います。
         </p>
         <div className="actions">
           <Link className="button primary" href="/m">

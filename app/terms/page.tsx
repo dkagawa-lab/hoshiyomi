@@ -10,7 +10,7 @@ export default function TermsPage() {
         <div className="eyebrow">Terms & Notes</div>
         <h1>利用規約・鑑定前のご注意</h1>
         <p className="lead">
-          Hoshiyomiは、星を通して自分を見つめるための鑑定サービスです。安心してご利用いただくために、以下をご確認ください。
+          HOSHIYOMIは、星を通して自分を見つめるための鑑定サービスです。安心してご利用いただくために、以下をご確認ください。
         </p>
       </section>
 

@@ -7,7 +7,7 @@ export default function MobileEntryPage() {
       <nav className="topbar mobile-entry-topbar">
         <Link className="brand" href="/">
           <span className="mark">☉</span>
-          <span>Hoshiyomi</span>
+          <span>HOSHIYOMI</span>
         </Link>
       </nav>
       <section className="mobile-entry-intro">

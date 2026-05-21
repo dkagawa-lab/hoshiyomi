@@ -118,10 +118,10 @@ export default function AboutPage() {
       </section>
 
       <section className="detail-section" id="app-reading">
-        <div className="eyebrow">Hoshiyomi</div>
+        <div className="eyebrow">HOSHIYOMI</div>
         <h2>このアプリでの読み方</h2>
         <p>
-          Hoshiyomiは、まず出生情報からホロスコープを計算し、天体、星座、ハウス、アスペクトを構造化します。
+          HOSHIYOMIは、まず出生情報からホロスコープを計算し、天体、星座、ハウス、アスペクトを構造化します。
           そのうえで、あなたの質問に合わせて必要な配置を取り出し、占星術的な根拠を添えて回答します。
         </p>
         <p>

@@ -37,7 +37,7 @@ export default function Home() {
       <section className="hero">
         <div className="copy">
           <div className="eyebrow">Your Private Astrologer</div>
-          <h1>Hoshiyomi</h1>
+          <h1>HOSHIYOMI</h1>
           <p className="lead">
             よくある占いは、決まった内容を、決まった言い回しで、一方的に伝えられるだけ。けれど本当に知りたいのは、「私の場合はどうなのか」ということ。
           </p>
@@ -45,7 +45,7 @@ export default function Home() {
             あなたの運命を深く知るには、生まれ持った星を理解し、今この瞬間の星の流れと重ね、そして本当に聞きたいことまで受け止めてくれる専任の占い師が必要です。
           </p>
           <p className="lead">
-            Hoshiyomiは、あなたの出生図と現在の星の位置をもとに、恋愛、仕事、相性、将来、不安、願いまで続けて相談できるパーソナル星読みです。
+            HOSHIYOMIは、あなたの出生図と現在の星の位置をもとに、恋愛、仕事、相性、将来、不安、願いまで続けて相談できるパーソナル星読みです。
           </p>
           <div className="hero-reason">
             <span>なぜ、当たると感じるのか</span>
@@ -75,7 +75,7 @@ export default function Home() {
             <div className="eyebrow">Real Sky, Personal Reading</div>
             <h2>占いの入口にあるのは、まず実際の星空です</h2>
             <p>
-              Hoshiyomiでは、作り物の幻想ではなく、出生時刻と場所から計算した天体位置を読み解きます。星の配置を地図として見つめることで、
+              HOSHIYOMIでは、作り物の幻想ではなく、出生時刻と場所から計算した天体位置を読み解きます。星の配置を地図として見つめることで、
               自分の性質や選び方を別の角度から言葉にしていきます。
             </p>
             <span>Image: Orion Constellation Star Field / NASA, ESA, STScI</span>
@@ -149,7 +149,7 @@ export default function Home() {
 
         <div className="method-panel">
           <div>
-            <div className="eyebrow">How Hoshiyomi Reads</div>
+            <div className="eyebrow">How HOSHIYOMI Reads</div>
             <h2>複雑な星の相互作用を、あなた専用の言葉に変えます</h2>
           </div>
           <div className="method-steps">

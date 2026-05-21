@@ -1,4 +1,4 @@
-# Hoshiyomi
+# HOSHIYOMI
 
 出生図をもとに無料診断と星読み相談を提供する、販売検証向けのNext.js MVPです。
 
@@ -55,7 +55,7 @@ SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
 ```
 
-Google登録を使う場合は、SupabaseのAuthentication ProvidersでGoogleを有効化し、Google Cloud側のOAuthクライアントにSupabaseのCallback URLを登録します。登録完了後は、Hoshiyomi側で `auth:<Supabase user id>` を既存の利用枠・鑑定履歴・紹介コードに紐づけます。
+Google登録を使う場合は、SupabaseのAuthentication ProvidersでGoogleを有効化し、Google Cloud側のOAuthクライアントにSupabaseのCallback URLを登録します。登録完了後は、HOSHIYOMI側で `auth:<Supabase user id>` を既存の利用枠・鑑定履歴・紹介コードに紐づけます。
 
 LINE登録を使う場合は、LINE DevelopersでLINE Loginチャネルを作成し、以下を設定します。
 
@@ -65,7 +65,7 @@ LINE_LOGIN_CHANNEL_SECRET=
 LINE_LOGIN_REDIRECT_URI=https://あなたのドメイン/api/auth/line/callback
 ```
 
-LINEはSupabaseのGoogle Providerのような標準ボタンではないため、Hoshiyomi側の `/api/auth/line/login` からLINE Loginへ遷移し、認証後に `line:<LINE user id>` として既存の会員データへ接続します。
+LINEはSupabaseのGoogle Providerのような標準ボタンではないため、HOSHIYOMI側の `/api/auth/line/login` からLINE Loginへ遷移し、認証後に `line:<LINE user id>` として既存の会員データへ接続します。
 
 ## AI回答の本番設定
 

@@ -14,7 +14,7 @@ const navItems = [
   { key: "support", label: "問い合わせ", href: "/contact" }
 ] as const;
 
-export function GlobalNav({ active, brandLabel = "Hoshiyomi", mark = "☽" }: GlobalNavProps) {
+export function GlobalNav({ active, brandLabel = "HOSHIYOMI", mark = "☽" }: GlobalNavProps) {
   return (
     <nav className="topbar global-topbar">
       <Link className="brand" href="/">
