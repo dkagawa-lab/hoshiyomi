@@ -29,6 +29,7 @@ import {
   isPlanKey,
   planQuotaLabel,
   planQuotaRemaining,
+  planStatusLabel,
   PlanKey,
   readAddOnCredits,
   readFreeBonusRemaining,
@@ -171,6 +172,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
   const readerStyleLocksDisabled = quotaDisabled;
   const quotaLabel = quotaDisabled ? "開発環境: 相談回数の制限なし" : planQuotaLabel(currentPlan, used, member, freeBonusRemaining, addOnCredits);
   const visibleQuotaLabel = !quotaDisabled && remainingQuota <= 0 ? "聞きたいことを入力して、内容を確認してから相談できます。" : quotaLabel;
+  const currentPlanLabel = planStatusLabel(currentPlan, member);
   const birthDateParts = parseBirthDateParts(input.date);
   const birthDayOptions = useMemo(() => buildBirthDayOptions(birthDateParts.year, birthDateParts.month), [birthDateParts.year, birthDateParts.month]);
   const canViewMemory = plan !== "free" || member;
@@ -328,7 +330,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
     const style = readerStyles.find((item) => item.key === nextStyle) ?? readerStyles[0];
     if (!readerStyleLocksDisabled && !canUseReaderStyle(style.key, plan)) {
       const requiredPlan = requiredPlanForReaderStyle(style.key);
-      setReaderStyleNotice(`${style.readerName}は${requiredPlan.label}で選択可能です。いまの${currentPlan.label}では${activeReaderStyle.label}の鑑定が使えます。`);
+      setReaderStyleNotice(`${style.readerName}は${requiredPlan.label}で選択可能です。いまの${currentPlanLabel}では${activeReaderStyle.label}の鑑定が使えます。`);
       setReaderStyleUpgradePlan(requiredPlan.key === "free" ? null : requiredPlan.key);
       return;
     }
@@ -539,6 +541,11 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
       const res = await fetch(`/api/me?clientUserId=${encodeURIComponent(nextClientUserId)}`);
       const data = (await res.json()) as ServerSnapshot;
       if (!res.ok || data.mode !== "server") return;
+      if (!data.user && !data.usage) {
+        setMember(false);
+        window.localStorage.removeItem("hoshiyomi:member");
+        window.sessionStorage.removeItem("hoshiyomi:member");
+      }
       if (data.usage) applyServerUsage(data.usage);
       if (data.user) applyServerProfile(data.user);
       if (Array.isArray(data.messages)) {
@@ -600,6 +607,9 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
       if (usage.isMember) {
         window.localStorage.setItem("hoshiyomi:member", "true");
         window.sessionStorage.setItem("hoshiyomi:member", "true");
+      } else {
+        window.localStorage.removeItem("hoshiyomi:member");
+        window.sessionStorage.removeItem("hoshiyomi:member");
       }
     }
   }
@@ -870,7 +880,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
             <div className="plan-entry-card">
               <div>
                 <span>Current Plan</span>
-                <strong>{currentPlan.label}</strong>
+                <strong>{currentPlanLabel}</strong>
                 <p>{quotaLabel}</p>
               </div>
               <Link className="button" href="/pricing">
@@ -1671,9 +1681,12 @@ function PaywallModal({
   onCheckout: (nextPlan: Exclude<PlanKey, "free">) => void | Promise<void>;
   onClose: () => void;
 }) {
-  const freeMessage =
-    isMember && freeBonusRemaining <= 0
-      ? `登録特典の${registeredFreeBonusLimit}回分を使い切りました。明日になれば無料プランでもまた3回相談できます。今すぐ続けたい場合は、相談回数と鑑定タイプを広げられます。`
+  const isUnregisteredFree = currentPlanKey === "free" && !isMember;
+  const modalTitle = isUnregisteredFree ? "無料会員登録で続きを相談できます" : "ここから先は、星の文脈を保存して続きます";
+  const freeMessage = isUnregisteredFree
+    ? `未登録で使える${resolvePlan("free").questionLimit}回分の相談枠を使い切りました。無料会員登録をすると、あなたの星を記録して初回${registeredFreeBonusLimit}回分の相談枠を受け取れます。`
+    : isMember && freeBonusRemaining <= 0
+      ? `今日の無料相談枠を使い切りました。明日になれば無料プランでもまた3回相談できます。今すぐ続けたい場合は、相談回数と鑑定タイプを広げられます。`
       : "今日の無料相談枠を使い切りました。明日また3回相談できます。今すぐ続きを読みたい場合だけ、下のプランから選べます。";
 
   return (
@@ -1684,10 +1697,21 @@ function PaywallModal({
         </button>
         <div className="pricing-modal-heading">
           <div className="eyebrow">Continue Reading</div>
-          <h2 id="pricing-modal-title">ここから先は、星の文脈を保存して続きます</h2>
+          <h2 id="pricing-modal-title">{modalTitle}</h2>
           <p>{freeMessage}</p>
         </div>
-        <PricingPanel addOnCredits={addOnCredits} currentPlanKey={currentPlanKey} onBuyAddOn={onBuyAddOn} onCheckout={onCheckout} />
+        {isUnregisteredFree ? (
+          <div className="actions compact-actions">
+            <Link className="button primary" href="/register?returnTo=/consultation">
+              無料会員登録して続きを相談する
+            </Link>
+            <Link className="button" href="/pricing">
+              有料プランも見る
+            </Link>
+          </div>
+        ) : (
+          <PricingPanel addOnCredits={addOnCredits} currentPlanKey={currentPlanKey} onBuyAddOn={onBuyAddOn} onCheckout={onCheckout} />
+        )}
       </div>
     </div>
   );

@@ -199,6 +199,11 @@ export function planRemainingLabel(plan: ServicePlan, used: number) {
   return `残り${remaining}回 / ${planUsageLabel(plan)}`;
 }
 
+export function planStatusLabel(plan: ServicePlan, isMember: boolean) {
+  if (plan.key === "free" && !isMember) return `未登録（${plan.questionLimit}回まで）`;
+  return plan.label;
+}
+
 export function planQuotaRemaining(plan: ServicePlan, used: number, isMember: boolean, freeBonusRemaining: number, addOnCredits = 0) {
   const baseRemaining = Math.max(0, plan.questionLimit - used);
   if (shouldUseFreeBonus(plan.key, isMember, freeBonusRemaining)) return freeBonusRemaining + addOnCredits;
@@ -207,6 +212,10 @@ export function planQuotaRemaining(plan: ServicePlan, used: number, isMember: bo
 
 export function planQuotaLabel(plan: ServicePlan, used: number, isMember: boolean, freeBonusRemaining: number, addOnCredits = 0) {
   const addOnLabel = addOnCredits > 0 ? ` / 追加残り${addOnCredits}回` : "";
+  if (plan.key === "free" && !isMember) {
+    const remaining = Math.max(0, plan.questionLimit - used);
+    return `未登録: 残り${remaining}回 / ${plan.questionLimit}回まで${addOnLabel}`;
+  }
   if (shouldUseFreeBonus(plan.key, isMember, freeBonusRemaining)) {
     return `${plan.label}: 登録特典 残り${freeBonusRemaining}回 / 初回${registeredFreeBonusLimit}回${addOnLabel}`;
   }

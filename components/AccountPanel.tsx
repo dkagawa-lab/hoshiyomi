@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { BirthInput } from "@/lib/astrology";
 import { ensureClientUserId } from "@/lib/clientIdentity";
 import { genderLabel, romanticInterestLabel } from "@/lib/profileOptions";
-import { addAddOnCredits, planQuotaLabel, PlanKey, readAddOnCredits, readFreeBonusRemaining, readPlanFromStorage, readPlanUsage, referralRewardCredits, resolvePlan, usageLimitsDisabled } from "@/lib/plans";
+import { addAddOnCredits, planQuotaLabel, planStatusLabel, PlanKey, readAddOnCredits, readFreeBonusRemaining, readPlanFromStorage, readPlanUsage, referralRewardCredits, resolvePlan, usageLimitsDisabled } from "@/lib/plans";
 
 type AccountState = {
   addOnCredits: number;
@@ -67,13 +67,27 @@ export function AccountPanel() {
       const res = await fetch(`/api/me?clientUserId=${encodeURIComponent(clientUserId)}`);
       const data = await res.json();
       if (!res.ok || data.mode !== "server") return;
+      if (!data.user && !data.usage) {
+        window.localStorage.removeItem("hoshiyomi:member");
+        window.sessionStorage.removeItem("hoshiyomi:member");
+      }
       const serverPlan = isPlanKey(data.usage?.plan) ? data.usage.plan : fallback.plan;
+      const serverMember =
+        typeof data.usage?.isMember === "boolean"
+          ? data.usage.isMember
+          : Boolean(data.user || data.usage)
+            ? fallback.member
+            : false;
+      if (!serverMember) {
+        window.localStorage.removeItem("hoshiyomi:member");
+        window.sessionStorage.removeItem("hoshiyomi:member");
+      }
       setAccount((current) => ({
         ...current,
         addOnCredits: typeof data.usage?.addOnCredits === "number" ? data.usage.addOnCredits : current.addOnCredits,
         birth: mergeServerBirth(buildBirthFromServer(data.user), current.birth),
         freeBonusRemaining: typeof data.usage?.freeBonusRemaining === "number" ? data.usage.freeBonusRemaining : current.freeBonusRemaining,
-        member: typeof data.usage?.isMember === "boolean" ? data.usage.isMember : current.member,
+        member: serverMember,
         plan: serverPlan,
         referralCode: typeof data.user?.referralCode === "string" ? data.user.referralCode : current.referralCode,
         serverSynced: Boolean(data.user || data.usage),
@@ -178,7 +192,7 @@ export function AccountPanel() {
           </div>
           <div>
             <span>現在のプラン</span>
-            <strong>{plan.label}</strong>
+            <strong>{planStatusLabel(plan, account.member)}</strong>
           </div>
           <div>
             <span>相談枠</span>
