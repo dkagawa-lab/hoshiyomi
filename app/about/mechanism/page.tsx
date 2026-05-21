@@ -51,7 +51,7 @@ export default function MechanismPage() {
           ひとつの配置だけで断定するのではなく、複数の配置を重ねて、その人らしいパターンを立体的に見ていきます。
         </p>
         <div className="actions">
-          <Link className="button primary" href="/#app">
+          <Link className="button primary" href="/m">
             出生図を作る
           </Link>
           <Link className="button" href="/#about">

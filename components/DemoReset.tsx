@@ -47,7 +47,7 @@ export function DemoReset() {
           <Link className="button primary" href="/dashboard">
             ダッシュボードへ戻る
           </Link>
-          <Link className="button" href="/#app">
+          <Link className="button" href="/m">
             入力フォームへ戻る
           </Link>
         </div>

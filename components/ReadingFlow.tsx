@@ -55,7 +55,7 @@ export function ReadingFlow() {
       <section className="panel reading-empty">
         <h1>出生情報がまだありません</h1>
         <p>まずトップページで生年月日、出生時刻、出生地を入力してホロスコープを作成してください。</p>
-        <Link className="button primary" href="/#app">
+        <Link className="button primary" href="/m">
           入力に戻る
         </Link>
       </section>

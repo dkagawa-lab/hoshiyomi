@@ -47,7 +47,7 @@ export default function HistoryPage() {
           ))}
         </div>
         <div className="actions">
-          <Link className="button primary" href="/#app">
+          <Link className="button primary" href="/m">
             出生図を作る
           </Link>
           <Link className="button" href="/#about">

@@ -58,9 +58,9 @@ export default function Home() {
             </p>
           </div>
           <div className="actions">
-            <a className="button primary" href="#app">
+            <Link className="button primary" href="/m">
               いますぐ無料で星を読む
-            </a>
+            </Link>
             <a className="button" href="#about">
               ホロスコープとは
             </a>
@@ -166,9 +166,9 @@ export default function Home() {
               <span>「彼との距離感は？」「転職するなら何を見ればいい？」のような悩みに、出生図の根拠つきで答えます。</span>
             </div>
             <div className="method-cta">
-              <a className="button primary" href="#app">
+              <Link className="button primary" href="/m">
                 今すぐ占う
-              </a>
+              </Link>
             </div>
           </div>
         </div>

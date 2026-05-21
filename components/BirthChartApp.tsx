@@ -1167,7 +1167,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
           <h2>先にホロスコープを作成してください</h2>
           <p>相談を始めるには、生年月日と出生地からあなたの星を読み取る必要があります。</p>
           <div className="actions">
-            <Link className="button primary" href="/#app">
+            <Link className="button primary" href="/m">
               出生情報を入力する
             </Link>
           </div>

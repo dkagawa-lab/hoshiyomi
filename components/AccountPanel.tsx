@@ -92,7 +92,7 @@ export function AccountPanel() {
     ? account.member
       ? { href: "/consultation", label: "この星で相談する" }
       : { href: "/register?returnTo=/account", label: "無料会員登録する" }
-    : { href: "/#app", label: "ホロスコープを作成する" };
+    : { href: "/m", label: "ホロスコープを作成する" };
   const nextStepLinks = buildAccountNextStepLinks(account);
   const referralLink = account.referralCode && shareOrigin ? `${shareOrigin}/register?ref=${encodeURIComponent(account.referralCode)}&returnTo=/account` : "";
 
@@ -251,7 +251,7 @@ export function AccountPanel() {
         ) : (
           <div className="empty-account-state">
             <p>まだ出生情報が保存されていません。先にホロスコープを作成すると、ここに登録情報として表示されます。</p>
-            <Link className="button primary" href="/#app">
+            <Link className="button primary" href="/m">
               ホロスコープを作成する
             </Link>
           </div>
@@ -290,7 +290,7 @@ function buildAccountNextStepLinks(account: AccountState) {
     });
   } else {
     links.push({
-      href: "/#app",
+      href: "/m",
       title: "まずホロスコープを作成する",
       description: "生年月日と出生地から、相談の土台になるあなたの星を読み取ります。"
     });

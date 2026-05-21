@@ -514,7 +514,7 @@ export default function GlossaryPage() {
       <section className="detail-section">
         <GlossaryGuide glossaryGroups={glossaryGroups} guideSections={enrichedHoroscopeGuideSections} />
         <div className="actions">
-          <Link className="button primary" href="/#app">
+          <Link className="button primary" href="/m">
             出生図を作る
           </Link>
           <BackButton fallback="/" />

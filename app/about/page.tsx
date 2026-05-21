@@ -129,7 +129,7 @@ export default function AboutPage() {
           「仕事で何を活かすべきか」と聞いた場合は、太陽、水星、火星、MC、10ハウスを中心に読みます。質問に応じて見る場所が変わるため、定型文の占いよりも個人の文脈に寄せた読み方ができます。
         </p>
         <div className="actions">
-          <Link className="button primary" href="/#app">
+          <Link className="button primary" href="/m">
             出生図を作る
           </Link>
           <Link className="button" href="/">

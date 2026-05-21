@@ -38,7 +38,7 @@ export default function WhyItResonatesPage() {
           Hoshiyomiでは、星の配置を断定ではなく、自己理解と選択のための地図として扱います。
         </p>
         <div className="actions">
-          <Link className="button primary" href="/#app">
+          <Link className="button primary" href="/m">
             出生図を作る
           </Link>
           <Link className="button" href="/#about">
