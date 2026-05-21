@@ -132,7 +132,7 @@ export function RegisterActions() {
           </div>
         </form>
 
-        <button className="button auth-provider-button" disabled={!supabaseConfigured || status.kind === "loading"} onClick={handleGoogleSignIn} type="button">
+        <button className="button auth-provider-button" disabled={status.kind === "loading"} onClick={handleGoogleSignIn} type="button">
           Googleで登録する
         </button>
 
