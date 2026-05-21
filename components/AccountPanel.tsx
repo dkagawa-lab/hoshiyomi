@@ -183,7 +183,7 @@ export function AccountPanel() {
         <div className="eyebrow">Account</div>
         <h1>登録情報</h1>
         <p>
-          ここから会員登録の状態、保存されている出生情報、現在のプランをいつでも確認できます。ホロスコープ作成や相談画面へ移動しても、このページには上部ナビの「登録情報」から戻れます。
+          会員登録の状態、保存されている出生情報、現在のプランを確認できます。星の確認や相談へ移動しても、上部ナビの「登録情報」からいつでも戻れます。
         </p>
         <div className="account-status-strip">
           <div>
@@ -214,39 +214,6 @@ export function AccountPanel() {
           <Link className="button" href="/pricing">
             プランを見る
           </Link>
-        </div>
-      </div>
-
-      <div className="panel account-detail-card referral-card">
-        <div className="eyebrow">Invite Gift</div>
-        <h2>紹介コード</h2>
-        <p>
-          あなたの紹介コードを使って誰かが登録すると、紹介した人と紹介された人の両方に{referralRewardCredits}回分の相談枠をプレゼントします。
-        </p>
-        <div className="referral-code-box">
-          <span>あなたのコード</span>
-          <strong>{account.referralCode || "会員登録後に発行されます"}</strong>
-          {account.referralCode ? (
-            <button className="button" onClick={copyReferral} type="button">
-              {copiedReferral ? "コピーしました" : "共有リンクをコピー"}
-            </button>
-          ) : null}
-        </div>
-        {referralLink ? <p className="small referral-link-text">{referralLink}</p> : null}
-        <div className="referral-form">
-          <label htmlFor="referral-code-input">紹介コードを入力</label>
-          <div>
-            <input
-              id="referral-code-input"
-              onChange={(event) => setReferralInput(event.target.value)}
-              placeholder="例: HSY-ABCD1234"
-              value={referralInput}
-            />
-            <button className="button primary" disabled={referralLoading} onClick={applyReferralCode} type="button">
-              {referralLoading ? "確認中" : "特典を受け取る"}
-            </button>
-          </div>
-          {referralMessage ? <p className="small referral-message">{referralMessage}</p> : null}
         </div>
       </div>
 
@@ -284,6 +251,43 @@ export function AccountPanel() {
           ))}
         </div>
         <p className="small">{account.serverSynced ? "登録した星の情報は保存されています。" : "登録前でも、この端末に残っている星の情報を確認できます。"}</p>
+      </div>
+
+      <div className="panel account-detail-card referral-card">
+        <div className="eyebrow">Invite Gift</div>
+        <h2>紹介コード</h2>
+        <div className="referral-layout">
+          <div className="referral-copy">
+            <p>
+              あなたの紹介コードを使って誰かが登録すると、紹介した人と紹介された人の両方に{referralRewardCredits}回分の相談枠をプレゼントします。
+            </p>
+            <div className="referral-code-box">
+              <span>あなたのコード</span>
+              <strong>{account.referralCode || "会員登録後に発行されます"}</strong>
+              {account.referralCode ? (
+                <button className="button" onClick={copyReferral} type="button">
+                  {copiedReferral ? "コピーしました" : "共有リンクをコピー"}
+                </button>
+              ) : null}
+            </div>
+            {referralLink ? <p className="small referral-link-text">{referralLink}</p> : null}
+          </div>
+          <div className="referral-form">
+            <label htmlFor="referral-code-input">紹介コードを入力</label>
+            <div>
+              <input
+                id="referral-code-input"
+                onChange={(event) => setReferralInput(event.target.value)}
+                placeholder="例: HSY-ABCD1234"
+                value={referralInput}
+              />
+              <button className="button primary" disabled={referralLoading} onClick={applyReferralCode} type="button">
+                {referralLoading ? "確認中" : "特典を受け取る"}
+              </button>
+            </div>
+            {referralMessage ? <p className="small referral-message">{referralMessage}</p> : null}
+          </div>
+        </div>
       </div>
     </section>
   );
