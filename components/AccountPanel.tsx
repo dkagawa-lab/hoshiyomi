@@ -105,14 +105,14 @@ export function AccountPanel() {
   const quotaText = usageLimitsDisabled()
     ? "開発環境: 相談回数の制限なし"
     : planQuotaLabel(plan, account.used, account.member, account.freeBonusRemaining, account.addOnCredits);
-  const primaryAction = account.birth
-    ? account.member
+  const primaryAction = !account.member
+    ? { href: "/login?returnTo=/account", label: "ログインする" }
+    : account.birth
       ? { href: "/consultation", label: "この星で相談する" }
-      : { href: "/register?returnTo=/account", label: "無料会員登録する" }
-    : { href: "/m", label: "ホロスコープを作成する" };
+      : { href: "/m", label: "ホロスコープを作成する" };
   const nextStepLinks = buildAccountNextStepLinks(account);
   const referralLink = account.referralCode && shareOrigin ? `${shareOrigin}/register?ref=${encodeURIComponent(account.referralCode)}&returnTo=/account` : "";
-  const registrationMethod = resolveRegistrationMethod(account.clientUserId);
+  const registrationMethod = resolveRegistrationMethod(account.member, account.clientUserId);
 
   async function copyReferral() {
     if (!account.referralCode) return;
@@ -205,8 +205,11 @@ export function AccountPanel() {
       <div className="panel account-hero-card">
         <div className="eyebrow">Account</div>
         <h1>登録情報</h1>
-        <p>
-          会員登録の状態、保存されている出生情報、現在のプランを確認できます。星の確認や相談へ移動しても、上部ナビの「登録情報」からいつでも戻れます。
+        <p className="account-hero-copy">
+          <span>会員登録の状態、保存されている出生情報、</span>
+          <span>現在のプランを確認できます。</span>
+          <span>星の確認や相談へ移動しても、</span>
+          <span>上部ナビの「登録情報」からいつでも戻れます。</span>
         </p>
         <div className="account-status-strip">
           <div>
@@ -230,9 +233,14 @@ export function AccountPanel() {
           <Link className="button primary" href={primaryAction.href}>
             {primaryAction.label}
           </Link>
-          {!account.member && primaryAction.href !== "/register?returnTo=/account" ? (
+          {!account.member ? (
             <Link className="button" href="/register?returnTo=/account">
-              無料会員登録
+              新規登録する
+            </Link>
+          ) : null}
+          {!account.member && !account.birth ? (
+            <Link className="button" href="/m">
+              ホロスコープを作成する
             </Link>
           ) : null}
           <Link className="button" href="/dashboard">
@@ -349,8 +357,13 @@ function buildAccountNextStepLinks(account: AccountState) {
   if (!account.member) {
     links.push({
       href: "/register?returnTo=/account",
-      title: "無料会員登録で星を記録する",
+      title: "新規登録して星を記録する",
       description: "出生情報と鑑定履歴を保存して、次回以降も同じ文脈で相談できます。"
+    });
+    links.push({
+      href: "/login?returnTo=/account",
+      title: "ログインして登録情報を読み込む",
+      description: "登録済みの方は、保存している星の情報や鑑定履歴を確認できます。"
     });
   }
   links.push({
@@ -380,7 +393,8 @@ function AccountRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function resolveRegistrationMethod(clientUserId: string) {
+function resolveRegistrationMethod(member: boolean, clientUserId: string) {
+  if (!member) return "未登録";
   if (!clientUserId) return "未確認";
   if (clientUserId.startsWith("line:")) return "LINE";
   if (clientUserId.startsWith("auth:")) return "メール / Google";

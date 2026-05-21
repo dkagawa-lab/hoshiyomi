@@ -6,11 +6,11 @@ export default function LineAuthCompletePage() {
   return (
     <main className="shell">
       <GlobalNav active="account" mark="✦" />
-      <section className="panel form-panel" style={{ maxWidth: 720 }}>
+      <section className="panel form-panel auth-entry-page">
         <div className="eyebrow">LINE Membership</div>
-        <h1 style={{ fontSize: "3.1rem" }}>LINE登録を完了しています</h1>
-        <p>登録が完了したら、元の画面へ自動で戻ります。</p>
-        <Suspense fallback={<p className="form-status">LINE登録を反映しています。</p>}>
+        <h1>LINE認証を完了しています</h1>
+        <p>確認が完了したら、元の画面へ自動で戻ります。</p>
+        <Suspense fallback={<p className="form-status">LINE認証を反映しています。</p>}>
           <LineAuthCompleteClient />
         </Suspense>
       </section>

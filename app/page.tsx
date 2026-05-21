@@ -65,7 +65,10 @@ export default function Home() {
               ホロスコープとは
             </a>
             <Link className="button" href="/register">
-              無料会員登録
+              新規登録
+            </Link>
+            <Link className="button" href="/login">
+              ログイン
             </Link>
           </div>
         </div>

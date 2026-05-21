@@ -23,7 +23,11 @@ type AuthStatus = {
   message: string;
 };
 
-export function RegisterActions() {
+type RegisterActionsProps = {
+  mode?: "register" | "login";
+};
+
+export function RegisterActions({ mode = "register" }: RegisterActionsProps) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [loginEmail, setLoginEmail] = useState("");
@@ -32,6 +36,8 @@ export function RegisterActions() {
   const [returnTo, setReturnTo] = useState("/account");
   const [status, setStatus] = useState<AuthStatus>({ kind: "idle", message: "" });
   const supabaseConfigured = isSupabaseAuthConfigured();
+  const isLoginMode = mode === "login";
+  const authFlow = isLoginMode ? "login" : "signup";
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -43,10 +49,12 @@ export function RegisterActions() {
     if (authError === "line_not_configured") {
       setStatus({
         kind: "error",
-        message: "LINE登録は、LINE Developersのチャネル設定後に有効になります。先にメールまたはGoogleで登録できます。"
+        message: isLoginMode
+          ? "LINEログインは、LINE Developersのチャネル設定後に有効になります。先にメールまたはGoogleでログインできます。"
+          : "LINE登録は、LINE Developersのチャネル設定後に有効になります。先にメールまたはGoogleで登録できます。"
       });
     }
-  }, []);
+  }, [isLoginMode]);
 
   useEffect(() => {
     const supabase = getSupabaseAuthClient();
@@ -59,10 +67,10 @@ export function RegisterActions() {
   }, [referralCode]);
 
   const lineHref = useMemo(() => {
-    const params = new URLSearchParams({ returnTo });
-    if (referralCode.trim()) params.set("ref", referralCode.trim());
+    const params = new URLSearchParams({ returnTo, mode: authFlow });
+    if (!isLoginMode && referralCode.trim()) params.set("ref", referralCode.trim());
     return `/api/auth/line/login?${params.toString()}`;
-  }, [referralCode, returnTo]);
+  }, [authFlow, isLoginMode, referralCode, returnTo]);
 
   async function handleEmailSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -102,7 +110,7 @@ export function RegisterActions() {
       setStatus({ kind: "error", message: "メールログインを使うには、Supabase Authの公開キー設定が必要です。" });
       return;
     }
-    setStatus({ kind: "loading", message: "登録情報を確認しています。" });
+    setStatus({ kind: "loading", message: "ログイン情報を確認しています。" });
     const { data, error } = await supabase.auth.signInWithPassword({
       email: loginEmail.trim(),
       password: loginPassword
@@ -111,26 +119,26 @@ export function RegisterActions() {
       setStatus({ kind: "error", message: "メールアドレスまたはパスワードが違います。" });
       return;
     }
-    await completeClientRegistration({ birth: readStoredBirth(), clientUserId: authClientUserId(data.user.id), referralCode });
-    router.push(buildRegistrationCompleteUrl(returnTo, "mail"));
+    await completeClientRegistration({ birth: readStoredBirth(), clientUserId: authClientUserId(data.user.id), referralCode: isLoginMode ? "" : referralCode });
+    router.push(buildRegistrationCompleteUrl(returnTo, "mail", authFlow));
   }
 
   async function handleGoogleSignIn() {
     const supabase = getSupabaseAuthClient();
     if (!supabase) {
-      setStatus({ kind: "error", message: "Google登録を使うには、Supabase Authの公開キー設定が必要です。" });
+      setStatus({ kind: "error", message: isLoginMode ? "Googleログインを使うには、Supabase Authの公開キー設定が必要です。" : "Google登録を使うには、Supabase Authの公開キー設定が必要です。" });
       return;
     }
-    rememberPendingReferralCode(referralCode);
-    setStatus({ kind: "loading", message: "Googleの登録画面へ移動します。" });
+    if (!isLoginMode) rememberPendingReferralCode(referralCode);
+    setStatus({ kind: "loading", message: isLoginMode ? "Googleログインへ移動します。" : "Googleの登録画面へ移動します。" });
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: buildAuthRedirectUrl(returnTo, referralCode)
+        redirectTo: buildAuthRedirectUrl(returnTo, isLoginMode ? "" : referralCode, authFlow)
       }
     });
     if (error) {
-      setStatus({ kind: "error", message: "Google登録を開始できませんでした。設定を確認してください。" });
+      setStatus({ kind: "error", message: isLoginMode ? "Googleログインを開始できませんでした。設定を確認してください。" : "Google登録を開始できませんでした。設定を確認してください。" });
     }
   }
 
@@ -138,67 +146,90 @@ export function RegisterActions() {
     const clientUserId = ensureClientUserId();
     setStatus({ kind: "loading", message: "開発用の登録として保存しています。" });
     await completeClientRegistration({ birth: readStoredBirth(), clientUserId, referralCode });
-    router.push(buildRegistrationCompleteUrl(returnTo, "mail"));
+    router.push(buildRegistrationCompleteUrl(returnTo, "mail", "signup"));
   }
 
   return (
-    <div className="auth-register">
+    <div className={`auth-register ${isLoginMode ? "auth-login" : ""}`}>
       <div className="auth-method-grid">
-        <form className="auth-email-form" onSubmit={handleEmailSubmit}>
-          <label htmlFor="register-email">メールアドレスで登録</label>
-          <div>
-            <input
-              autoComplete="email"
-              id="register-email"
-              inputMode="email"
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="you@example.com"
-              type="email"
-              value={email}
-            />
-            <button className="button primary" disabled={status.kind === "loading"} type="submit">
-              メールで登録する
-            </button>
-          </div>
-        </form>
-
-        <form className="auth-password-form" onSubmit={handlePasswordSignIn}>
-          <div className="auth-section-heading">
-            <strong>登録済みの方</strong>
-            <Link href="/forgot-password">パスワードを忘れた方</Link>
-          </div>
-          <div className="auth-password-fields">
-            <input
-              autoComplete="email"
-              inputMode="email"
-              onChange={(event) => setLoginEmail(event.target.value)}
-              placeholder="メールアドレス"
-              type="email"
-              value={loginEmail}
-            />
-            <input
-              autoComplete="current-password"
-              onChange={(event) => setLoginPassword(event.target.value)}
-              placeholder="パスワード"
-              type="password"
-              value={loginPassword}
-            />
-            <button className="button" disabled={status.kind === "loading"} type="submit">
-              メールでログインする
-            </button>
-          </div>
-        </form>
+        {isLoginMode ? (
+          <form className="auth-password-form" onSubmit={handlePasswordSignIn}>
+            <div className="auth-section-heading">
+              <strong>メールアドレスでログイン</strong>
+              <Link href="/forgot-password">パスワードを忘れた方</Link>
+            </div>
+            <div className="auth-password-fields">
+              <input
+                autoComplete="email"
+                inputMode="email"
+                onChange={(event) => setLoginEmail(event.target.value)}
+                placeholder="メールアドレス"
+                type="email"
+                value={loginEmail}
+              />
+              <input
+                autoComplete="current-password"
+                onChange={(event) => setLoginPassword(event.target.value)}
+                placeholder="パスワード"
+                type="password"
+                value={loginPassword}
+              />
+              <button className="button primary" disabled={status.kind === "loading"} type="submit">
+                ログインする
+              </button>
+            </div>
+          </form>
+        ) : (
+          <form className="auth-email-form" onSubmit={handleEmailSubmit}>
+            <label htmlFor="register-email">メールアドレスで新規登録</label>
+            <div>
+              <input
+                autoComplete="email"
+                id="register-email"
+                inputMode="email"
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="you@example.com"
+                type="email"
+                value={email}
+              />
+              <button className="button primary" disabled={status.kind === "loading"} type="submit">
+                登録メールを受け取る
+              </button>
+            </div>
+          </form>
+        )}
 
         <button className="button auth-provider-button" disabled={status.kind === "loading"} onClick={handleGoogleSignIn} type="button">
-          Googleで登録する
+          {isLoginMode ? "Googleでログイン" : "Googleで新規登録"}
         </button>
 
-        <a className="button auth-provider-button line" href={lineHref} onClick={() => rememberPendingReferralCode(referralCode)}>
-          LINEで登録する
+        <a className="button auth-provider-button line" href={lineHref} onClick={() => !isLoginMode && rememberPendingReferralCode(referralCode)}>
+          {isLoginMode ? "LINEでログイン" : "LINEで新規登録"}
         </a>
       </div>
 
-      {!supabaseConfigured ? (
+      <div className="auth-switch-panel">
+        {isLoginMode ? (
+          <>
+            <strong>初めて使う方</strong>
+            <span>初めての方は、新規登録から始めてください。</span>
+            <Link className="text-link" href={`/register?returnTo=${encodeURIComponent(returnTo)}`}>
+              新規登録へ進む
+            </Link>
+          </>
+        ) : (
+          <>
+            <strong>すでに登録済みの方</strong>
+            <span>登録済みのメール、Google、LINEで</span>
+            <span>ログインできます。</span>
+            <Link className="text-link" href={`/login?returnTo=${encodeURIComponent(returnTo)}`}>
+              ログインへ進む
+            </Link>
+          </>
+        )}
+      </div>
+
+      {!supabaseConfigured && !isLoginMode ? (
         <div className="auth-dev-fallback">
           <p>本番のメール・Google登録にはSupabase Authの設定が必要です。開発中だけ、下のボタンで現在の端末に保存して確認できます。</p>
           <button className="button subtle" disabled={status.kind === "loading"} onClick={registerDemoMember} type="button">

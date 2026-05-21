@@ -25,11 +25,12 @@ export async function GET(req: NextRequest) {
   const returnPayload = readReturnPayload(req.cookies.get(nextCookieName)?.value);
   const returnTo = returnPayload.returnTo;
   const ref = returnPayload.ref;
-  const errorRedirect = new URL(`/register?returnTo=${encodeURIComponent(returnTo)}&authError=line_failed`, req.url);
+  const fallbackPath = returnPayload.flow === "login" ? "/login" : "/register";
+  const errorRedirect = new URL(`${fallbackPath}?returnTo=${encodeURIComponent(returnTo)}&authError=line_failed`, req.url);
   if (ref) errorRedirect.searchParams.set("ref", ref);
 
   if (!channelId || !channelSecret) {
-    return NextResponse.redirect(new URL("/register?authError=line_not_configured", req.url));
+    return NextResponse.redirect(new URL(`${fallbackPath}?returnTo=${encodeURIComponent(returnTo)}&authError=line_not_configured`, req.url));
   }
 
   const code = url.searchParams.get("code");
@@ -58,6 +59,7 @@ export async function GET(req: NextRequest) {
 
   const completeUrl = new URL("/auth/line/complete", req.url);
   completeUrl.searchParams.set("returnTo", returnTo);
+  completeUrl.searchParams.set("flow", returnPayload.flow);
   if (ref) completeUrl.searchParams.set("ref", ref);
 
   const res = NextResponse.redirect(completeUrl);
@@ -105,11 +107,12 @@ function toLineClientUserId(sub: string) {
 }
 
 function readReturnPayload(value: string | undefined) {
-  const fallback = { ref: "", returnTo: "/account" };
+  const fallback = { flow: "signup", ref: "", returnTo: "/account" };
   if (!value) return fallback;
   try {
-    const parsed = JSON.parse(Buffer.from(value, "base64url").toString("utf8")) as { ref?: string; returnTo?: string };
+    const parsed = JSON.parse(Buffer.from(value, "base64url").toString("utf8")) as { flow?: string; ref?: string; returnTo?: string };
     return {
+      flow: parsed.flow === "login" ? "login" : "signup",
       ref: parsed.ref || "",
       returnTo: resolveReturnTo(parsed.returnTo || null)
     };
@@ -122,4 +125,3 @@ function resolveReturnTo(value: string | null) {
   const allowed = new Set(["/account", "/reading", "/consultation", "/dashboard", "/pricing"]);
   return value && allowed.has(value) ? value : "/account";
 }
-

@@ -185,7 +185,7 @@ export function ReadingFlow() {
                 </p>
                 <div className="member-gate-actions">
                   <Link className="button primary" href="/register?returnTo=/reading">
-                    無料会員登録してこの先を見る
+                    新規登録してこの先を見る
                   </Link>
                   <Link className="button" href="/consultation">
                     会員登録はしないで、この星のあなたについて占い師に相談する

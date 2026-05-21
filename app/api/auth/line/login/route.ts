@@ -15,6 +15,7 @@ export async function GET(req: NextRequest) {
   const nonce = createRandomValue();
   const nextPayload = Buffer.from(
     JSON.stringify({
+      flow: resolveAuthFlow(req.nextUrl.searchParams.get("mode")),
       ref: req.nextUrl.searchParams.get("ref") || "",
       returnTo: resolveReturnTo(req.nextUrl.searchParams.get("returnTo"))
     })
@@ -42,4 +43,8 @@ function createRandomValue() {
 function resolveReturnTo(value: string | null) {
   const allowed = new Set(["/account", "/reading", "/consultation", "/dashboard", "/pricing"]);
   return value && allowed.has(value) ? value : "/account";
+}
+
+function resolveAuthFlow(value: string | null) {
+  return value === "login" ? "login" : "signup";
 }

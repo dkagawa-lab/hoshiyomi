@@ -2833,6 +2833,35 @@ textarea:focus {
   color: var(--muted);
 }
 
+.auth-entry-page {
+  width: min(100%, 760px);
+}
+
+.auth-entry-page h1 {
+  font-size: clamp(2.6rem, 6vw, 3.8rem);
+}
+
+.auth-entry-page > p,
+.auth-entry-page .notice-box p,
+.account-hero-card p {
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+.auth-lead,
+.notice-copy,
+.account-hero-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.auth-lead span,
+.notice-copy span,
+.account-hero-copy span {
+  display: block;
+  max-width: 100%;
+}
+
 .register-sub-actions {
   display: flex;
   flex-wrap: wrap;
@@ -2848,6 +2877,10 @@ textarea:focus {
 .auth-method-grid {
   display: grid;
   gap: 12px;
+}
+
+.auth-login .auth-method-grid {
+  gap: 14px;
 }
 
 .auth-email-form {
@@ -2871,6 +2904,25 @@ textarea:focus {
   border-color: rgba(6, 199, 85, 0.42);
   background: rgba(6, 199, 85, 0.12);
   color: #dfffea;
+}
+
+.auth-switch-panel {
+  display: grid;
+  gap: 6px;
+  border: 1px solid rgba(226, 190, 103, 0.14);
+  border-radius: 8px;
+  padding: 14px;
+  background: rgba(226, 190, 103, 0.06);
+}
+
+.auth-switch-panel strong {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.auth-switch-panel span {
+  color: var(--muted);
+  line-height: 1.6;
 }
 
 .auth-password-form,
@@ -3445,6 +3497,11 @@ textarea:focus {
 
   .contact-heading h2 {
     font-size: 1.85rem;
+  }
+
+  .auth-section-heading {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .glossary-bridge .button {

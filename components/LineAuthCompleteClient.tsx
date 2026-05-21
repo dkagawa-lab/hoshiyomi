@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
+  AuthFlowMode,
   authClientCookieName,
   buildRegistrationCompleteUrl,
   completeClientRegistration,
@@ -15,7 +16,8 @@ import {
 export function LineAuthCompleteClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [message, setMessage] = useState("LINE登録を反映しています。");
+  const flow = resolveAuthFlow(searchParams.get("flow"));
+  const [message, setMessage] = useState(flow === "login" ? "LINEログインを反映しています。" : "LINE登録を反映しています。");
 
   useEffect(() => {
     let cancelled = false;
@@ -25,12 +27,13 @@ export function LineAuthCompleteClient() {
       const referralCode = searchParams.get("ref") || readPendingReferralCode();
       const clientUserId = readCookieValue(authClientCookieName);
       if (!clientUserId) {
-        setMessage("LINE登録の情報を確認できませんでした。登録画面に戻ります。");
-        setTimeout(() => router.replace(`/register?returnTo=${encodeURIComponent(returnTo)}`), 1200);
+        const fallbackPath = flow === "login" ? "/login" : "/register";
+        setMessage(flow === "login" ? "LINEログインの情報を確認できませんでした。ログイン画面に戻ります。" : "LINE登録の情報を確認できませんでした。登録画面に戻ります。");
+        setTimeout(() => router.replace(`${fallbackPath}?returnTo=${encodeURIComponent(returnTo)}`), 1200);
         return;
       }
-      await completeClientRegistration({ birth: readStoredBirth(), clientUserId, referralCode });
-      if (!cancelled) router.replace(buildRegistrationCompleteUrl(returnTo, "line"));
+      await completeClientRegistration({ birth: readStoredBirth(), clientUserId, referralCode: flow === "login" ? "" : referralCode });
+      if (!cancelled) router.replace(buildRegistrationCompleteUrl(returnTo, "line", flow));
     }
 
     finishRegistration();
@@ -38,7 +41,11 @@ export function LineAuthCompleteClient() {
     return () => {
       cancelled = true;
     };
-  }, [router, searchParams]);
+  }, [flow, router, searchParams]);
 
   return <p className="form-status">{message}</p>;
+}
+
+function resolveAuthFlow(value: string | null): AuthFlowMode {
+  return value === "login" ? "login" : "signup";
 }

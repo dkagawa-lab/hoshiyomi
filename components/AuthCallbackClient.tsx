@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
+  AuthFlowMode,
   authClientUserId,
   buildRegistrationCompleteUrl,
   completeClientRegistration,
@@ -15,7 +16,8 @@ import {
 export function AuthCallbackClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [message, setMessage] = useState("登録情報を確認しています。");
+  const flow = resolveAuthFlow(searchParams.get("flow"));
+  const [message, setMessage] = useState(flow === "login" ? "ログイン情報を確認しています。" : "登録情報を確認しています。");
 
   useEffect(() => {
     let cancelled = false;
@@ -23,10 +25,11 @@ export function AuthCallbackClient() {
     async function finishRegistration() {
       const supabase = getSupabaseAuthClient();
       const returnTo = resolveReturnTo(searchParams.get("returnTo"));
+      const fallbackPath = flow === "login" ? "/login" : "/register";
       const referralCode = searchParams.get("ref") || readPendingReferralCode();
       if (!supabase) {
-        setMessage("登録設定がまだ完了していません。登録画面に戻ります。");
-        setTimeout(() => router.replace(`/register?returnTo=${encodeURIComponent(returnTo)}`), 900);
+        setMessage(flow === "login" ? "ログイン設定がまだ完了していません。ログイン画面に戻ります。" : "登録設定がまだ完了していません。登録画面に戻ります。");
+        setTimeout(() => router.replace(`${fallbackPath}?returnTo=${encodeURIComponent(returnTo)}`), 900);
         return;
       }
 
@@ -36,18 +39,18 @@ export function AuthCallbackClient() {
       if (cancelled) return;
 
       if (sessionResult.error || !sessionResult.data.session?.user) {
-        setMessage("登録状態を確認できませんでした。もう一度登録画面からお試しください。");
-        setTimeout(() => router.replace(`/register?returnTo=${encodeURIComponent(returnTo)}`), 1400);
+        setMessage(flow === "login" ? "ログイン状態を確認できませんでした。もう一度ログイン画面からお試しください。" : "登録状態を確認できませんでした。もう一度登録画面からお試しください。");
+        setTimeout(() => router.replace(`${fallbackPath}?returnTo=${encodeURIComponent(returnTo)}`), 1400);
         return;
       }
 
-      setMessage("あなたの星と登録情報を結びつけています。");
+      setMessage(flow === "login" ? "保存されている星の情報を読み込んでいます。" : "あなたの星と登録情報を結びつけています。");
       await completeClientRegistration({
         birth: readStoredBirth(),
         clientUserId: authClientUserId(sessionResult.data.session.user.id),
-        referralCode
+        referralCode: flow === "login" ? "" : referralCode
       });
-      if (!cancelled) router.replace(buildRegistrationCompleteUrl(returnTo, "google"));
+      if (!cancelled) router.replace(buildRegistrationCompleteUrl(returnTo, "google", flow));
     }
 
     finishRegistration();
@@ -55,7 +58,11 @@ export function AuthCallbackClient() {
     return () => {
       cancelled = true;
     };
-  }, [router, searchParams]);
+  }, [flow, router, searchParams]);
 
   return <p className="form-status">{message}</p>;
+}
+
+function resolveAuthFlow(value: string | null): AuthFlowMode {
+  return value === "login" ? "login" : "signup";
 }

@@ -1682,9 +1682,9 @@ function PaywallModal({
   onClose: () => void;
 }) {
   const isUnregisteredFree = currentPlanKey === "free" && !isMember;
-  const modalTitle = isUnregisteredFree ? "無料会員登録で続きを相談できます" : "ここから先は、星の文脈を保存して続きます";
+  const modalTitle = isUnregisteredFree ? "新規登録で続きを相談できます" : "ここから先は、星の文脈を保存して続きます";
   const freeMessage = isUnregisteredFree
-    ? `未登録で使える${resolvePlan("free").questionLimit}回分の相談枠を使い切りました。無料会員登録をすると、あなたの星を記録して初回${registeredFreeBonusLimit}回分の相談枠を受け取れます。`
+    ? `未登録で使える${resolvePlan("free").questionLimit}回分の相談枠を使い切りました。新規登録をすると、あなたの星を記録して初回${registeredFreeBonusLimit}回分の相談枠を受け取れます。`
     : isMember && freeBonusRemaining <= 0
       ? `今日の無料相談枠を使い切りました。明日になれば無料プランでもまた3回相談できます。今すぐ続けたい場合は、相談回数と鑑定タイプを広げられます。`
       : "今日の無料相談枠を使い切りました。明日また3回相談できます。今すぐ続きを読みたい場合だけ、下のプランから選べます。";
@@ -1703,7 +1703,7 @@ function PaywallModal({
         {isUnregisteredFree ? (
           <div className="actions compact-actions">
             <Link className="button primary" href="/register?returnTo=/consultation">
-              無料会員登録して続きを相談する
+              新規登録して続きを相談する
             </Link>
             <Link className="button" href="/pricing">
               有料プランも見る

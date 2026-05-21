@@ -5,6 +5,7 @@ import { addAddOnCredits, ensureFreeBonusRemaining, readAddOnCredits, referralRe
 
 export const authClientCookieName = "hoshiyomi_auth_client_user_id";
 export const pendingReferralCodeKey = "hoshiyomi:pendingReferralCode";
+export type AuthFlowMode = "signup" | "login";
 
 let supabaseBrowserClient: SupabaseClient | null = null;
 
@@ -38,10 +39,11 @@ export function resolveReturnTo(value: string | null) {
   return value && allowed.has(value) ? value : "/account";
 }
 
-export function buildRegistrationCompleteUrl(returnTo: string, method = "mail") {
+export function buildRegistrationCompleteUrl(returnTo: string, method = "mail", flow: AuthFlowMode = "signup") {
   const url = new URL("/registration-complete", window.location.origin);
   url.searchParams.set("returnTo", resolveReturnTo(returnTo));
   url.searchParams.set("method", method);
+  url.searchParams.set("flow", flow);
   return `${url.pathname}${url.search}`;
 }
 
@@ -51,9 +53,10 @@ export function registerButtonLabel(returnTo: string) {
   return "同意して会員登録する";
 }
 
-export function buildAuthRedirectUrl(returnTo: string, referralCode = "") {
+export function buildAuthRedirectUrl(returnTo: string, referralCode = "", flow: AuthFlowMode = "signup") {
   const url = new URL("/auth/callback", window.location.origin);
   url.searchParams.set("returnTo", resolveReturnTo(returnTo));
+  url.searchParams.set("flow", flow);
   const code = referralCode.trim();
   if (code) url.searchParams.set("ref", code);
   return url.toString();
