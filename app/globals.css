@@ -1357,6 +1357,19 @@ textarea:focus {
   font-size: 0.88rem;
 }
 
+.pill:hover {
+  border-color: rgba(226, 190, 103, 0.42);
+  color: var(--text);
+  background: rgba(226, 190, 103, 0.08);
+}
+
+.pill.active {
+  border-color: rgba(226, 190, 103, 0.62);
+  color: var(--gold);
+  background: rgba(226, 190, 103, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(255, 238, 188, 0.08);
+}
+
 .messages {
   display: grid;
   max-height: min(68vh, 680px);
@@ -2242,6 +2255,28 @@ textarea:focus {
 .chat-form-heading small {
   color: var(--muted);
   font-size: 0.78rem;
+}
+
+.selected-question-card {
+  display: grid;
+  gap: 7px;
+  border: 1px solid rgba(226, 190, 103, 0.24);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(226, 190, 103, 0.08);
+}
+
+.selected-question-card span {
+  color: var(--gold);
+  font-size: 0.76rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.selected-question-card p {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.6;
 }
 
 .pricing-grid {

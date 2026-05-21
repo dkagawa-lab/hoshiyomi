@@ -142,6 +142,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
   const [question, setQuestion] = useState("");
+  const [selectedQuestionIntent, setSelectedQuestionIntent] = useState<QuestionIntentKey | undefined>();
   const [locationQuery, setLocationQuery] = useState("");
   const [locationChoicePending, setLocationChoicePending] = useState(false);
   const [pendingLoveQuestion, setPendingLoveQuestion] = useState<PendingLoveQuestion | null>(null);
@@ -397,6 +398,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
     const nextLoadingSequence = buildLoadingSequence(trimmedQuestion, activeReaderStyle.key);
     setMessages(nextMessages);
     setQuestion("");
+    setSelectedQuestionIntent(undefined);
     setPendingLoveQuestion(null);
     setLoading(true);
     setLoadingSequence(nextLoadingSequence);
@@ -472,6 +474,12 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
       setLoading(false);
       setStreamingAnswer("");
     }
+  }
+
+  function prepareQuestion(text: string, intent?: QuestionIntentKey) {
+    setQuestion(text);
+    setSelectedQuestionIntent(intent);
+    window.requestAnimationFrame(() => document.querySelector(".selected-question-card")?.scrollIntoView({ behavior: "smooth", block: "center" }));
   }
 
   async function revealAnswer(answer: string) {
@@ -998,7 +1006,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
             ) : null}
             <div className="pill-row">
               {starterQuestions.map((sample) => (
-                <button className="pill" key={sample.text} onClick={() => ask(sample.text, sample.intent)} type="button">
+                <button className={`pill ${question === sample.text ? "active" : ""}`} key={sample.text} onClick={() => prepareQuestion(sample.text, sample.intent)} type="button">
                   {sample.text}
                 </button>
               ))}
@@ -1010,7 +1018,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
                 </div>
               ) : null}
               {messages.map((message, index) => (
-                <MessageBubble key={index} message={message} onFollowUp={(followUp) => ask(followUp)} />
+                <MessageBubble key={index} message={message} onFollowUp={(followUp) => prepareQuestion(followUp)} />
               ))}
               {loading ? (
                 <div className="message assistant reader-answer thinking-message">
@@ -1027,7 +1035,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
                 <span>この続きを深掘りする</span>
                 <div className="pill-row">
                   {followUpQuestions.map((followUp) => (
-                    <button className="pill" key={followUp} onClick={() => ask(followUp)} type="button">
+                    <button className={`pill ${question === followUp ? "active" : ""}`} key={followUp} onClick={() => prepareQuestion(followUp)} type="button">
                       {followUp}
                     </button>
                   ))}
@@ -1041,16 +1049,32 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
                 className="chat-form"
                 onSubmit={(event) => {
                   event.preventDefault();
-                  ask();
+                  ask(question, selectedQuestionIntent);
                 }}
               >
                 <div className="chat-form-heading">
-                  <span>自由に相談を書く</span>
-                  <small>候補にない悩みも、そのまま送れます</small>
+                  <span>{question ? "この質問について相談しますか？" : "自由に相談を書く"}</span>
+                  <small>{question ? "内容を確認してから開始できます" : "候補にない悩みも、そのまま送れます"}</small>
                 </div>
-                <textarea value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="候補にないことでも大丈夫です。例: あの人との今後は？今の仕事を続けるべき？今年動くなら何を意識すればいい？" />
+                {question ? (
+                  <div className="selected-question-card">
+                    <span>選択中の相談</span>
+                    <p>{question}</p>
+                    <button className="text-button" onClick={() => { setQuestion(""); setSelectedQuestionIntent(undefined); }} type="button">
+                      内容を変更する
+                    </button>
+                  </div>
+                ) : null}
+                <textarea
+                  value={question}
+                  onChange={(e) => {
+                    setQuestion(e.target.value);
+                    setSelectedQuestionIntent(undefined);
+                  }}
+                  placeholder="候補にないことでも大丈夫です。例: あの人との今後は？今の仕事を続けるべき？今年動くなら何を意識すればいい？"
+                />
                 <button className="button primary" type="submit" disabled={loading}>
-                  相談する
+                  {question ? "この内容で相談する" : "相談する"}
                 </button>
               </form>
             )}
