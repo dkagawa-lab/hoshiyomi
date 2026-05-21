@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   authClientUserId,
+  buildRegistrationCompleteUrl,
   completeClientRegistration,
   getSupabaseAuthClient,
   readPendingReferralCode,
@@ -46,7 +47,7 @@ export function AuthCallbackClient() {
         clientUserId: authClientUserId(sessionResult.data.session.user.id),
         referralCode
       });
-      if (!cancelled) router.replace(returnTo);
+      if (!cancelled) router.replace(buildRegistrationCompleteUrl(returnTo, "google"));
     }
 
     finishRegistration();

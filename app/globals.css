@@ -2869,6 +2869,47 @@ textarea:focus {
   line-height: 1.02;
 }
 
+.completion-page {
+  max-width: 760px;
+}
+
+.registration-complete-card {
+  display: grid;
+  justify-items: start;
+  gap: 14px;
+}
+
+.completion-mark {
+  display: grid;
+  width: 56px;
+  height: 56px;
+  place-items: center;
+  border: 1px solid rgba(226, 190, 103, 0.46);
+  border-radius: 50%;
+  background: rgba(226, 190, 103, 0.12);
+  color: var(--gold);
+  font-size: 1.8rem;
+}
+
+.registration-complete-card h1 {
+  max-width: none;
+  margin: 0;
+  font-size: clamp(2.6rem, 6vw, 4.5rem);
+  line-height: 1;
+}
+
+.registration-complete-card p {
+  max-width: 620px;
+  margin: 0;
+}
+
+.completion-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+
 .auth-dev-fallback {
   display: grid;
   gap: 10px;
@@ -3274,6 +3315,11 @@ textarea:focus {
   }
 
   .actions .button {
+    width: 100%;
+  }
+
+  .completion-actions,
+  .completion-actions .button {
     width: 100%;
   }
 

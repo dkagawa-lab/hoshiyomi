@@ -38,6 +38,13 @@ export function resolveReturnTo(value: string | null) {
   return value && allowed.has(value) ? value : "/account";
 }
 
+export function buildRegistrationCompleteUrl(returnTo: string, method = "mail") {
+  const url = new URL("/registration-complete", window.location.origin);
+  url.searchParams.set("returnTo", resolveReturnTo(returnTo));
+  url.searchParams.set("method", method);
+  return `${url.pathname}${url.search}`;
+}
+
 export function registerButtonLabel(returnTo: string) {
   if (returnTo === "/reading") return "同意して続きを読む";
   if (returnTo === "/consultation") return "同意して相談へ戻る";

@@ -8,6 +8,7 @@ import {
   authClientUserId,
   buildAuthRedirectUrl,
   buildPasswordRedirectUrl,
+  buildRegistrationCompleteUrl,
   completeClientRegistration,
   getSupabaseAuthClient,
   isSupabaseAuthConfigured,
@@ -111,7 +112,7 @@ export function RegisterActions() {
       return;
     }
     await completeClientRegistration({ birth: readStoredBirth(), clientUserId: authClientUserId(data.user.id), referralCode });
-    router.push(returnTo);
+    router.push(buildRegistrationCompleteUrl(returnTo, "mail"));
   }
 
   async function handleGoogleSignIn() {
@@ -137,7 +138,7 @@ export function RegisterActions() {
     const clientUserId = ensureClientUserId();
     setStatus({ kind: "loading", message: "開発用の登録として保存しています。" });
     await completeClientRegistration({ birth: readStoredBirth(), clientUserId, referralCode });
-    router.push(returnTo);
+    router.push(buildRegistrationCompleteUrl(returnTo, "mail"));
   }
 
   return (

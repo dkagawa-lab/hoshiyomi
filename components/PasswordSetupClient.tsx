@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   authClientUserId,
+  buildRegistrationCompleteUrl,
   completeClientRegistration,
   getSupabaseAuthClient,
   readPendingReferralCode,
@@ -98,8 +99,8 @@ export function PasswordSetupClient() {
       clientUserId: authClientUserId(sessionData.session.user.id),
       referralCode
     });
-    setStatus({ kind: "success", message: "パスワードを設定しました。元の画面へ戻ります。" });
-    router.replace(returnTo);
+    setStatus({ kind: "success", message: "パスワードを設定しました。登録完了画面へ移動します。" });
+    router.replace(buildRegistrationCompleteUrl(returnTo, "mail"));
   }
 
   return (

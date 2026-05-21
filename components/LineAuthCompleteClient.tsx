@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   authClientCookieName,
+  buildRegistrationCompleteUrl,
   completeClientRegistration,
   readCookieValue,
   readPendingReferralCode,
@@ -29,7 +30,7 @@ export function LineAuthCompleteClient() {
         return;
       }
       await completeClientRegistration({ birth: readStoredBirth(), clientUserId, referralCode });
-      if (!cancelled) router.replace(returnTo);
+      if (!cancelled) router.replace(buildRegistrationCompleteUrl(returnTo, "line"));
     }
 
     finishRegistration();
