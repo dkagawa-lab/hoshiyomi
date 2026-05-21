@@ -7,19 +7,27 @@ export default function ContactPage() {
     <main className="shell detail-shell">
       <GlobalNav active="support" mark="✦" />
 
-      <section className="detail-hero">
+      <section className="detail-hero contact-hero">
         <div className="eyebrow">Contact</div>
-        <h1>お問い合わせ・ご要望</h1>
-        <p className="lead">
-          鑑定内容の違和感、不具合、欲しい相談テーマ、決済や解約についてはこちらから送れます。いただいた声は、占い師タイプや鑑定体験の改善にも使います。
+        <h1 className="contact-title">
+          <span>お問い合わせ</span>
+          <span>ご要望</span>
+        </h1>
+        <p className="lead contact-lead">
+          <span>鑑定内容の違和感、不具合、</span>
+          <span>欲しい相談テーマ、決済や解約について</span>
+          <span>ご連絡いただけます。</span>
+          <span>いただいた声は、占い師タイプや</span>
+          <span>鑑定体験の改善にも反映します。</span>
         </p>
       </section>
 
       <section className="contact-layout">
         <div className="panel contact-main">
-          <div>
+          <div className="contact-heading">
             <div className="eyebrow">Message</div>
             <h2>内容を送る</h2>
+            <p>返信が必要な場合は、確認しやすいメールアドレスを入力してください。</p>
           </div>
           <ContactForm />
         </div>
