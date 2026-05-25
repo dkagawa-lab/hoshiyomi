@@ -35,6 +35,8 @@ const initialAccountState: AccountState = {
 export function AccountPanel() {
   const [account, setAccount] = useState<AccountState>(initialAccountState);
   const [copiedReferral, setCopiedReferral] = useState(false);
+  const [billingLoading, setBillingLoading] = useState(false);
+  const [billingMessage, setBillingMessage] = useState("");
   const [logoutMessage, setLogoutMessage] = useState("");
   const [logoutLoading, setLogoutLoading] = useState(false);
   const [referralInput, setReferralInput] = useState("");
@@ -200,6 +202,25 @@ export function AccountPanel() {
     setLogoutMessage("ログアウトしました。保存済みの星の情報はこの端末に残っています。");
   }
 
+  async function openBillingPortal() {
+    setBillingLoading(true);
+    setBillingMessage("");
+    try {
+      const res = await fetch("/api/stripe/portal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientUserId: account.clientUserId || ensureClientUserId() })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.url) throw new Error(data.error || "支払い管理画面を開けませんでした。");
+      window.location.href = data.url;
+    } catch (error) {
+      setBillingMessage(error instanceof Error ? error.message : "支払い管理画面を開けませんでした。");
+    } finally {
+      setBillingLoading(false);
+    }
+  }
+
   return (
     <section className="account-page-grid">
       <div className="panel account-hero-card">
@@ -249,12 +270,18 @@ export function AccountPanel() {
           <Link className="button" href="/pricing">
             プランを見る
           </Link>
+          {account.member && account.plan !== "free" ? (
+            <button className="button" disabled={billingLoading} onClick={openBillingPortal} type="button">
+              {billingLoading ? "支払い管理を開いています" : "支払い管理"}
+            </button>
+          ) : null}
           {account.member ? (
             <button className="button subtle logout-button" disabled={logoutLoading} onClick={logout} type="button">
               {logoutLoading ? "ログアウト中" : "ログアウト"}
             </button>
           ) : null}
         </div>
+        {billingMessage ? <p className="small logout-message">{billingMessage}</p> : null}
         {logoutMessage ? <p className="small logout-message">{logoutMessage}</p> : null}
       </div>
 
@@ -470,9 +497,11 @@ function buildBirthFromServer(user: unknown): BirthInput | null {
     birthCity?: unknown;
     birthDate?: unknown;
     birthTime?: unknown;
+    gender?: unknown;
     latitude?: unknown;
     longitude?: unknown;
     name?: unknown;
+    romanticInterest?: unknown;
   };
   if (typeof value.birthDate !== "string" || typeof value.birthCity !== "string" || typeof value.latitude !== "number" || typeof value.longitude !== "number") return null;
   return {
@@ -481,7 +510,9 @@ function buildBirthFromServer(user: unknown): BirthInput | null {
     time: typeof value.birthTime === "string" ? value.birthTime : "",
     city: value.birthCity,
     latitude: value.latitude,
-    longitude: value.longitude
+    longitude: value.longitude,
+    gender: typeof value.gender === "string" ? (value.gender as BirthInput["gender"]) : undefined,
+    romanticInterest: typeof value.romanticInterest === "string" ? (value.romanticInterest as BirthInput["romanticInterest"]) : undefined
   };
 }
 
@@ -489,7 +520,7 @@ function mergeServerBirth(serverBirth: BirthInput | null, currentBirth: BirthInp
   if (!serverBirth) return currentBirth;
   return {
     ...serverBirth,
-    gender: currentBirth?.gender,
-    romanticInterest: currentBirth?.romanticInterest
+    gender: serverBirth.gender ?? currentBirth?.gender,
+    romanticInterest: serverBirth.romanticInterest ?? currentBirth?.romanticInterest
   };
 }

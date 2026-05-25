@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { addOnPack, AddOnPackKey, isPlanKey, PlanKey } from "@/lib/plans";
-import { normalizeClientUserId } from "@/lib/serverStore";
+import { getUserByClientUserId, isServerStoreConfigured, normalizeClientUserId } from "@/lib/serverStore";
 import { getStripe } from "@/lib/stripe";
 
 type CheckoutRequest = {
@@ -26,6 +26,7 @@ export async function POST(req: Request) {
     return NextResponse.json(selectedProduct ? { demo: true, product: selectedProduct, credits: addOnPack.credits } : { demo: true, plan: selectedPlan });
   }
 
+  const existingUser = clientUserId && isServerStoreConfigured() ? await getUserByClientUserId(clientUserId).catch(() => null) : null;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   const clientMetadata: Record<string, string> = clientUserId ? { client_user_id: clientUserId } : {};
   const metadata: Record<string, string> = selectedProduct
@@ -39,6 +40,7 @@ export async function POST(req: Request) {
       : `${appUrl}/consultation?checkout=success&plan=${selectedPlan}`,
     cancel_url: `${appUrl}/consultation?checkout=cancel`,
     metadata,
+    ...(existingUser?.stripe_customer_id ? { customer: existingUser.stripe_customer_id } : {}),
     ...(!selectedProduct ? { subscription_data: { metadata } } : {}),
     ...(firstMonthCoupon ? { discounts: [{ coupon: firstMonthCoupon }] } : {})
   });

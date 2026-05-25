@@ -1,9 +1,13 @@
 import { Chart } from "@/lib/astrology";
 import { PlanKey, referralRewardCredits, registeredFreeBonusLimit, resolvePlan } from "@/lib/plans";
+import type { GenderKey, RomanticInterestKey } from "@/lib/profileOptions";
 
 export type StoredUser = {
   id: string;
   client_user_id: string | null;
+  line_user_id: string | null;
+  gender: GenderKey | null;
+  romantic_interest: RomanticInterestKey | null;
   name: string | null;
   birth_date: string | null;
   birth_time: string | null;
@@ -51,12 +55,14 @@ export type PublicUserSnapshot = {
   birthCity: string | null;
   birthDate: string | null;
   birthTime: string | null;
+  gender: GenderKey | null;
   isMember: boolean;
   latitude: number | null;
   longitude: number | null;
   name: string | null;
   plan: PlanKey;
   referralCode: string | null;
+  romanticInterest: RomanticInterestKey | null;
 };
 
 export type ContactInquiryInput = {
@@ -90,6 +96,13 @@ export function normalizeClientUserId(value: unknown) {
   return trimmed;
 }
 
+export function normalizeLineUserId(value: unknown) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!/^[a-zA-Z0-9_-]{8,100}$/.test(trimmed)) return null;
+  return trimmed;
+}
+
 export async function upsertUserForChart(input: { chart: Chart; clientUserId: string; isMember: boolean }) {
   const existing = await getUserByClientUserId(input.clientUserId);
   const nextIsMember = existing?.is_member || input.isMember;
@@ -100,6 +113,8 @@ export async function upsertUserForChart(input: { chart: Chart; clientUserId: st
     birth_date: input.chart.input.date || null,
     birth_time: input.chart.input.time || null,
     birth_city: input.chart.input.city || null,
+    gender: input.chart.input.gender || null,
+    romantic_interest: input.chart.input.romanticInterest || null,
     latitude: Number.isFinite(Number(input.chart.input.latitude)) ? Number(input.chart.input.latitude) : null,
     longitude: Number.isFinite(Number(input.chart.input.longitude)) ? Number(input.chart.input.longitude) : null,
     is_member: nextIsMember,
@@ -138,6 +153,57 @@ export async function registerClientUser(clientUserId: string) {
     headers: { Prefer: "return=representation" },
     body: JSON.stringify({
       client_user_id: clientUserId,
+      is_member: true,
+      plan: "free",
+      free_bonus_remaining: registeredFreeBonusLimit,
+      add_on_credits: 0
+    })
+  });
+  return ensureReferralCodeForUser(users[0]);
+}
+
+export async function registerLineUser(input: { clientUserId?: string | null; lineUserId: string }) {
+  const lineUserId = normalizeLineUserId(input.lineUserId);
+  const clientUserId = normalizeClientUserId(input.clientUserId);
+  if (!lineUserId) throw new Error("lineUserId is required");
+
+  const existingByLine = await getUserByLineUserId(lineUserId);
+  const existingByClient = clientUserId ? await getUserByClientUserId(clientUserId) : null;
+  if (existingByLine && existingByClient && existingByLine.id !== existingByClient.id) {
+    await updateUser(existingByLine.id, { line_user_id: null });
+    const updated = await updateUser(existingByClient.id, {
+      is_member: true,
+      line_user_id: lineUserId,
+      free_bonus_remaining: existingByClient.is_member ? existingByClient.free_bonus_remaining : registeredFreeBonusLimit
+    });
+    return ensureReferralCodeForUser(updated);
+  }
+
+  if (existingByLine) {
+    const updated = await updateUser(existingByLine.id, {
+      client_user_id: existingByLine.client_user_id ?? clientUserId,
+      is_member: true,
+      line_user_id: lineUserId,
+      free_bonus_remaining: existingByLine.is_member ? existingByLine.free_bonus_remaining : registeredFreeBonusLimit
+    });
+    return ensureReferralCodeForUser(updated);
+  }
+
+  if (existingByClient) {
+    const updated = await updateUser(existingByClient.id, {
+      is_member: true,
+      line_user_id: lineUserId,
+      free_bonus_remaining: existingByClient.is_member ? existingByClient.free_bonus_remaining : registeredFreeBonusLimit
+    });
+    return ensureReferralCodeForUser(updated);
+  }
+
+  const users = await supabaseJson<StoredUser[]>("users?select=*", {
+    method: "POST",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify({
+      client_user_id: clientUserId ?? `line:${lineUserId}`,
+      line_user_id: lineUserId,
       is_member: true,
       plan: "free",
       free_bonus_remaining: registeredFreeBonusLimit,
@@ -267,6 +333,13 @@ export async function addCreditsByClientUserId(input: { clientUserId: string; cr
   return users[0];
 }
 
+export async function getUserByLineUserId(lineUserId: string) {
+  const normalized = normalizeLineUserId(lineUserId);
+  if (!normalized) return null;
+  const users = await supabaseJson<StoredUser[]>(`users?line_user_id=eq.${encodeURIComponent(normalized)}&select=*&limit=1`);
+  return users[0] ?? null;
+}
+
 export class ReferralCodeError extends Error {
   status: number;
 
@@ -351,7 +424,7 @@ export async function insertContactInquiry(input: ContactInquiryInput) {
   return inquiries[0] ?? null;
 }
 
-async function getUserByClientUserId(clientUserId: string) {
+export async function getUserByClientUserId(clientUserId: string) {
   const users = await supabaseJson<StoredUser[]>(`users?client_user_id=eq.${encodeURIComponent(clientUserId)}&select=*&limit=1`);
   return users[0] ?? null;
 }
@@ -416,12 +489,14 @@ function toPublicUserSnapshot(user: StoredUser): PublicUserSnapshot {
     birthCity: user.birth_city,
     birthDate: user.birth_date,
     birthTime: user.birth_time,
+    gender: user.gender,
     isMember: user.is_member,
     latitude: user.latitude === null ? null : Number(user.latitude),
     longitude: user.longitude === null ? null : Number(user.longitude),
     name: user.name,
     plan: resolvePlan(user.plan).key,
-    referralCode: user.referral_code ?? null
+    referralCode: user.referral_code ?? null,
+    romanticInterest: user.romantic_interest
   };
 }
 

@@ -14,8 +14,8 @@
 - `SUPABASE_URL` と `SUPABASE_SERVICE_ROLE_KEY` があれば、相談履歴・回数・追加枠をサーバー側で保存
 - `NEXT_PUBLIC_SUPABASE_URL` と `NEXT_PUBLIC_SUPABASE_ANON_KEY` があれば、メール登録、パスワード設定、パスワード再設定、Googleで実際の会員登録/ログインが可能
 - Supabase接続時は、問い合わせフォームの内容も `contact_inquiries` に保存
-- `STRIPE_SECRET_KEY` とPrice IDがあればStripe Checkoutへ遷移し、Webhookでプラン・追加100回をDBへ反映
-- LINE webhookの受け口と、LINE Loginの登録入口を用意
+- `STRIPE_SECRET_KEY` とPrice IDがあればStripe Checkoutへ遷移し、Webhookでプラン・追加100回をDBへ反映。アカウント画面からStripeの支払い管理画面も開けます
+- LINE Loginで会員情報とLINE IDを紐づけると、LINEトーク上で相談、相談回数確認、上限時のプラン案内ができます
 
 ## 起動
 
@@ -74,7 +74,33 @@ LINE_LOGIN_CHANNEL_SECRET=
 LINE_LOGIN_REDIRECT_URI=https://あなたのドメイン/api/auth/line/callback
 ```
 
-LINEはSupabaseのGoogle Providerのような標準ボタンではないため、HOSHIYOMI側の `/api/auth/line/login` からLINE Loginへ遷移し、認証後に `line:<LINE user id>` として既存の会員データへ接続します。
+LINEはSupabaseのGoogle Providerのような標準ボタンではないため、HOSHIYOMI側の `/api/auth/line/login` からLINE Loginへ遷移し、認証後にLINE user idを既存の会員データへ接続します。すでにメール/Googleで登録済みの状態でLINE登録すると、その会員データにLINE IDを紐づけます。
+
+LINEから相談できるようにするには、LINE LoginチャネルとMessaging APIチャネルを同じLINE DevelopersのProvider内に置き、以下を設定します。
+
+```bash
+LINE_CHANNEL_SECRET=
+LINE_CHANNEL_ACCESS_TOKEN=
+LINE_LOGIN_CHANNEL_ID=
+LINE_LOGIN_CHANNEL_SECRET=
+LINE_LOGIN_REDIRECT_URI=https://あなたのドメイン/api/auth/line/callback
+```
+
+LINE DevelopersのMessaging API設定では、Webhook URLを次にします。
+
+```text
+https://あなたのドメイン/api/line/webhook
+```
+
+LINEで「残り」「相談回数」「プラン」と送ると、現在の相談枠を返します。通常はそのまま質問を送れば標準鑑定で回答します。文頭に「マイルド:」「はっきり:」「寄り添い:」「辛辣:」を付けると、プランに応じて占い師タイプを切り替えます。
+
+StripeのWebhook URLは次です。
+
+```text
+https://あなたのドメイン/api/stripe/webhook
+```
+
+Stripe Customer Portalを有効化しておくと、アカウント画面の「支払い管理」からカード変更やサブスク管理へ遷移できます。
 
 ## AI回答の本番設定
 

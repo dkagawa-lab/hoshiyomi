@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authClientCookieName } from "@/lib/authRegistrationClient";
-import { isServerStoreConfigured, registerClientUser } from "@/lib/serverStore";
+import { isServerStoreConfigured, normalizeClientUserId, registerLineUser } from "@/lib/serverStore";
 
 const stateCookieName = "hoshiyomi_line_oauth_state";
 const nextCookieName = "hoshiyomi_line_oauth_next";
@@ -46,12 +46,16 @@ export async function GET(req: NextRequest) {
   if (!token?.id_token) return NextResponse.redirect(errorRedirect);
 
   const profile = await verifyLineIdToken({ channelId, idToken: token.id_token }).catch(() => null);
-  const clientUserId = profile?.sub ? toLineClientUserId(profile.sub) : null;
-  if (!clientUserId) return NextResponse.redirect(errorRedirect);
+  const lineUserId = profile?.sub || "";
+  const lineClientUserId = toLineClientUserId(lineUserId);
+  if (!lineClientUserId) return NextResponse.redirect(errorRedirect);
+
+  const existingClientUserId = normalizeClientUserId(req.cookies.get(authClientCookieName)?.value);
+  const clientUserId = existingClientUserId ?? lineClientUserId;
 
   if (isServerStoreConfigured()) {
     try {
-      await registerClientUser(clientUserId);
+      await registerLineUser({ clientUserId, lineUserId });
     } catch (error) {
       console.warn("LINE registration could not be stored yet", { message: error instanceof Error ? error.message : "Unknown error" });
     }

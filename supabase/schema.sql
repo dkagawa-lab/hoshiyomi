@@ -4,6 +4,8 @@ create table if not exists users (
   line_user_id text unique,
   email text unique,
   name text,
+  gender text,
+  romantic_interest text,
   birth_date date,
   birth_time time,
   birth_city text,
@@ -22,6 +24,9 @@ create table if not exists users (
 );
 
 alter table users add column if not exists client_user_id text;
+alter table users add column if not exists line_user_id text;
+alter table users add column if not exists gender text;
+alter table users add column if not exists romantic_interest text;
 alter table users add column if not exists is_member boolean not null default false;
 alter table users add column if not exists free_bonus_remaining integer not null default 0;
 alter table users add column if not exists add_on_credits integer not null default 0;
@@ -35,9 +40,17 @@ create unique index if not exists users_client_user_id_idx
   on users(client_user_id)
   where client_user_id is not null;
 
+create unique index if not exists users_line_user_id_idx
+  on users(line_user_id)
+  where line_user_id is not null;
+
 create index if not exists users_stripe_customer_idx
   on users(stripe_customer_id)
   where stripe_customer_id is not null;
+
+create index if not exists users_stripe_subscription_idx
+  on users(stripe_subscription_id)
+  where stripe_subscription_id is not null;
 
 create unique index if not exists users_referral_code_idx
   on users(referral_code)
