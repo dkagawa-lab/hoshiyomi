@@ -505,11 +505,13 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ plan: nextPlan, clientUserId: activeClientUserId })
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.error) throw new Error(data.error || "決済画面を開けませんでした。");
     if (data.url) {
       window.location.href = data.url;
       return;
     }
+    if (!data.demo) throw new Error("決済画面を開けませんでした。Stripeの設定を確認してください。");
     setPlan(nextPlan);
     setUsed(readPlanUsage(nextPlan));
     setReaderStyleNotice("");
@@ -527,11 +529,13 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ product: addOnPack.key, clientUserId: activeClientUserId })
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.error) throw new Error(data.error || "追加相談枠の決済画面を開けませんでした。");
     if (data.url) {
       window.location.href = data.url;
       return;
     }
+    if (!data.demo) throw new Error("追加相談枠の決済画面を開けませんでした。Stripeの設定を確認してください。");
     setAddOnCredits((current) => addAddOnCredits(current));
   }
 

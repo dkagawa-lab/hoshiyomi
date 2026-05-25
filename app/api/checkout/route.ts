@@ -23,7 +23,17 @@ export async function POST(req: Request) {
   const firstMonthCoupon = !selectedProduct && selectedPlan === "standard" ? process.env.STRIPE_STANDARD_FIRST_MONTH_COUPON_ID : undefined;
 
   if (!stripe || !price) {
-    return NextResponse.json(selectedProduct ? { demo: true, product: selectedProduct, credits: addOnPack.credits } : { demo: true, plan: selectedPlan });
+    if (process.env.NODE_ENV !== "production") {
+      return NextResponse.json(selectedProduct ? { demo: true, product: selectedProduct, credits: addOnPack.credits } : { demo: true, plan: selectedPlan });
+    }
+    return NextResponse.json(
+      {
+        error: selectedProduct
+          ? "追加相談枠の決済設定がまだ完了していません。STRIPE_ADDON_100_PRICE_IDを確認してください。"
+          : "プランの決済設定がまだ完了していません。StripeのPrice IDとSecret keyを確認してください。"
+      },
+      { status: 500 }
+    );
   }
 
   const existingUser = clientUserId && isServerStoreConfigured() ? await getUserByClientUserId(clientUserId).catch(() => null) : null;
