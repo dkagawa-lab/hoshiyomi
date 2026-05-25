@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { addOnPack, AddOnPackKey, isPlanKey, PlanKey } from "@/lib/plans";
 import { getUserByClientUserId, isServerStoreConfigured, normalizeClientUserId } from "@/lib/serverStore";
 import { getStripe } from "@/lib/stripe";
+import type Stripe from "stripe";
 
 type CheckoutRequest = {
   clientUserId?: string;
@@ -21,7 +22,7 @@ export async function POST(req: Request) {
       : selectedPlan === "luxury"
         ? process.env.STRIPE_LUXURY_PRICE_ID
         : process.env.STRIPE_STANDARD_PRICE_ID;
-    const firstMonthCoupon = !selectedProduct && selectedPlan === "standard" ? process.env.STRIPE_STANDARD_FIRST_MONTH_COUPON_ID : undefined;
+    const firstMonthDiscount = !selectedProduct && selectedPlan === "standard" ? buildStripeDiscount(process.env.STRIPE_STANDARD_FIRST_MONTH_COUPON_ID) : null;
 
     if (!stripe || !price) {
       if (process.env.NODE_ENV !== "production") {
@@ -33,6 +34,13 @@ export async function POST(req: Request) {
             ? "追加相談枠の決済設定がまだ完了していません。STRIPE_ADDON_100_PRICE_IDを確認してください。"
             : "プランの決済設定がまだ完了していません。StripeのPrice IDとSecret keyを確認してください。"
         },
+        { status: 500 }
+      );
+    }
+
+    if (!selectedProduct && selectedPlan === "standard" && !firstMonthDiscount && process.env.NODE_ENV === "production") {
+      return NextResponse.json(
+        { error: "通常プラン初回480円用のクーポン設定が未設定です。STRIPE_STANDARD_FIRST_MONTH_COUPON_ID に coupon_... または promo_... を設定してください。" },
         { status: 500 }
       );
     }
@@ -54,7 +62,7 @@ export async function POST(req: Request) {
         metadata,
         ...(existingUser?.stripe_customer_id ? { customer: existingUser.stripe_customer_id } : {}),
         ...(!selectedProduct ? { subscription_data: { metadata } } : {}),
-        ...(firstMonthCoupon ? { discounts: [{ coupon: firstMonthCoupon }] } : {})
+        ...(firstMonthDiscount ? { discounts: [firstMonthDiscount] } : {})
       },
       { timeout: 10000 }
     );
@@ -65,8 +73,29 @@ export async function POST(req: Request) {
     return NextResponse.json({ url: session.url });
   } catch (error) {
     console.warn("Stripe checkout session failed", { message: error instanceof Error ? error.message : "Unknown error" });
-    return NextResponse.json({ error: "Stripeの決済画面を開けませんでした。Price ID、クーポンID、Secret keyの組み合わせを確認してください。" }, { status: 502 });
+    return NextResponse.json({ error: buildCheckoutErrorMessage(error) }, { status: 502 });
   }
+}
+
+function buildStripeDiscount(value: string | undefined): Stripe.Checkout.SessionCreateParams.Discount | null {
+  const id = value?.trim();
+  if (!id) return null;
+  if (id.startsWith("promo_")) return { promotion_code: id };
+  return { coupon: id };
+}
+
+function buildCheckoutErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+  if (message.includes("No such coupon") || message.includes("No such promotion_code") || message.includes("No such promotion code")) {
+    return "通常プラン初回480円用のクーポンIDがStripeで見つかりません。テスト/本番のモード違い、または coupon_... / promo_... の貼り間違いを確認してください。";
+  }
+  if (message.includes("No such price")) {
+    return "StripeのPrice IDが見つかりません。Vercelに入れた price_... が本番モードの価格IDか確認してください。";
+  }
+  if (message.includes("Invalid API Key") || message.includes("api_key")) {
+    return "Stripe Secret keyが正しくありません。VercelのSTRIPE_SECRET_KEYが本番モードの sk_live_... になっているか確認してください。";
+  }
+  return "Stripeの決済画面を開けませんでした。Price ID、クーポンID、Secret keyの組み合わせを確認してください。";
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T) {
