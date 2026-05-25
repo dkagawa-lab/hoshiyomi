@@ -16,6 +16,7 @@ export async function GET(req: NextRequest) {
   const nextPayload = Buffer.from(
     JSON.stringify({
       flow: resolveAuthFlow(req.nextUrl.searchParams.get("mode")),
+      clientUserId: resolveClientUserId(req.nextUrl.searchParams.get("clientUserId")),
       ref: req.nextUrl.searchParams.get("ref") || "",
       returnTo: resolveReturnTo(req.nextUrl.searchParams.get("returnTo"))
     })
@@ -47,4 +48,10 @@ function resolveReturnTo(value: string | null) {
 
 function resolveAuthFlow(value: string | null) {
   return value === "login" ? "login" : "signup";
+}
+
+function resolveClientUserId(value: string | null) {
+  if (!value) return "";
+  const trimmed = value.trim();
+  return /^[a-zA-Z0-9:_-]{12,100}$/.test(trimmed) ? trimmed : "";
 }

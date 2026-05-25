@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { BirthInput, calculateChart } from "@/lib/astrology";
-import { getUsageSnapshot, isServerStoreConfigured, normalizeClientUserId, registerClientUser, upsertUserForChart } from "@/lib/serverStore";
+import { getUsageSnapshot, isServerStoreConfigured, mergeClientUserRecords, normalizeClientUserId, normalizeLineUserId, registerClientUser, registerLineUser, upsertUserForChart } from "@/lib/serverStore";
 
 type RegisterRequest = {
   birth?: BirthInput;
   clientUserId?: string;
+  lineClientUserId?: string;
+  previousClientUserId?: string;
 };
 
 export async function POST(req: Request) {
@@ -18,9 +20,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, mode: "local" });
   }
 
+  await mergeClientUserRecords({ sourceClientUserId: body.previousClientUserId, targetClientUserId: clientUserId });
   const user = body.birth
     ? await upsertUserForChart({ chart: calculateChart(body.birth), clientUserId, isMember: true })
     : await registerClientUser(clientUserId);
+  const lineUserId = lineUserIdFromClientUserId(body.lineClientUserId);
+  const linkedUser = lineUserId ? await registerLineUser({ clientUserId, lineUserId }) : user;
 
-  return NextResponse.json({ ok: true, usage: await getUsageSnapshot(user) });
+  return NextResponse.json({ ok: true, usage: await getUsageSnapshot(linkedUser) });
+}
+
+function lineUserIdFromClientUserId(value: unknown) {
+  if (typeof value !== "string" || !value.startsWith("line:")) return null;
+  return normalizeLineUserId(value.slice("line:".length));
 }

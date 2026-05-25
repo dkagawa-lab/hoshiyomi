@@ -50,12 +50,13 @@ export async function GET(req: NextRequest) {
   const lineClientUserId = toLineClientUserId(lineUserId);
   if (!lineClientUserId) return NextResponse.redirect(errorRedirect);
 
-  const existingClientUserId = normalizeClientUserId(req.cookies.get(authClientCookieName)?.value);
-  const clientUserId = existingClientUserId ?? lineClientUserId;
+  const requestedClientUserId = normalizeClientUserId(returnPayload.clientUserId);
+  let clientUserId = requestedClientUserId ?? lineClientUserId;
 
   if (isServerStoreConfigured()) {
     try {
-      await registerLineUser({ clientUserId, lineUserId });
+      const user = await registerLineUser({ clientUserId, lineUserId });
+      clientUserId = normalizeClientUserId(user?.client_user_id) ?? clientUserId;
     } catch (error) {
       console.warn("LINE registration could not be stored yet", { message: error instanceof Error ? error.message : "Unknown error" });
     }
@@ -111,11 +112,12 @@ function toLineClientUserId(sub: string) {
 }
 
 function readReturnPayload(value: string | undefined) {
-  const fallback = { flow: "signup", ref: "", returnTo: "/account" };
+  const fallback = { clientUserId: "", flow: "signup", ref: "", returnTo: "/account" };
   if (!value) return fallback;
   try {
-    const parsed = JSON.parse(Buffer.from(value, "base64url").toString("utf8")) as { flow?: string; ref?: string; returnTo?: string };
+    const parsed = JSON.parse(Buffer.from(value, "base64url").toString("utf8")) as { clientUserId?: string; flow?: string; ref?: string; returnTo?: string };
     return {
+      clientUserId: normalizeClientUserId(parsed.clientUserId) || "",
       flow: parsed.flow === "login" ? "login" : "signup",
       ref: parsed.ref || "",
       returnTo: resolveReturnTo(parsed.returnTo || null)

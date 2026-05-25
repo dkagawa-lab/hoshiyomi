@@ -1,5 +1,5 @@
 import { Chart } from "@/lib/astrology";
-import { PlanKey, referralRewardCredits, registeredFreeBonusLimit, resolvePlan } from "@/lib/plans";
+import { PlanKey, planRank, referralRewardCredits, registeredFreeBonusLimit, resolvePlan } from "@/lib/plans";
 import type { GenderKey, RomanticInterestKey } from "@/lib/profileOptions";
 
 export type StoredUser = {
@@ -170,18 +170,21 @@ export async function registerLineUser(input: { clientUserId?: string | null; li
   const existingByLine = await getUserByLineUserId(lineUserId);
   const existingByClient = clientUserId ? await getUserByClientUserId(clientUserId) : null;
   if (existingByLine && existingByClient && existingByLine.id !== existingByClient.id) {
+    const targetClientUserId = existingByClient.client_user_id || clientUserId;
+    if (!targetClientUserId) throw new Error("clientUserId is required");
     await updateUser(existingByLine.id, { line_user_id: null });
-    const updated = await updateUser(existingByClient.id, {
+    const merged = await mergeClientUserRecords({ sourceClientUserId: existingByLine.client_user_id, targetClientUserId });
+    const updated = await updateUser((merged ?? existingByClient).id, {
       is_member: true,
       line_user_id: lineUserId,
-      free_bonus_remaining: existingByClient.is_member ? existingByClient.free_bonus_remaining : registeredFreeBonusLimit
+      free_bonus_remaining: (merged ?? existingByClient).is_member ? (merged ?? existingByClient).free_bonus_remaining : registeredFreeBonusLimit
     });
     return ensureReferralCodeForUser(updated);
   }
 
   if (existingByLine) {
     const updated = await updateUser(existingByLine.id, {
-      client_user_id: existingByLine.client_user_id ?? clientUserId,
+      client_user_id: clientUserId ?? existingByLine.client_user_id,
       is_member: true,
       line_user_id: lineUserId,
       free_bonus_remaining: existingByLine.is_member ? existingByLine.free_bonus_remaining : registeredFreeBonusLimit
@@ -211,6 +214,28 @@ export async function registerLineUser(input: { clientUserId?: string | null; li
     })
   });
   return ensureReferralCodeForUser(users[0]);
+}
+
+export async function mergeClientUserRecords(input: { sourceClientUserId?: string | null; targetClientUserId: string }) {
+  const sourceClientUserId = normalizeClientUserId(input.sourceClientUserId);
+  const targetClientUserId = normalizeClientUserId(input.targetClientUserId);
+  if (!targetClientUserId) throw new Error("targetClientUserId is required");
+  if (!sourceClientUserId || sourceClientUserId === targetClientUserId) return getUserByClientUserId(targetClientUserId);
+
+  const source = await getUserByClientUserId(sourceClientUserId);
+  if (!source) return getUserByClientUserId(targetClientUserId);
+
+  const target = await getUserByClientUserId(targetClientUserId);
+  if (!target) {
+    return updateUser(source.id, { client_user_id: targetClientUserId });
+  }
+
+  if (source.id === target.id) return target;
+
+  await moveChatMessages(source.id, target.id);
+  const merged = await updateUser(target.id, buildMergedUserPayload(source, target, targetClientUserId));
+  await updateUser(source.id, { client_user_id: null, line_user_id: null });
+  return ensureReferralCodeForUser(merged);
 }
 
 export async function getUserSnapshotByClientUserId(clientUserId: string) {
@@ -507,6 +532,40 @@ async function updateUser(userId: string, payload: Record<string, unknown>) {
     body: JSON.stringify({ ...payload, updated_at: new Date().toISOString() })
   });
   return users[0];
+}
+
+async function moveChatMessages(sourceUserId: string, targetUserId: string) {
+  await supabaseJson(`chat_messages?user_id=eq.${encodeURIComponent(sourceUserId)}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({ user_id: targetUserId })
+  });
+}
+
+function buildMergedUserPayload(source: StoredUser, target: StoredUser, targetClientUserId: string) {
+  const sourcePlan = resolvePlan(source.plan).key;
+  const targetPlan = resolvePlan(target.plan).key;
+  const plan = planRank(sourcePlan) > planRank(targetPlan) ? sourcePlan : targetPlan;
+  return {
+    client_user_id: targetClientUserId,
+    line_user_id: target.line_user_id ?? source.line_user_id,
+    name: target.name ?? source.name,
+    birth_date: target.birth_date ?? source.birth_date,
+    birth_time: target.birth_time ?? source.birth_time,
+    birth_city: target.birth_city ?? source.birth_city,
+    gender: target.gender ?? source.gender,
+    romantic_interest: target.romantic_interest ?? source.romantic_interest,
+    latitude: target.latitude ?? source.latitude,
+    longitude: target.longitude ?? source.longitude,
+    plan,
+    is_member: target.is_member || source.is_member,
+    free_bonus_remaining: Math.max(Number(target.free_bonus_remaining || 0), Number(source.free_bonus_remaining || 0)),
+    add_on_credits: Math.max(0, Number(target.add_on_credits || 0)) + Math.max(0, Number(source.add_on_credits || 0)),
+    referral_code: target.referral_code ?? source.referral_code,
+    referred_by_user_id: target.referred_by_user_id ?? source.referred_by_user_id,
+    stripe_customer_id: target.stripe_customer_id ?? source.stripe_customer_id,
+    stripe_subscription_id: target.stripe_subscription_id ?? source.stripe_subscription_id
+  };
 }
 
 async function countUserMessages(userId: string, plan: PlanKey) {

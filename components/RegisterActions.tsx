@@ -32,6 +32,7 @@ export function RegisterActions({ mode = "register" }: RegisterActionsProps) {
   const [email, setEmail] = useState("");
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
+  const [currentClientUserId, setCurrentClientUserId] = useState("");
   const [referralCode, setReferralCode] = useState("");
   const [returnTo, setReturnTo] = useState("/account");
   const [status, setStatus] = useState<AuthStatus>({ kind: "idle", message: "" });
@@ -54,6 +55,7 @@ export function RegisterActions({ mode = "register" }: RegisterActionsProps) {
           : "LINE登録は、LINE Developersのチャネル設定後に有効になります。先にメールまたはGoogleで登録できます。"
       });
     }
+    setCurrentClientUserId(ensureClientUserId());
   }, [isLoginMode]);
 
   useEffect(() => {
@@ -62,15 +64,17 @@ export function RegisterActions({ mode = "register" }: RegisterActionsProps) {
     supabase.auth.getSession().then(async ({ data }) => {
       if (!data.session?.user) return;
       const clientUserId = authClientUserId(data.session.user.id);
+      setCurrentClientUserId(clientUserId);
       await completeClientRegistration({ birth: readStoredBirth(), clientUserId, referralCode });
     });
   }, [referralCode]);
 
   const lineHref = useMemo(() => {
     const params = new URLSearchParams({ returnTo, mode: authFlow });
+    if (currentClientUserId) params.set("clientUserId", currentClientUserId);
     if (!isLoginMode && referralCode.trim()) params.set("ref", referralCode.trim());
     return `/api/auth/line/login?${params.toString()}`;
-  }, [authFlow, isLoginMode, referralCode, returnTo]);
+  }, [authFlow, currentClientUserId, isLoginMode, referralCode, returnTo]);
 
   async function handleEmailSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

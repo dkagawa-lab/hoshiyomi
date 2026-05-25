@@ -113,7 +113,8 @@ export function readCookieValue(name: string) {
   return value ? decodeURIComponent(value) : "";
 }
 
-export async function completeClientRegistration(input: { birth?: BirthInput | null; clientUserId: string; referralCode?: string }) {
+export async function completeClientRegistration(input: { birth?: BirthInput | null; clientUserId: string; lineClientUserId?: string; referralCode?: string }) {
+  const previousClientUserId = readStoredClientUserId();
   writeClientUserId(input.clientUserId);
   window.localStorage.setItem("hoshiyomi:member", "true");
   window.sessionStorage.setItem("hoshiyomi:member", "true");
@@ -122,12 +123,31 @@ export async function completeClientRegistration(input: { birth?: BirthInput | n
   await fetch("/api/register", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ birth: input.birth ?? readStoredBirth(), clientUserId: input.clientUserId })
+    body: JSON.stringify({
+      birth: input.birth ?? readStoredBirth(),
+      clientUserId: input.clientUserId,
+      lineClientUserId: input.lineClientUserId || resolveLineClientUserId(input.clientUserId, previousClientUserId),
+      previousClientUserId: previousClientUserId && previousClientUserId !== input.clientUserId ? previousClientUserId : undefined
+    })
   }).catch(() => undefined);
 
   const code = (input.referralCode || readPendingReferralCode()).trim();
   if (code) await applyReferralCode(input.clientUserId, code);
   clearPendingReferralCode();
+}
+
+function readStoredClientUserId() {
+  try {
+    return window.localStorage.getItem("hoshiyomi:clientUserId") || window.sessionStorage.getItem("hoshiyomi:clientUserId") || "";
+  } catch {
+    return "";
+  }
+}
+
+function resolveLineClientUserId(clientUserId: string, previousClientUserId: string) {
+  if (clientUserId.startsWith("line:")) return clientUserId;
+  if (previousClientUserId.startsWith("line:")) return previousClientUserId;
+  return undefined;
 }
 
 export async function applyReferralCode(clientUserId: string, code: string) {
