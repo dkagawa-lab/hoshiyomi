@@ -22,8 +22,6 @@ export async function POST(req: Request) {
       : selectedPlan === "luxury"
         ? process.env.STRIPE_LUXURY_PRICE_ID
         : process.env.STRIPE_STANDARD_PRICE_ID;
-    const firstMonthDiscount = !selectedProduct && selectedPlan === "standard" ? buildStripeDiscount(process.env.STRIPE_STANDARD_FIRST_MONTH_COUPON_ID) : null;
-
     if (!stripe || !price) {
       if (process.env.NODE_ENV !== "production") {
         return NextResponse.json(selectedProduct ? { demo: true, product: selectedProduct, credits: addOnPack.credits } : { demo: true, plan: selectedPlan });
@@ -38,6 +36,7 @@ export async function POST(req: Request) {
       );
     }
 
+    const firstMonthDiscount = !selectedProduct && selectedPlan === "standard" ? await resolveStripeDiscount(stripe, process.env.STRIPE_STANDARD_FIRST_MONTH_COUPON_ID) : null;
     if (!selectedProduct && selectedPlan === "standard" && !firstMonthDiscount && process.env.NODE_ENV === "production") {
       return NextResponse.json(
         { error: "通常プラン初回480円用のクーポン設定が未設定です。STRIPE_STANDARD_FIRST_MONTH_COUPON_ID に coupon_... または promo_... を設定してください。" },
@@ -77,10 +76,15 @@ export async function POST(req: Request) {
   }
 }
 
-function buildStripeDiscount(value: string | undefined): Stripe.Checkout.SessionCreateParams.Discount | null {
+async function resolveStripeDiscount(stripe: Stripe, value: string | undefined): Promise<Stripe.Checkout.SessionCreateParams.Discount | null> {
   const id = value?.trim();
   if (!id) return null;
   if (id.startsWith("promo_")) return { promotion_code: id };
+  if (!id.startsWith("coupon_")) {
+    const promotionCodes = await stripe.promotionCodes.list({ active: true, code: id, limit: 1 });
+    const promotionCodeId = promotionCodes.data[0]?.id;
+    if (promotionCodeId) return { promotion_code: promotionCodeId };
+  }
   return { coupon: id };
 }
 
