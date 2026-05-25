@@ -500,12 +500,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
   async function checkout(nextPlan: Exclude<PlanKey, "free">) {
     const activeClientUserId = clientUserId || ensureClientUserId();
     if (!clientUserId) setClientUserId(activeClientUserId);
-    const res = await fetch("/api/checkout", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ plan: nextPlan, clientUserId: activeClientUserId })
-    });
-    const data = await res.json().catch(() => ({}));
+    const { data, res } = await postCheckout({ plan: nextPlan, clientUserId: activeClientUserId });
     if (!res.ok || data.error) throw new Error(data.error || "決済画面を開けませんでした。");
     if (data.url) {
       window.location.href = data.url;
@@ -524,12 +519,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
   async function buyAddOnPack() {
     const activeClientUserId = clientUserId || ensureClientUserId();
     if (!clientUserId) setClientUserId(activeClientUserId);
-    const res = await fetch("/api/checkout", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ product: addOnPack.key, clientUserId: activeClientUserId })
-    });
-    const data = await res.json().catch(() => ({}));
+    const { data, res } = await postCheckout({ product: addOnPack.key, clientUserId: activeClientUserId });
     if (!res.ok || data.error) throw new Error(data.error || "追加相談枠の決済画面を開けませんでした。");
     if (data.url) {
       window.location.href = data.url;
@@ -537,6 +527,27 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
     }
     if (!data.demo) throw new Error("追加相談枠の決済画面を開けませんでした。Stripeの設定を確認してください。");
     setAddOnCredits((current) => addAddOnCredits(current));
+  }
+
+  async function postCheckout(body: Record<string, string>) {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 15000);
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: controller.signal
+      });
+      return { data: await res.json().catch(() => ({})), res };
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        throw new Error("決済画面の準備に時間がかかっています。Stripeの環境変数とPrice IDを確認して、もう一度お試しください。");
+      }
+      throw error;
+    } finally {
+      window.clearTimeout(timer);
+    }
   }
 
   async function syncServerState(nextClientUserId = clientUserId) {

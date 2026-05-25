@@ -43,12 +43,7 @@ export function PricingPanel({ addOnCredits, currentPlanKey, onBuyAddOn, onCheck
     }
     const clientUserId = ensureClientUserId();
     try {
-      const res = await fetch("/api/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan: nextPlan, clientUserId })
-      });
-      const data = await res.json().catch(() => ({}));
+      const { data, res } = await postCheckout({ plan: nextPlan, clientUserId });
       if (!res.ok || data.error) throw new Error(data.error || "決済画面を開けませんでした。");
       if (data.url) {
         window.location.href = data.url;
@@ -81,12 +76,7 @@ export function PricingPanel({ addOnCredits, currentPlanKey, onBuyAddOn, onCheck
     }
     const clientUserId = ensureClientUserId();
     try {
-      const res = await fetch("/api/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ product: addOnPack.key, clientUserId })
-      });
-      const data = await res.json().catch(() => ({}));
+      const { data, res } = await postCheckout({ product: addOnPack.key, clientUserId });
       if (!res.ok || data.error) throw new Error(data.error || "追加相談枠の決済画面を開けませんでした。");
       if (data.url) {
         window.location.href = data.url;
@@ -121,6 +111,27 @@ export function PricingPanel({ addOnCredits, currentPlanKey, onBuyAddOn, onCheck
       }
       if (typeof data.usage?.addOnCredits === "number") setActiveAddOnCredits(data.usage.addOnCredits);
     } catch {}
+  }
+
+  async function postCheckout(body: Record<string, string>) {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 15000);
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: controller.signal
+      });
+      return { data: await res.json().catch(() => ({})), res };
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        throw new Error("決済画面の準備に時間がかかっています。Stripeの環境変数とPrice IDを確認して、もう一度お試しください。");
+      }
+      throw error;
+    } finally {
+      window.clearTimeout(timer);
+    }
   }
 
   return (
