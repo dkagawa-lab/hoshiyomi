@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { BirthChartApp } from "@/components/BirthChartApp";
+import { BrandLogo } from "@/components/BrandLogo";
 
 export default function MobileEntryPage() {
   return (
     <main className="shell mobile-entry">
       <nav className="topbar mobile-entry-topbar">
         <Link className="brand" href="/">
-          <span className="mark">☉</span>
-          <span>HOSHIYOMI</span>
+          <BrandLogo />
         </Link>
       </nav>
       <section className="mobile-entry-intro">

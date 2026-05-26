@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BrandLogo } from "@/components/BrandLogo";
 
 type GlobalNavProps = {
   active?: "chart" | "consultation" | "glossary" | "account" | "support";
@@ -14,12 +15,11 @@ const navItems = [
   { key: "support", label: "問い合わせ", href: "/contact" }
 ] as const;
 
-export function GlobalNav({ active, brandLabel = "HOSHIYOMI", mark = "☽" }: GlobalNavProps) {
+export function GlobalNav({ active, brandLabel = "HOSHIYOMI" }: GlobalNavProps) {
   return (
     <nav className="topbar global-topbar">
       <Link className="brand" href="/">
-        <span className="mark">{mark}</span>
-        <span>{brandLabel}</span>
+        <BrandLogo label={brandLabel} />
       </Link>
       <details className="global-menu">
         <summary className="global-menu-button" aria-label="メニューを開く">

@@ -4,7 +4,11 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "HOSHIYOMI",
-  description: "出生図から読む、パーソナル星読み"
+  description: "出生図から読む、パーソナル星読み",
+  icons: {
+    icon: [{ url: "/brand/hoshiyomi-mark.svg", type: "image/svg+xml" }],
+    shortcut: "/brand/hoshiyomi-mark.svg"
+  }
 };
 
 export const viewport: Viewport = {
