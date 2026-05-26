@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 160" role="img" aria-labelledby="title desc">
+  <title id="title">HOSHIYOMI wordmark 2 to 1</title>
+  <desc id="desc">HOSHIYOMI wordmark in an approximately 2:1 horizontal format.</desc>
+  <rect width="320" height="160" rx="24" fill="#070b18" />
+  <text x="31" y="70" fill="#f5e7c5" font-family="Cormorant Garamond, Cinzel, Georgia, serif" font-size="33" letter-spacing="7">HOSHIYOMI</text>
+  <path d="M31 92h196" stroke="#e2be67" stroke-opacity=".42" />
+  <text x="31" y="116" fill="#9fb9bc" font-family="Georgia, serif" font-size="12" letter-spacing="3">PRIVATE ASTROLOGY READING</text>
+</svg>
