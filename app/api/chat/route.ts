@@ -99,6 +99,10 @@ export async function POST(req: Request) {
     const result = await generateAstrologyAnswer({
       freeAnswerCount,
       planKey: plan.key,
+      periodUsed: quota?.used ?? countPreviousClientUserQuestions(body.messages),
+      questionIntent,
+      quotaMode: resolveQuotaMode(quota),
+      readerStyle,
       system: [
         systemPrompt(readerStyle, plan.key, questionIntent, body.question),
         buildConversationContext(conversationMessages, plan.key),
@@ -186,6 +190,13 @@ function countPreviousClientUserQuestions(messages: ChatRequest["messages"]) {
   const currentIncludedCount =
     messages?.filter((message) => message.role === "user" && typeof message.content === "string" && message.content.trim()).length ?? 0;
   return Math.max(0, currentIncludedCount - 1);
+}
+
+function resolveQuotaMode(quota: Awaited<ReturnType<typeof getQuotaState>> | null) {
+  if (!quota) return "base";
+  if (quota.usesFreeBonus) return "free_bonus";
+  if (quota.baseRemaining <= 0 && quota.addOnCredits > 0) return "add_on";
+  return "base";
 }
 
 function buildNonBillableChatAnswer(billing: QuestionBilling, usage: Awaited<ReturnType<typeof getUsageSnapshot>> | null) {

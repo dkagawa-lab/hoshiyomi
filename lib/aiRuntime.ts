@@ -1,5 +1,7 @@
 import { PlanKey, resolvePlan } from "@/lib/plans";
 import { coerceAnswerText, normalizeAnswerText } from "@/lib/answerText";
+import type { QuestionIntentKey } from "@/lib/questionIntents";
+import type { ReaderStyleKey } from "@/lib/readerStyles";
 
 export type ChatRuntimeMessage = {
   role: "user" | "assistant";
@@ -9,7 +11,11 @@ export type ChatRuntimeMessage = {
 type GenerateAnswerInput = {
   freeAnswerCount?: number;
   messages: ChatRuntimeMessage[];
+  periodUsed?: number;
   planKey: PlanKey;
+  questionIntent?: QuestionIntentKey;
+  quotaMode?: "add_on" | "base" | "free_bonus";
+  readerStyle?: ReaderStyleKey;
   system: string;
 };
 
@@ -24,9 +30,9 @@ type AnthropicMessageResponse = {
   stop_reason?: string | null;
 };
 
-const defaultAnthropicModel = "claude-sonnet-4-6";
-const defaultFreeAfterTrialModel = "claude-haiku-4-5-20251001";
-export const highPerformanceFreeTrialLimit = 10;
+const defaultPremiumAnthropicModel = "claude-sonnet-4-6";
+const defaultEfficientAnthropicModel = "claude-haiku-4-5-20251001";
+export const standardPremiumAnswerLimit = 5;
 
 export type AnthropicRateLimitInfo = {
   inputTokensRemaining?: number;
@@ -71,15 +77,16 @@ export function isProductionAiConfigured() {
   return Boolean(readEnv("ANTHROPIC_API_KEY"));
 }
 
-export function resolveAnthropicModel(planKey: PlanKey, freeAnswerCount = 0) {
-  if (planKey === "free") {
-    if (freeAnswerCount < highPerformanceFreeTrialLimit) {
-      return readEnv("ANTHROPIC_MODEL_FREE_TRIAL") || readEnv("ANTHROPIC_MODEL_STANDARD") || readEnv("ANTHROPIC_MODEL") || defaultAnthropicModel;
-    }
-    return readEnv("ANTHROPIC_MODEL_FREE_AFTER_TRIAL") || readEnv("ANTHROPIC_MODEL_FREE") || readEnv("ANTHROPIC_MODEL") || defaultFreeAfterTrialModel;
-  }
-  const planSpecificKey = `ANTHROPIC_MODEL_${planKey.toUpperCase()}`;
-  return readEnv(planSpecificKey) || readEnv("ANTHROPIC_MODEL") || defaultAnthropicModel;
+export function resolveAnthropicModel(input: {
+  freeAnswerCount?: number;
+  periodUsed?: number;
+  planKey: PlanKey;
+  questionIntent?: QuestionIntentKey;
+  quotaMode?: "add_on" | "base" | "free_bonus";
+  readerStyle?: ReaderStyleKey;
+}) {
+  const tier = resolveModelTier(input);
+  return tier === "premium" ? readPremiumAnthropicModel(input.planKey) : readEfficientAnthropicModel();
 }
 
 export function isAnthropicRateLimitError(error: unknown): error is AnthropicRateLimitError {
@@ -88,6 +95,44 @@ export function isAnthropicRateLimitError(error: unknown): error is AnthropicRat
 
 export function isAnthropicApiError(error: unknown): error is AnthropicApiError {
   return error instanceof AnthropicApiError;
+}
+
+function resolveModelTier(input: {
+  freeAnswerCount?: number;
+  periodUsed?: number;
+  planKey: PlanKey;
+  questionIntent?: QuestionIntentKey;
+  quotaMode?: "add_on" | "base" | "free_bonus";
+  readerStyle?: ReaderStyleKey;
+}) {
+  if (input.quotaMode === "free_bonus" || input.quotaMode === "add_on") return "efficient";
+  if (input.planKey === "free") return "efficient";
+  if (input.planKey === "luxury") return "premium";
+  if (input.readerStyle === "companion" || input.readerStyle === "harsh") return "premium";
+  if (input.planKey === "standard" && (input.periodUsed ?? 0) < standardPremiumAnswerLimit) return "premium";
+  if (input.planKey === "standard" && isDeepQuestionIntent(input.questionIntent)) return "premium";
+  return "efficient";
+}
+
+function isDeepQuestionIntent(intent?: QuestionIntentKey) {
+  return (
+    intent === "reconciliation" ||
+    intent === "continue_love" ||
+    intent === "marriage" ||
+    intent === "career_change" ||
+    intent === "talent_money" ||
+    intent === "turning_point" ||
+    intent === "custom"
+  );
+}
+
+function readPremiumAnthropicModel(planKey: PlanKey) {
+  const planSpecificKey = `ANTHROPIC_MODEL_${planKey.toUpperCase()}`;
+  return readEnv(planSpecificKey) || readEnv("ANTHROPIC_MODEL_PREMIUM") || readEnv("ANTHROPIC_MODEL_SONNET") || readEnv("ANTHROPIC_MODEL") || defaultPremiumAnthropicModel;
+}
+
+function readEfficientAnthropicModel() {
+  return readEnv("ANTHROPIC_MODEL_HAIKU") || readEnv("ANTHROPIC_MODEL_FAST") || readEnv("ANTHROPIC_MODEL_FREE_AFTER_TRIAL") || readEnv("ANTHROPIC_MODEL_FREE") || defaultEfficientAnthropicModel;
 }
 
 export function normalizeChatMessages(messages: ChatRuntimeMessage[] | undefined, question: string, planKey: PlanKey) {
@@ -152,7 +197,14 @@ export function buildConversationContext(messages: ChatRuntimeMessage[], planKey
 
 export async function generateAstrologyAnswer(input: GenerateAnswerInput): Promise<GenerateAnswerResult> {
   const plan = resolvePlan(input.planKey);
-  const model = resolveAnthropicModel(plan.key, input.freeAnswerCount);
+  const model = resolveAnthropicModel({
+    freeAnswerCount: input.freeAnswerCount,
+    periodUsed: input.periodUsed,
+    planKey: plan.key,
+    questionIntent: input.questionIntent,
+    quotaMode: input.quotaMode,
+    readerStyle: input.readerStyle
+  });
   const temperature = resolveTemperature(plan.key);
   const data = await requestAnthropicMessage({
     maxTokens: plan.maxTokens,

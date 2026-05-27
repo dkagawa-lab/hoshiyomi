@@ -166,6 +166,10 @@ async function handleLineEventCore(event: LineEvent, replyToken: string, lineUse
       const result = await generateAstrologyAnswer({
         freeAnswerCount,
         planKey: plan.key,
+        periodUsed: quota.used,
+        questionIntent: intent,
+        quotaMode: resolveLineQuotaMode(quota),
+        readerStyle,
         system: [
           systemPrompt(readerStyle, plan.key, intent, normalizedQuestion),
           "LINEでの相談です。返信は自然な手紙調にしつつ、星の根拠・現在の流れ・次に聞ける問いを省略しないでください。",
@@ -301,6 +305,12 @@ function usageSnapshotFromQuota(quota: Awaited<ReturnType<typeof getQuotaState>>
     remaining: quota.remaining,
     used: quota.used
   };
+}
+
+function resolveLineQuotaMode(quota: Awaited<ReturnType<typeof getQuotaState>>) {
+  if (quota.usesFreeBonus) return "free_bonus";
+  if (quota.baseRemaining <= 0 && quota.addOnCredits > 0) return "add_on";
+  return "base";
 }
 
 function buildLimitReply(user: StoredUser, quota: Awaited<ReturnType<typeof getQuotaState>>) {
