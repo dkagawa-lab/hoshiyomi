@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import { Chart } from "@/lib/astrology";
 import { PlanKey, planRank, referralRewardCredits, registeredFreeBonusLimit, resolvePlan } from "@/lib/plans";
 import type { GenderKey, RomanticInterestKey } from "@/lib/profileOptions";
@@ -76,6 +77,15 @@ export type ContactInquiryInput = {
   userAgent?: string | null;
 };
 
+export type NonBillableRateLimitResult = {
+  allowed: boolean;
+  limit: number;
+  remaining: number;
+  retryAfterSeconds: number;
+  resetAt: string;
+  used: number;
+};
+
 type QuotaState = UsageSnapshot & {
   baseRemaining: number;
   usesFreeBonus: boolean;
@@ -85,6 +95,12 @@ type SupabaseConfig = {
   key: string;
   url: string;
 };
+
+const nonBillableRateLimit = {
+  limit: 5,
+  windowMs: 10 * 60 * 1000
+};
+const localNonBillableEvents = new Map<string, number[]>();
 
 export function isServerStoreConfigured() {
   return Boolean(getSupabaseConfig());
@@ -468,6 +484,43 @@ export async function insertContactInquiry(input: ContactInquiryInput) {
   return inquiries[0] ?? null;
 }
 
+export async function checkNonBillableRateLimit(input: { identifier: string; kind: string; scope: string }): Promise<NonBillableRateLimitResult> {
+  const now = Date.now();
+  const windowStart = new Date(now - nonBillableRateLimit.windowMs);
+  const normalizedIdentifier = normalizeRateLimitValue(input.identifier) || "anonymous";
+  const normalizedScope = normalizeRateLimitValue(input.scope) || "unknown";
+  const keyHash = hashRateLimitKey(`${normalizedScope}:${normalizedIdentifier}`);
+  const config = getSupabaseConfig();
+
+  if (!config) {
+    return checkLocalNonBillableRateLimit(`${normalizedScope}:${keyHash}`, now);
+  }
+
+  try {
+    const used = await countNonBillableEvents(normalizedScope, keyHash, windowStart.toISOString());
+    if (used >= nonBillableRateLimit.limit) {
+      return buildNonBillableRateLimitResult(used, now, undefined, false);
+    }
+
+    await supabaseJson("non_billable_events", {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({
+        key_hash: keyHash,
+        kind: normalizeRateLimitValue(input.kind) || "unknown",
+        scope: normalizedScope
+      })
+    });
+    cleanupOldNonBillableEvents().catch((error) => {
+      console.warn("Non-billable event cleanup skipped", { message: error instanceof Error ? error.message : "Unknown error" });
+    });
+    return buildNonBillableRateLimitResult(used + 1, now);
+  } catch (error) {
+    console.warn("Non-billable rate limit fell back to local memory", { message: error instanceof Error ? error.message : "Unknown error" });
+    return checkLocalNonBillableRateLimit(`${normalizedScope}:${keyHash}`, now);
+  }
+}
+
 export async function getUserByClientUserId(clientUserId: string) {
   const users = await supabaseJson<StoredUser[]>(`users?client_user_id=eq.${encodeURIComponent(clientUserId)}&select=*&limit=1`);
   return users[0] ?? null;
@@ -601,6 +654,61 @@ async function countUserMessagesByPath(path: string) {
   const range = response.headers.get("content-range");
   const total = range?.split("/")[1];
   return total && total !== "*" ? Number(total) || 0 : 0;
+}
+
+async function countNonBillableEvents(scope: string, keyHash: string, windowStartIso: string) {
+  const response = await supabaseFetch(
+    `non_billable_events?scope=eq.${encodeURIComponent(scope)}&key_hash=eq.${encodeURIComponent(keyHash)}&created_at=gte.${encodeURIComponent(windowStartIso)}&select=id&limit=1`,
+    {
+      headers: { Prefer: "count=exact" }
+    }
+  );
+  if (!response.ok) throw new Error(await response.text());
+  const range = response.headers.get("content-range");
+  const total = range?.split("/")[1];
+  return total && total !== "*" ? Number(total) || 0 : 0;
+}
+
+async function cleanupOldNonBillableEvents(date = new Date()) {
+  const cutoff = new Date(date.getTime() - 24 * 60 * 60 * 1000).toISOString();
+  const response = await supabaseFetch(`non_billable_events?created_at=lt.${encodeURIComponent(cutoff)}`, {
+    method: "DELETE",
+    headers: { Prefer: "return=minimal" }
+  });
+  if (!response.ok) throw new Error(await response.text());
+}
+
+function checkLocalNonBillableRateLimit(key: string, now: number): NonBillableRateLimitResult {
+  const windowStart = now - nonBillableRateLimit.windowMs;
+  const events = (localNonBillableEvents.get(key) ?? []).filter((timestamp) => timestamp >= windowStart);
+  if (events.length >= nonBillableRateLimit.limit) {
+    localNonBillableEvents.set(key, events);
+    return buildNonBillableRateLimitResult(events.length, now, events[0] + nonBillableRateLimit.windowMs, false);
+  }
+
+  const nextEvents = [...events, now];
+  localNonBillableEvents.set(key, nextEvents);
+  return buildNonBillableRateLimitResult(nextEvents.length, now, nextEvents[0] + nonBillableRateLimit.windowMs);
+}
+
+function buildNonBillableRateLimitResult(used: number, now: number, resetAtMs = now + nonBillableRateLimit.windowMs, allowed = true): NonBillableRateLimitResult {
+  return {
+    allowed,
+    limit: nonBillableRateLimit.limit,
+    remaining: Math.max(0, nonBillableRateLimit.limit - used),
+    retryAfterSeconds: Math.max(1, Math.ceil((resetAtMs - now) / 1000)),
+    resetAt: new Date(resetAtMs).toISOString(),
+    used
+  };
+}
+
+function hashRateLimitKey(value: string) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function normalizeRateLimitValue(value: unknown) {
+  if (typeof value !== "string") return "";
+  return value.trim().slice(0, 120);
 }
 
 function periodStartIso(plan: PlanKey, date = new Date()) {

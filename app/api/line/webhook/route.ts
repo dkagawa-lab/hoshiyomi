@@ -7,7 +7,7 @@ import { classifyQuestionBilling, NonBillableQuestionKind, QuestionBilling } fro
 import { ReaderStyleKey, resolveReaderStyle } from "@/lib/readerStyles";
 import { resolveQuestionIntent } from "@/lib/questionIntents";
 import { buildConversationContext, generateAstrologyAnswer, isAnthropicApiError, isAnthropicRateLimitError, isProductionAiConfigured, mergeConversationMessages, normalizeChatMessages } from "@/lib/aiRuntime";
-import { consumeQuota, countLifetimeUserMessages, getQuotaState, getUsageSnapshot, getUserByLineUserId, insertChatTurn, isServerStoreConfigured, listChatMessages, StoredUser, UsageSnapshot } from "@/lib/serverStore";
+import { checkNonBillableRateLimit, consumeQuota, countLifetimeUserMessages, getQuotaState, getUsageSnapshot, getUserByLineUserId, insertChatTurn, isServerStoreConfigured, listChatMessages, NonBillableRateLimitResult, StoredUser, UsageSnapshot } from "@/lib/serverStore";
 
 type LineWebhookBody = {
   events?: LineEvent[];
@@ -93,6 +93,15 @@ async function handleLineEventCore(event: LineEvent, replyToken: string, lineUse
   const user = await getUserByLineUserId(lineUserId);
   if (!user) {
     if (!billing.countable) {
+      const rateLimit = await checkNonBillableRateLimit({
+        identifier: lineUserId,
+        kind: billing.kind,
+        scope: "line-unlinked"
+      });
+      if (!rateLimit.allowed) {
+        await replyLineText(replyToken, [buildNonBillableLineLimitReply(rateLimit)]);
+        return;
+      }
       await replyLineText(replyToken, [buildNonBillableLineReply(billing, null)]);
       return;
     }
@@ -103,6 +112,15 @@ async function handleLineEventCore(event: LineEvent, replyToken: string, lineUse
   }
 
   if (!billing.countable) {
+    const rateLimit = await checkNonBillableRateLimit({
+      identifier: user.id,
+      kind: billing.kind,
+      scope: "line-user"
+    });
+    if (!rateLimit.allowed) {
+      await replyLineText(replyToken, [buildNonBillableLineLimitReply(rateLimit)]);
+      return;
+    }
     await replyLineText(replyToken, [buildNonBillableLineReply(billing, await getUsageSnapshot(user))]);
     return;
   }
@@ -232,6 +250,11 @@ function buildNonBillableLineReply(billing: QuestionBilling, usage: UsageSnapsho
     return `ここでは、星読み・登録情報・使い方に関する内容を扱っています。\n\n医療、法律、投資など専門判断が必要なことは専門家へ相談してください。占いたいテーマがあれば、恋愛・仕事・人生の流れのように送ってください。${usageText}${noCount}`;
   }
   return `使い方や不具合については、Webの登録情報ページや問い合わせページから確認できます。\n${appUrl("/account")}\n${appUrl("/contact")}${usageText}${noCount}`;
+}
+
+function buildNonBillableLineLimitReply(rateLimit: NonBillableRateLimitResult) {
+  const wait = formatRetryAfter(rateLimit.retryAfterSeconds);
+  return `確認系のメッセージが短時間に続いているため、一時的に受付を止めています。\n\n占い相談の回数は消費していません。${wait ? `${wait}ほど時間をおいて、` : "少し時間をおいて、"}もう一度送ってください。`;
 }
 
 function buildLineStatusFooter(input: { persistence?: LinePersistenceResult; readerStyle: ReaderStyleKey; usage: UsageSnapshot; verbose?: boolean }) {

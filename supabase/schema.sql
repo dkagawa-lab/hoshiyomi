@@ -89,6 +89,20 @@ create table if not exists chat_messages (
 create index if not exists chat_messages_user_created_idx
   on chat_messages(user_id, created_at desc);
 
+create table if not exists non_billable_events (
+  id uuid primary key default gen_random_uuid(),
+  scope text not null,
+  key_hash text not null,
+  kind text not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists non_billable_events_key_created_idx
+  on non_billable_events(scope, key_hash, created_at desc);
+
+create index if not exists non_billable_events_created_idx
+  on non_billable_events(created_at desc);
+
 create view monthly_user_chat_counts as
 select
   user_id,

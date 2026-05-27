@@ -6,7 +6,7 @@ import { PlanKey, resolvePlan, usageLimitsDisabled } from "@/lib/plans";
 import { classifyQuestionBilling, NonBillableQuestionKind, QuestionBilling } from "@/lib/questionBilling";
 import { QuestionIntentKey, resolveQuestionIntent } from "@/lib/questionIntents";
 import { buildConversationContext, generateAstrologyAnswer, isAnthropicApiError, isAnthropicRateLimitError, isProductionAiConfigured, mergeConversationMessages, normalizeChatMessages } from "@/lib/aiRuntime";
-import { consumeQuota, countLifetimeUserMessages, getQuotaState, getUsageSnapshot, insertChatTurn, isServerStoreConfigured, listChatMessages, normalizeClientUserId, upsertUserForChart } from "@/lib/serverStore";
+import { checkNonBillableRateLimit, consumeQuota, countLifetimeUserMessages, getQuotaState, getUsageSnapshot, insertChatTurn, isServerStoreConfigured, listChatMessages, normalizeClientUserId, NonBillableRateLimitResult, upsertUserForChart } from "@/lib/serverStore";
 
 type ChatRequest = {
   chart: Chart;
@@ -33,10 +33,29 @@ export async function POST(req: Request) {
   const quotaDisabled = usageLimitsDisabled();
   if (!billing.countable) {
     const usage = storedUser ? await safeServerStore("read usage for non-billable chat", () => getUsageSnapshot(storedUser)) : null;
+    const rateLimit = await checkNonBillableRateLimit({
+      identifier: buildWebNonBillableIdentifier(req, storedUser?.id ?? clientUserId),
+      kind: billing.kind,
+      scope: storedUser ? "web-user" : clientUserId ? "web-client" : "web-anonymous"
+    });
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        {
+          counted: false,
+          error: buildNonBillableLimitMessage(rateLimit),
+          nonBillableKind: billing.kind,
+          nonBillableLimited: true,
+          retryAfterSeconds: rateLimit.retryAfterSeconds,
+          ...(usage ? { usage } : {})
+        },
+        { status: 429 }
+      );
+    }
     return NextResponse.json({
       answer: buildNonBillableChatAnswer(billing, usage),
       counted: false,
       nonBillableKind: billing.kind,
+      nonBillableRemaining: rateLimit.remaining,
       ...(usage ? { usage } : {})
     });
   }
@@ -201,6 +220,19 @@ function buildNonBillableChatAnswer(billing: QuestionBilling, usage: Awaited<Ret
     return `ここでは、星読み・登録情報・使い方に関する内容を扱っています。\n\n医療、法律、投資など専門判断が必要なことは専門家へ相談してください。占いたいテーマがあれば、恋愛・仕事・人生の流れのように聞いてください。${usageText}${noCount}`;
   }
   return `使い方や不具合については、登録情報ページや問い合わせページから確認できます。\n/account\n/contact${usageText}${noCount}`;
+}
+
+function buildNonBillableLimitMessage(rateLimit: NonBillableRateLimitResult) {
+  const wait = formatRetryAfter(rateLimit.retryAfterSeconds);
+  return `確認系のメッセージが短時間に続いているため、一時的に受付を止めています。占い相談の回数は消費していません。${wait ? `${wait}ほど時間をおいて、` : "少し時間をおいて、"}もう一度送ってください。`;
+}
+
+function buildWebNonBillableIdentifier(req: Request, userKey?: string | null) {
+  if (userKey) return userKey;
+  const forwardedFor = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  const realIp = req.headers.get("x-real-ip")?.trim();
+  const userAgent = req.headers.get("user-agent")?.trim();
+  return [forwardedFor || realIp || "unknown-ip", userAgent || "unknown-agent"].join("|");
 }
 
 function buildRateLimitMessage(retryAfterSeconds?: number) {
