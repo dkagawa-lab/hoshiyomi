@@ -144,6 +144,9 @@ export function AccountPanel() {
   const lineFriendUrl = getLineFriendUrl();
   const nextStepLinks = buildAccountNextStepLinks(account, lineFriendUrl);
   const referralLink = account.referralCode && shareOrigin ? `${shareOrigin}/register?ref=${encodeURIComponent(account.referralCode)}&returnTo=/account` : "";
+  const referralShareText = `HOSHIYOMIで星読み相談を始めるなら、この紹介リンクから登録すると相談枠がもらえます。`;
+  const xShareHref = referralLink ? `https://twitter.com/intent/tweet?text=${encodeURIComponent(referralShareText)}&url=${encodeURIComponent(referralLink)}` : "";
+  const lineShareHref = referralLink ? `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(referralLink)}&text=${encodeURIComponent(referralShareText)}` : "";
   const loginMethod = resolveLoginMethod(account.member, account.authMethod, account.clientUserId, account.lineLinked);
   const lineConnectHref = `/api/auth/line/login?returnTo=/account&mode=signup&clientUserId=${encodeURIComponent(account.clientUserId || ensureClientUserId())}`;
 
@@ -157,6 +160,24 @@ export function AccountPanel() {
     } catch {
       setReferralMessage("コピーできませんでした。紹介コードを手動で選択して共有してください。");
     }
+  }
+
+  async function shareReferralNative() {
+    if (!referralLink) return;
+    const shareData = {
+      text: referralShareText,
+      title: "HOSHIYOMIの紹介リンク",
+      url: referralLink
+    };
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+        return;
+      }
+      await navigator.clipboard.writeText(`${referralShareText}\n${referralLink}`);
+      setCopiedReferral(true);
+      window.setTimeout(() => setCopiedReferral(false), 1800);
+    } catch {}
   }
 
   async function applyReferralCode() {
@@ -481,6 +502,22 @@ export function AccountPanel() {
               ) : null}
             </div>
             {referralLink ? <p className="small referral-link-text">{referralLink}</p> : null}
+            {referralLink ? (
+              <div className="referral-share-actions" aria-label="紹介リンクをSNSで共有">
+                <button className="button primary" onClick={shareReferralNative} type="button">
+                  端末から共有
+                </button>
+                <a className="button" href={xShareHref} rel="noreferrer" target="_blank">
+                  Xで共有
+                </a>
+                <a className="button auth-provider-button line" href={lineShareHref} rel="noreferrer" target="_blank">
+                  LINEで共有
+                </a>
+              </div>
+            ) : null}
+            <p className="small">
+              共有リンクを開いた人は、紹介コードが入力された登録・ログイン画面へ進みます。登録またはログインが完了すると、紹介した人と紹介された人の相談枠に特典が反映されます。
+            </p>
           </div>
           <div className="referral-form">
             <label htmlFor="referral-code-input">紹介コードを入力</label>

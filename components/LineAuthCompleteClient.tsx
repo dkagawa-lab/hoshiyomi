@@ -40,7 +40,7 @@ export function LineAuthCompleteClient() {
         birth: readStoredBirth(),
         clientUserId: shouldKeepWebClient ? currentClientUserId : lineOrCanonicalClientUserId,
         lineClientUserId: lineOrCanonicalClientUserId.startsWith("line:") ? lineOrCanonicalClientUserId : undefined,
-        referralCode: flow === "login" ? "" : referralCode
+        referralCode
       });
       if (!cancelled) router.replace(buildRegistrationCompleteUrl(returnTo, "line", flow));
     }

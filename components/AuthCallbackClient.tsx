@@ -49,7 +49,7 @@ export function AuthCallbackClient() {
         authMethod: "google",
         birth: readStoredBirth(),
         clientUserId: authClientUserId(sessionResult.data.session.user.id),
-        referralCode: flow === "login" ? "" : referralCode
+        referralCode
       });
       if (!cancelled) router.replace(buildRegistrationCompleteUrl(returnTo, "google", flow));
     }

@@ -3059,6 +3059,38 @@ textarea:focus {
   gap: 14px;
 }
 
+.auth-referral-panel {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(125, 199, 197, 0.18);
+  border-radius: 8px;
+  padding: 14px;
+  background:
+    linear-gradient(135deg, rgba(125, 199, 197, 0.08), transparent 58%),
+    rgba(5, 8, 18, 0.28);
+}
+
+.auth-referral-panel label {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.auth-referral-panel input {
+  width: 100%;
+  border: 1px solid rgba(226, 190, 103, 0.18);
+  border-radius: 8px;
+  padding: 12px;
+  color: var(--text);
+  background: rgba(5, 8, 18, 0.52);
+}
+
+.auth-referral-panel p {
+  margin: 0;
+  color: rgba(247, 241, 223, 0.68);
+  font-size: 0.88rem;
+  line-height: 1.62;
+}
+
 .auth-email-form {
   display: grid;
   gap: 8px;
@@ -3487,6 +3519,12 @@ textarea:focus {
   overflow-wrap: anywhere;
 }
 
+.referral-share-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
 .referral-form {
   display: grid;
   gap: 8px;
@@ -3875,6 +3913,7 @@ textarea:focus {
   .reader-style-current,
   .referral-code-box,
   .referral-form div,
+  .referral-share-actions,
   .review-form-footer,
   .reader-style-group.private .reader-style-grid,
   .reader-style-grid,

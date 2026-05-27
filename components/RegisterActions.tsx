@@ -82,7 +82,7 @@ export function RegisterActions({ mode = "register" }: RegisterActionsProps) {
   const lineHref = useMemo(() => {
     const params = new URLSearchParams({ returnTo, mode: authFlow });
     if (currentClientUserId) params.set("clientUserId", currentClientUserId);
-    if (!isLoginMode && referralCode.trim()) params.set("ref", referralCode.trim());
+    if (referralCode.trim()) params.set("ref", referralCode.trim());
     return `/api/auth/line/login?${params.toString()}`;
   }, [authFlow, currentClientUserId, isLoginMode, referralCode, returnTo]);
 
@@ -133,7 +133,7 @@ export function RegisterActions({ mode = "register" }: RegisterActionsProps) {
       setStatus({ kind: "error", message: "メールアドレスまたはパスワードが違います。" });
       return;
     }
-    await completeClientRegistration({ authMethod: "mail", birth: readStoredBirth(), clientUserId: authClientUserId(data.user.id), referralCode: isLoginMode ? "" : referralCode });
+    await completeClientRegistration({ authMethod: "mail", birth: readStoredBirth(), clientUserId: authClientUserId(data.user.id), referralCode });
     router.push(buildRegistrationCompleteUrl(returnTo, "mail", authFlow));
   }
 
@@ -143,12 +143,12 @@ export function RegisterActions({ mode = "register" }: RegisterActionsProps) {
       setStatus({ kind: "error", message: isLoginMode ? "Googleログインを使うには、Supabase Authの公開キー設定が必要です。" : "Google登録を使うには、Supabase Authの公開キー設定が必要です。" });
       return;
     }
-    if (!isLoginMode) rememberPendingReferralCode(referralCode);
+    rememberPendingReferralCode(referralCode);
     setStatus({ kind: "loading", message: isLoginMode ? "Googleログインへ移動します。" : "Googleの登録画面へ移動します。" });
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: buildAuthRedirectUrl(returnTo, isLoginMode ? "" : referralCode, authFlow)
+        redirectTo: buildAuthRedirectUrl(returnTo, referralCode, authFlow)
       }
     });
     if (error) {
@@ -166,6 +166,23 @@ export function RegisterActions({ mode = "register" }: RegisterActionsProps) {
   return (
     <div className={`auth-register ${isLoginMode ? "auth-login" : ""}`}>
       <div className="auth-method-grid">
+        <div className="auth-referral-panel">
+          <label htmlFor="auth-referral-code">紹介コード</label>
+          <div>
+            <input
+              autoComplete="off"
+              id="auth-referral-code"
+              onChange={(event) => {
+                setReferralCode(event.target.value);
+                rememberPendingReferralCode(event.target.value);
+              }}
+              placeholder="紹介リンクから来た場合は自動入力されます"
+              value={referralCode}
+            />
+          </div>
+          <p>紹介コードがある場合は、登録またはログイン完了後に相談枠が付与されます。</p>
+        </div>
+
         {isLoginMode ? (
           <form className="auth-password-form" onSubmit={handlePasswordSignIn}>
             <div className="auth-section-heading">
@@ -217,7 +234,7 @@ export function RegisterActions({ mode = "register" }: RegisterActionsProps) {
           {isLoginMode ? "Googleでログイン" : "Googleで新規登録"}
         </button>
 
-        <a className="button auth-provider-button line" href={lineHref} onClick={() => !isLoginMode && rememberPendingReferralCode(referralCode)}>
+        <a className="button auth-provider-button line" href={lineHref} onClick={() => rememberPendingReferralCode(referralCode)}>
           {isLoginMode ? "LINEでログイン" : "LINEで登録・友だち追加"}
         </a>
       </div>
@@ -227,7 +244,7 @@ export function RegisterActions({ mode = "register" }: RegisterActionsProps) {
           <>
             <strong>初めて使う方</strong>
             <span>初めての方は、新規登録から始めてください。</span>
-            <Link className="text-link" href={`/register?returnTo=${encodeURIComponent(returnTo)}`}>
+            <Link className="text-link" href={`/register?returnTo=${encodeURIComponent(returnTo)}${referralCode.trim() ? `&ref=${encodeURIComponent(referralCode.trim())}` : ""}`}>
               新規登録へ進む
             </Link>
           </>
@@ -236,7 +253,7 @@ export function RegisterActions({ mode = "register" }: RegisterActionsProps) {
             <strong>すでに登録済みの方</strong>
             <span>登録済みのメール、Google、LINEで</span>
             <span>ログインできます。</span>
-            <Link className="text-link" href={`/login?returnTo=${encodeURIComponent(returnTo)}`}>
+            <Link className="text-link" href={`/login?returnTo=${encodeURIComponent(returnTo)}${referralCode.trim() ? `&ref=${encodeURIComponent(referralCode.trim())}` : ""}`}>
               ログインへ進む
             </Link>
           </>
