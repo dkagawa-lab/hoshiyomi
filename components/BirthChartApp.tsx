@@ -45,6 +45,7 @@ import {
   writeFreeBonusRemaining,
   writePlanUsage
 } from "@/lib/plans";
+import { classifyQuestionBilling } from "@/lib/questionBilling";
 import { QuestionIntentKey, resolveQuestionIntent, starterQuestions } from "@/lib/questionIntents";
 
 type Message = {
@@ -395,12 +396,14 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
     if (!chart || !text.trim() || loading) return;
     const trimmedQuestion = text.trim();
     const resolvedIntent = resolveQuestionIntent(trimmedQuestion, questionIntent).key;
-    if (!quotaDisabled && remainingQuota <= 0) {
+    const billing = classifyQuestionBilling(trimmedQuestion);
+    const isCountableQuestion = billing.countable;
+    if (isCountableQuestion && !quotaDisabled && remainingQuota <= 0) {
       setShowPaywallModal(true);
       return;
     }
     const effectiveRomanticInterest = options?.romanticInterest ?? input.romanticInterest ?? "unspecified";
-    if (!options?.bypassLovePreference && loveIntentKeys.has(resolvedIntent) && !hasRomanticInterest(effectiveRomanticInterest)) {
+    if (isCountableQuestion && !options?.bypassLovePreference && loveIntentKeys.has(resolvedIntent) && !hasRomanticInterest(effectiveRomanticInterest)) {
       setPendingLoveQuestion({ questionIntent: resolvedIntent, text: trimmedQuestion });
       setQuestion(trimmedQuestion);
       window.requestAnimationFrame(() => document.querySelector(".love-preference-panel")?.scrollIntoView({ behavior: "smooth", block: "center" }));
@@ -457,27 +460,30 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
       if (!answer) {
         throw new Error("星からの返答を受け取れませんでした。");
       }
+      const responseIsCounted = data.counted !== false;
       if (stepTimer) clearTimeout(stepTimer);
       await revealAnswer(answer);
       const answeredMessages: Message[] = [...nextMessages, { role: "assistant", content: answer, readerStyle: activeReaderStyle.key }];
-      const nextHistory: HistoryEntry[] = [
-        {
-          id: `${Date.now()}`,
-          createdAt: new Date().toISOString(),
-          question: trimmedQuestion,
-          answer,
-          chartName: requestChart.input.name || "あなた",
-          birthDate: requestChart.input.date,
-          readerStyle: activeReaderStyle.key
-        },
-        ...history
-      ].slice(0, 30);
       setMessages(answeredMessages);
       window.setTimeout(() => scrollToLatestMessage("auto"), 60);
-      setHistory(nextHistory);
       window.localStorage.setItem("hoshiyomi:messages", JSON.stringify(answeredMessages));
-      window.localStorage.setItem("hoshiyomi:history", JSON.stringify(nextHistory));
-      if (!data.usage && !quotaDisabled) consumeLocalQuota();
+      if (responseIsCounted) {
+        const nextHistory: HistoryEntry[] = [
+          {
+            id: `${Date.now()}`,
+            createdAt: new Date().toISOString(),
+            question: trimmedQuestion,
+            answer,
+            chartName: requestChart.input.name || "あなた",
+            birthDate: requestChart.input.date,
+            readerStyle: activeReaderStyle.key
+          },
+          ...history
+        ].slice(0, 30);
+        setHistory(nextHistory);
+        window.localStorage.setItem("hoshiyomi:history", JSON.stringify(nextHistory));
+      }
+      if (responseIsCounted && !data.usage && !quotaDisabled) consumeLocalQuota();
     } catch (error) {
       const errorMessage =
         error instanceof Error && error.message

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { BirthInput, calculateChart, calculateTransits } from "@/lib/astrology";
 import { buildChartContext, buildTransitContext, demoAnswer, systemPrompt } from "@/lib/prompt";
 import { canUseReaderStyle, resolvePlan, usageLimitsDisabled } from "@/lib/plans";
+import { classifyQuestionBilling, NonBillableQuestionKind, QuestionBilling } from "@/lib/questionBilling";
 import { ReaderStyleKey, resolveReaderStyle } from "@/lib/readerStyles";
 import { resolveQuestionIntent } from "@/lib/questionIntents";
 import { buildConversationContext, generateAstrologyAnswer, isAnthropicApiError, isAnthropicRateLimitError, isProductionAiConfigured, mergeConversationMessages, normalizeChatMessages } from "@/lib/aiRuntime";
@@ -87,17 +88,22 @@ async function handleLineEventCore(event: LineEvent, replyToken: string, lineUse
   if (event.type !== "message" || event.message?.type !== "text") return;
   const question = normalizeLineQuestion(event.message.text);
   if (!question) return;
+  const billing = classifyQuestionBilling(question);
 
   const user = await getUserByLineUserId(lineUserId);
   if (!user) {
+    if (!billing.countable) {
+      await replyLineText(replyToken, [buildNonBillableLineReply(billing, null)]);
+      return;
+    }
     await replyLineText(replyToken, [
       `LINEから相談するには、先にHOSHIYOMIで会員登録とLINE登録・友だち追加が必要です。\n\n登録済みの場合も、アカウント画面からLINE登録をもう一度行うと、このLINEと鑑定履歴がつながります。\n${appUrl("/login?returnTo=/consultation")}`
     ]);
     return;
   }
 
-  if (isUsageQuestion(question)) {
-    await replyLineText(replyToken, [await buildUsageReply(user)]);
+  if (!billing.countable) {
+    await replyLineText(replyToken, [buildNonBillableLineReply(billing, await getUsageSnapshot(user))]);
     return;
   }
 
@@ -194,16 +200,38 @@ function birthInputFromUser(user: StoredUser): BirthInput | null {
   };
 }
 
-function isUsageQuestion(question: string) {
-  return /^(残り|回数|相談回数|トークン|プラン|利用状況|あと何回)/.test(question.trim());
-}
+function buildNonBillableLineReply(billing: QuestionBilling, usage: UsageSnapshot | null) {
+  const usageText = usage ? `\n\n現在の利用状況\nプラン: ${resolvePlan(usage.plan).label}\n残り回数: ${usage.remaining}回` : "";
+  const noCount = "\n\nこの確認では相談回数は消費していません。";
+  const kind = billing.kind as NonBillableQuestionKind;
 
-async function buildUsageReply(user: StoredUser) {
-  return buildLineStatusFooter({
-    readerStyle: "normal",
-    usage: await getUsageSnapshot(user),
-    verbose: true
-  });
+  if (kind === "usage") {
+    return usage
+      ? `${buildLineStatusFooter({ readerStyle: "normal", usage, verbose: true })}${noCount}`
+      : `利用状況を確認するには、先にHOSHIYOMIで会員登録とLINE登録・友だち追加が必要です。\n${appUrl("/login?returnTo=/consultation")}${noCount}`;
+  }
+  if (kind === "pricing") {
+    return `料金やプランは、プランページで確認できます。\n\n通常プラン、プライベートプラン、追加100回パックを用意しています。\n${appUrl("/pricing")}${usageText}${noCount}`;
+  }
+  if (kind === "reader") {
+    return `占い師タイプは、通常・マイルド・はっきり厳しめ・寄り添い系・辛辣から選べます。\n\nLINEでは「辛辣: 復縁を見て」のように、占い師タイプを先頭につけて送れます。無料プランでは通常、通常プランではマイルドとはっきり厳しめ、プライベートプランでは全タイプが使えます。${usageText}${noCount}`;
+  }
+  if (kind === "line") {
+    return `LINEでは、登録済みの星と鑑定履歴を引き継いで相談できます。\n\n連携状態や登録情報はWebの登録情報ページで確認できます。\n${appUrl("/account")}${usageText}${noCount}`;
+  }
+  if (kind === "account") {
+    return `登録情報、ログイン状態、出生情報、鑑定履歴はWebの登録情報ページで確認できます。\n${appUrl("/account")}${usageText}${noCount}`;
+  }
+  if (kind === "legal") {
+    return `利用規約、プライバシーポリシー、特定商取引法に基づく表記はこちらから確認できます。\n${appUrl("/terms")}\n${appUrl("/privacy")}\n${appUrl("/legal/commercial-disclosure")}${noCount}`;
+  }
+  if (kind === "small_talk") {
+    return `ありがとうございます。占いたいことがあれば、そのまま短く送ってください。\n\n例: 今日の運勢は？ / 復縁をどう見ればいい？ / 転職するなら何を重視すべき？${usageText}${noCount}`;
+  }
+  if (kind === "off_topic") {
+    return `ここでは、星読み・登録情報・使い方に関する内容を扱っています。\n\n医療、法律、投資など専門判断が必要なことは専門家へ相談してください。占いたいテーマがあれば、恋愛・仕事・人生の流れのように送ってください。${usageText}${noCount}`;
+  }
+  return `使い方や不具合については、Webの登録情報ページや問い合わせページから確認できます。\n${appUrl("/account")}\n${appUrl("/contact")}${usageText}${noCount}`;
 }
 
 function buildLineStatusFooter(input: { persistence?: LinePersistenceResult; readerStyle: ReaderStyleKey; usage: UsageSnapshot; verbose?: boolean }) {

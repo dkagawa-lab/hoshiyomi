@@ -3,6 +3,7 @@ import { Chart, calculateTransits } from "@/lib/astrology";
 import { buildChartContext, buildTransitContext, demoAnswer, systemPrompt } from "@/lib/prompt";
 import { ReaderStyleKey, resolveReaderStyle } from "@/lib/readerStyles";
 import { PlanKey, resolvePlan, usageLimitsDisabled } from "@/lib/plans";
+import { classifyQuestionBilling, NonBillableQuestionKind, QuestionBilling } from "@/lib/questionBilling";
 import { QuestionIntentKey, resolveQuestionIntent } from "@/lib/questionIntents";
 import { buildConversationContext, generateAstrologyAnswer, isAnthropicApiError, isAnthropicRateLimitError, isProductionAiConfigured, mergeConversationMessages, normalizeChatMessages } from "@/lib/aiRuntime";
 import { consumeQuota, countLifetimeUserMessages, getQuotaState, getUsageSnapshot, insertChatTurn, isServerStoreConfigured, listChatMessages, normalizeClientUserId, upsertUserForChart } from "@/lib/serverStore";
@@ -24,14 +25,25 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "chart and question are required" }, { status: 400 });
   }
 
-  const transits = calculateTransits(body.chart);
-  const readerStyle = resolveReaderStyle(body.readerStyle).key;
-  const questionIntent = resolveQuestionIntent(body.question, body.questionIntent).key;
+  const billing = classifyQuestionBilling(body.question);
   const clientUserId = normalizeClientUserId(body.clientUserId);
   const storedUser = isServerStoreConfigured() && clientUserId ? await safeServerStore("upsert user for chat", () => upsertUserForChart({ chart: body.chart, clientUserId, isMember: Boolean(body.isMember) })) : null;
   const quota = storedUser ? await safeServerStore("read quota for chat", () => getQuotaState(storedUser)) : null;
   const plan = resolvePlan(quota?.plan ?? body.plan);
   const quotaDisabled = usageLimitsDisabled();
+  if (!billing.countable) {
+    const usage = storedUser ? await safeServerStore("read usage for non-billable chat", () => getUsageSnapshot(storedUser)) : null;
+    return NextResponse.json({
+      answer: buildNonBillableChatAnswer(billing, usage),
+      counted: false,
+      nonBillableKind: billing.kind,
+      ...(usage ? { usage } : {})
+    });
+  }
+
+  const transits = calculateTransits(body.chart);
+  const readerStyle = resolveReaderStyle(body.readerStyle).key;
+  const questionIntent = resolveQuestionIntent(body.question, body.questionIntent).key;
   const clientMessages = normalizeChatMessages(body.messages, body.question, plan.key);
   const storedMessages = storedUser
     ? (await safeServerStore("read stored chat messages", () => listChatMessages(storedUser.id, plan.key === "luxury" ? 80 : 40)))?.map((message) => ({ role: message.role, content: message.content })) ?? []
@@ -155,6 +167,40 @@ function countPreviousClientUserQuestions(messages: ChatRequest["messages"]) {
   const currentIncludedCount =
     messages?.filter((message) => message.role === "user" && typeof message.content === "string" && message.content.trim()).length ?? 0;
   return Math.max(0, currentIncludedCount - 1);
+}
+
+function buildNonBillableChatAnswer(billing: QuestionBilling, usage: Awaited<ReturnType<typeof getUsageSnapshot>> | null) {
+  const usageText = usage ? `\n\n現在の利用状況\nプラン: ${resolvePlan(usage.plan).label}\n残り回数: ${usage.remaining}回` : "";
+  const noCount = "\n\nこの確認では相談回数は消費していません。";
+  const kind = billing.kind as NonBillableQuestionKind;
+
+  if (kind === "usage") {
+    return usage
+      ? `現在の利用状況です。\n\nプラン: ${resolvePlan(usage.plan).label}\n残り回数: ${usage.remaining}回${usage.freeBonusRemaining > 0 && usage.plan === "free" ? `\n登録特典: 残り${usage.freeBonusRemaining}回` : ""}${usage.addOnCredits > 0 ? `\n追加分: 残り${usage.addOnCredits}回` : ""}${noCount}`
+      : `利用状況を確認するには、登録情報との連携が必要です。登録情報ページから確認できます。\n/account${noCount}`;
+  }
+  if (kind === "pricing") {
+    return `料金やプランは、プランページで確認できます。\n\n通常プラン、プライベートプラン、追加100回パックを用意しています。\n/pricing${usageText}${noCount}`;
+  }
+  if (kind === "reader") {
+    return `占い師タイプは、通常・マイルド・はっきり厳しめ・寄り添い系・辛辣から選べます。\n\n無料プランでは通常、通常プランではマイルドとはっきり厳しめ、プライベートプランでは寄り添い系と辛辣を含む全タイプが使えます。${usageText}${noCount}`;
+  }
+  if (kind === "line") {
+    return `LINEで相談するには、登録情報とLINEをつなぎます。LINE登録の流れで公式アカウントの友だち追加も行えます。\n\n登録情報ページから「LINEで登録・友だち追加」を選んでください。\n/account${usageText}${noCount}`;
+  }
+  if (kind === "account") {
+    return `登録情報、ログイン状態、出生情報、鑑定履歴は登録情報ページで確認できます。\n/account${usageText}${noCount}`;
+  }
+  if (kind === "legal") {
+    return `利用規約、プライバシーポリシー、特定商取引法に基づく表記は各ページで確認できます。\n\n/terms\n/privacy\n/legal/commercial-disclosure${noCount}`;
+  }
+  if (kind === "small_talk") {
+    return `ありがとうございます。占いたいことがあれば、そのまま短く送ってください。恋愛、仕事、今日の運勢、今月の流れなど、気になるテーマから読めます。${usageText}${noCount}`;
+  }
+  if (kind === "off_topic") {
+    return `ここでは、星読み・登録情報・使い方に関する内容を扱っています。\n\n医療、法律、投資など専門判断が必要なことは専門家へ相談してください。占いたいテーマがあれば、恋愛・仕事・人生の流れのように聞いてください。${usageText}${noCount}`;
+  }
+  return `使い方や不具合については、登録情報ページや問い合わせページから確認できます。\n/account\n/contact${usageText}${noCount}`;
 }
 
 function buildRateLimitMessage(retryAfterSeconds?: number) {
