@@ -120,7 +120,7 @@ create index if not exists user_reviews_public_idx
   on user_reviews(updated_at desc)
   where comment is not null;
 
-create view monthly_user_chat_counts as
+create or replace view monthly_user_chat_counts as
 select
   user_id,
   date_trunc('month', created_at) as month,
