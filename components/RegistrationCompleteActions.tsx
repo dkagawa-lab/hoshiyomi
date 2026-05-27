@@ -9,7 +9,7 @@ import { getLineFriendUrl } from "@/lib/lineLinks";
 
 const signupMethodLabels: Record<string, string> = {
   google: "Google登録",
-  line: "LINE登録",
+  line: "LINE登録・友だち追加",
   mail: "メール登録"
 };
 
@@ -63,7 +63,7 @@ export function RegistrationCompleteActions() {
         ) : null}
         {isLineMethod && lineFriendUrl ? (
           <a className="button auth-provider-button line" href={lineFriendUrl} rel="noreferrer" target="_blank">
-            LINEで友だち追加
+            LINEで相談を開く
           </a>
         ) : null}
         <Link className="button" href="/account">
@@ -71,18 +71,18 @@ export function RegistrationCompleteActions() {
         </Link>
       </div>
       <div className="registration-line-guide">
-        <strong>{isLineMethod ? "LINEで友だちになると、メッセージで相談できます。" : "LINEでも相談したい場合は、登録情報からLINE連携できます。"}</strong>
+        <strong>{isLineMethod ? "LINEから、そのまま相談できます。" : "LINEでも相談したい場合は、LINEで登録・友だち追加できます。"}</strong>
         <p>
           {isLineMethod
-            ? "友だち追加後は、登録済みの星と鑑定履歴を引き継いだまま、LINEのメッセージで質問できます。"
-            : "メール・Googleで登録した場合も、登録情報画面でLINE連携を済ませると、あなたの星の記憶をLINEに引き継げます。"}
+            ? "LINE登録の流れの中で公式アカウントの友だち追加画面が表示されます。登録済みの星と鑑定履歴を引き継いだまま、LINEのメッセージで質問できます。"
+            : "メール・Googleで登録した場合も、LINE登録・友だち追加を済ませると、あなたの星の記憶をLINEに引き継げます。"}
         </p>
         {!isLineMethod && lineConnectHref ? (
           <div className="registration-line-actions">
             <a className="button primary auth-provider-button line" href={lineConnectHref}>
-              LINEと連携する
+              LINEで登録・友だち追加
             </a>
-            <span>連携後は、Webで登録した星の情報を使ってLINEから相談できます。</span>
+            <span>完了後は、Webで登録した星の情報を使ってLINEから相談できます。</span>
           </div>
         ) : null}
       </div>

@@ -283,12 +283,12 @@ export function AccountPanel() {
           </Link>
           {account.member && !account.lineLinked ? (
             <a className="button" href={lineConnectHref}>
-              LINEと連携する
+              LINEで登録・友だち追加
             </a>
           ) : null}
           {account.member && account.lineLinked && lineFriendUrl ? (
             <a className="button auth-provider-button line" href={lineFriendUrl} rel="noreferrer" target="_blank">
-              LINEで友だち追加
+              LINEで相談する
             </a>
           ) : null}
           {account.member && account.plan !== "free" ? (
@@ -418,13 +418,13 @@ function buildAccountNextStepLinks(account: AccountState, lineFriendUrl: string)
   } else if (!account.lineLinked) {
     links.push({
       href: `/api/auth/line/login?returnTo=/account&mode=signup&clientUserId=${encodeURIComponent(account.clientUserId)}`,
-      title: "LINEと連携する",
-      description: "Webで保存した星の情報と相談履歴を、LINEからの相談にもつなげます。"
+      title: "LINEで登録・友だち追加する",
+      description: "LINE認証の流れで公式アカウントの友だち追加も行い、LINEからの相談につなげます。"
     });
   } else if (lineFriendUrl) {
     links.push({
       href: lineFriendUrl,
-      title: "LINEで友だち追加する",
+      title: "LINEで相談する",
       description: "登録済みの星と鑑定履歴を引き継いだまま、LINEのメッセージで相談できます。"
     });
   }
@@ -456,25 +456,25 @@ function LineFriendGuideCard({ account, lineConnectHref, lineFriendUrl }: { acco
         <h2>LINEでも、この星のまま相談できます</h2>
         {account.lineLinked ? (
           <p>
-            登録済みの場合、LINEで友だちになると、保存したあなたの星と鑑定履歴を引き継いだまま、メッセージで質問できます。
-            Webを開かなくても、気になったタイミングでそのまま相談できます。
+            LINE登録の流れで公式アカウントの友だち追加画面が表示されます。
+            保存したあなたの星と鑑定履歴を引き継いだまま、LINEのメッセージで相談できます。
           </p>
         ) : (
           <p>
-            LINEから相談するには、先にこの登録情報とLINEを連携します。連携後に公式アカウントを友だち追加すると、あなたの星の記憶を引き継いだままメッセージで質問できます。
+            LINEから相談するには、この登録情報とLINEをつなぎます。LINE認証の流れの中で公式アカウントの友だち追加画面も表示されます。
           </p>
         )}
       </div>
       <div className="line-friend-actions">
         {account.lineLinked && lineFriendUrl ? (
           <a className="button primary auth-provider-button line" href={lineFriendUrl} rel="noreferrer" target="_blank">
-            LINEで友だち追加する
+            LINEで相談を始める
           </a>
         ) : account.lineLinked ? (
-          <span className="line-friend-missing">友だち追加URLを設定すると、ここにボタンが表示されます。</span>
+          <span className="line-friend-missing">LINE公式アカウントURLを設定すると、ここからトーク画面を開けます。</span>
         ) : (
           <a className="button primary" href={lineConnectHref}>
-            LINEと連携する
+            LINEで登録・友だち追加する
           </a>
         )}
         <Link className="button" href="/consultation">

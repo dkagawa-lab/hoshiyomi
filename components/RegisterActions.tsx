@@ -53,14 +53,14 @@ export function RegisterActions({ mode = "register" }: RegisterActionsProps) {
         kind: "error",
         message: isLoginMode
           ? "LINEログインは、LINE Developersのチャネル設定後に有効になります。先にメールまたはGoogleでログインできます。"
-          : "LINE登録は、LINE Developersのチャネル設定後に有効になります。先にメールまたはGoogleで登録できます。"
+          : "LINE登録・友だち追加は、LINE Developersのチャネル設定後に有効になります。先にメールまたはGoogleで登録できます。"
       });
     } else if (authError === "line_failed") {
       setStatus({
         kind: "error",
         message: isLoginMode
           ? "LINEログインを完了できませんでした。もう一度LINEでログインするか、メール・Googleでログインしてください。"
-          : "LINE登録を完了できませんでした。もう一度LINEで新規登録するか、メール・Googleで登録してください。"
+          : "LINE登録・友だち追加を完了できませんでした。もう一度LINEで進むか、メール・Googleで登録してください。"
       });
     }
     setCurrentClientUserId(ensureClientUserId());
@@ -218,7 +218,7 @@ export function RegisterActions({ mode = "register" }: RegisterActionsProps) {
         </button>
 
         <a className="button auth-provider-button line" href={lineHref} onClick={() => !isLoginMode && rememberPendingReferralCode(referralCode)}>
-          {isLoginMode ? "LINEでログイン" : "LINEで新規登録"}
+          {isLoginMode ? "LINEでログイン" : "LINEで登録・友だち追加"}
         </a>
       </div>
 

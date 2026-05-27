@@ -1327,23 +1327,23 @@ function LineConsultationGuide({ lineConnectHref, lineFriendUrl, lineLinked }: {
     <div className={`line-consultation-guide ${lineLinked ? "linked" : ""}`}>
       <div>
         <span>LINEでも相談できます</span>
-        <strong>{lineLinked ? "メッセージで、そのまま星に質問できます" : "LINE連携をすると、Webの記憶をLINEに引き継げます"}</strong>
+        <strong>{lineLinked ? "メッセージで、そのまま星に質問できます" : "LINEで登録・友だち追加すると、Webの記憶をLINEに引き継げます"}</strong>
         <p>
           {lineLinked
-            ? "LINEで友だちになると、登録済みのあなたの星と鑑定履歴を使いながら、メッセージで質問できます。気になった瞬間に、ここでの相談の続きを送れます。"
-            : "登録情報とLINEを連携すると、保存した星の位置や相談履歴を引き継いだまま、LINEからも質問できるようになります。"}
+            ? "登録済みのあなたの星と鑑定履歴を使いながら、LINEのメッセージで質問できます。気になった瞬間に、ここでの相談の続きを送れます。"
+            : "LINE認証の流れで公式アカウントの友だち追加も行い、保存した星の位置や相談履歴を引き継いだままLINEからも質問できるようにします。"}
         </p>
       </div>
       <div className="line-consultation-actions">
         {lineLinked && lineFriendUrl ? (
           <a className="button primary auth-provider-button line" href={lineFriendUrl} rel="noreferrer" target="_blank">
-            LINEで友だち追加する
+            LINEで相談する
           </a>
         ) : lineLinked ? (
-          <span>友だち追加URLを設定すると、ここにボタンが表示されます。</span>
+          <span>LINE公式アカウントURLを設定すると、ここからトーク画面を開けます。</span>
         ) : (
           <a className="button primary" href={lineConnectHref}>
-            LINEと連携する
+            LINEで登録・友だち追加する
           </a>
         )}
       </div>

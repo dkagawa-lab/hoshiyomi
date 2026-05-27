@@ -12,6 +12,8 @@ export default function RegisterPage() {
         <p className="auth-lead">
           <span>メール・Google・LINEで新規登録すると、</span>
           <span>出生図と鑑定履歴を保存できます。</span>
+          <span>LINE登録では、公式アカウントの友だち追加も</span>
+          <span>同じ流れで行えます。</span>
           <span>最初の10回まで無料で相談でき、</span>
           <span>その後も無料プランでは1日3回、</span>
           <span>同じ星の文脈で相談できます。</span>

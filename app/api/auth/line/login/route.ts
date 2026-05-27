@@ -30,6 +30,7 @@ export async function GET(req: NextRequest) {
   authorizeUrl.searchParams.set("state", state);
   authorizeUrl.searchParams.set("scope", "profile openid");
   authorizeUrl.searchParams.set("nonce", nonce);
+  authorizeUrl.searchParams.set("bot_prompt", "aggressive");
 
   const res = NextResponse.redirect(authorizeUrl);
   const secure = process.env.NODE_ENV === "production";

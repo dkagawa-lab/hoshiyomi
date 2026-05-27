@@ -72,7 +72,7 @@ async function handleLineEvent(event: LineEvent) {
 async function handleLineEventCore(event: LineEvent, replyToken: string, lineUserId: string) {
   if (event.type === "follow") {
     await replyLineText(replyToken, [
-      "HOSHIYOMIを追加してくれてありがとうございます。\n\nWebで星を読んでLINE登録まで済ませると、このトーク画面からそのまま相談できます。\n\n登録済みの方は、いつもの言葉で質問を送ってください。"
+      "HOSHIYOMIを追加してくれてありがとうございます。\n\nWebで星を読んでLINE登録・友だち追加まで済ませると、このトーク画面からそのまま相談できます。\n\n登録済みの方は、いつもの言葉で質問を送ってください。"
     ]);
     return;
   }
@@ -84,7 +84,7 @@ async function handleLineEventCore(event: LineEvent, replyToken: string, lineUse
   const user = await getUserByLineUserId(lineUserId);
   if (!user) {
     await replyLineText(replyToken, [
-      `LINEから相談するには、先にHOSHIYOMIで会員登録とLINE連携が必要です。\n\n登録済みの場合も、アカウント画面からLINE登録をもう一度行うと、このLINEと鑑定履歴がつながります。\n${appUrl("/login?returnTo=/consultation")}`
+      `LINEから相談するには、先にHOSHIYOMIで会員登録とLINE登録・友だち追加が必要です。\n\n登録済みの場合も、アカウント画面からLINE登録をもう一度行うと、このLINEと鑑定履歴がつながります。\n${appUrl("/login?returnTo=/consultation")}`
     ]);
     return;
   }
