@@ -139,6 +139,7 @@ type PendingLoveQuestion = {
 export function BirthChartApp({ compact = false, consultationOnly = false, hideConsultation = false }: { compact?: boolean; consultationOnly?: boolean; hideConsultation?: boolean }) {
   const [input, setInput] = useState<BirthInput>(emptyInput);
   const [chart, setChart] = useState<Chart | null>(null);
+  const [birthFormExpanded, setBirthFormExpanded] = useState(true);
   const initialLocation = parseSavedLocation(input.city);
   const [prefecture, setPrefecture] = useState(initialLocation.prefecture);
   const [municipality, setMunicipality] = useState(initialLocation.municipality);
@@ -218,12 +219,16 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
       try {
         setInput(savedBirth);
         setChart(calculateChart(savedBirth));
+        setBirthFormExpanded(false);
         const savedLocation = parseSavedLocation(savedBirth.city);
         setPrefecture(savedLocation.prefecture);
         setMunicipality(savedLocation.municipality);
       } catch {
         setInput(emptyInput);
+        setBirthFormExpanded(true);
       }
+    } else {
+      setBirthFormExpanded(true);
     }
     setMessages(normalizeStoredMessages(readJson<Message[]>("hoshiyomi:messages", [])));
     setHistory(normalizeStoredHistory(readJson<HistoryEntry[]>("hoshiyomi:history", [])));
@@ -384,6 +389,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
       };
       const next = calculateChart(normalizedInput);
       setChart(next);
+      setBirthFormExpanded(false);
       writeStoredBirth(normalizedInput);
       const birthQuery = `?birth=${encodeURIComponent(JSON.stringify(normalizedInput))}`;
       window.location.assign(`/reading${birthQuery}`);
@@ -721,16 +727,52 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
   }
 
   const containerClass = compact ? "panel form-panel" : consultationOnly ? "consultation-grid" : "app-grid";
+  const showBirthForm = !consultationOnly && (!chart || birthFormExpanded);
 
   return (
     <div className={containerClass}>
-      {!consultationOnly ? (
+      {!consultationOnly && chart && !birthFormExpanded ? (
+        <section className={compact ? "birth-form-summary-card" : "panel birth-form-summary-card"}>
+          <div className="birth-form-summary-heading">
+            <div>
+              <div className="eyebrow">Birth Data</div>
+              <h2>ホロスコープは作成済みです</h2>
+            </div>
+            <button className="button" onClick={() => setBirthFormExpanded(true)} type="button">
+              出生情報を編集する
+            </button>
+          </div>
+          <div className="birth-summary compact">
+            <div>
+              <span>出生地</span>
+              <strong>{chart.input.city}</strong>
+            </div>
+            <div>
+              <span>出生日時</span>
+              <strong>
+                {chart.input.date} {chart.input.time || "時刻不明"}
+              </strong>
+            </div>
+          </div>
+          {compact ? (
+            <div className="actions compact-actions">
+              <Link className="button primary" href="/consultation">
+                この星で相談する
+              </Link>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      {showBirthForm ? (
       <form className={compact ? "" : "panel form-panel"} onSubmit={submitBirth}>
         <div className="form-intro">
           <div className="eyebrow">Birth Data</div>
-          <h2>まずは、あなたの星を知るところから</h2>
+          <h2>{chart ? "出生情報を編集する" : "まずは、あなたの星を知るところから"}</h2>
           <p className="small">
-            ホロスコープは、生まれた日と場所から「その瞬間の星の配置」を描くところから始まります。ここで入力した情報をもとに、あなたの本質や相談の土台になる星を読み取ります。
+            {chart
+              ? "生年月日や出生地を変更すると、ホロスコープを読み直します。入力内容を確認してから反映してください。"
+              : "ホロスコープは、生まれた日と場所から「その瞬間の星の配置」を描くところから始まります。ここで入力した情報をもとに、あなたの本質や相談の土台になる星を読み取ります。"}
           </p>
           <p className="small">出生時刻がわからない場合は空欄でもOKです。その場合はASCとハウスを省略して診断します。</p>
         </div>
@@ -875,8 +917,13 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
         </div>
         <div className="actions">
           <button className="button primary" type="submit">
-            ホロスコープを作成
+            {chart ? "変更を反映する" : "ホロスコープを作成"}
           </button>
+          {chart ? (
+            <button className="button" onClick={() => setBirthFormExpanded(false)} type="button">
+              編集を閉じる
+            </button>
+          ) : null}
         </div>
         {birthError ? <p className="form-error">{birthError}</p> : null}
       </form>

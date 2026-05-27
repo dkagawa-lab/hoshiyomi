@@ -1108,6 +1108,33 @@ p {
   margin: 0;
 }
 
+.birth-form-summary-card {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.form-panel > .birth-form-summary-card {
+  padding: 0;
+}
+
+.birth-form-summary-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+}
+
+.birth-form-summary-heading h2 {
+  margin-top: 4px;
+  font-size: clamp(1.45rem, 2.4vw, 2rem);
+  line-height: 1.16;
+}
+
+.birth-form-summary-heading .button {
+  white-space: nowrap;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3893,6 +3920,7 @@ textarea:focus {
   }
 
   .grid,
+  .birth-form-summary-heading,
   .auth-email-form > div,
   .auth-password-fields,
   .forgot-password-form > div,
@@ -3961,6 +3989,10 @@ textarea:focus {
 
   .birth-date-selects select {
     padding-inline: 8px;
+  }
+
+  .birth-form-summary-heading .button {
+    width: 100%;
   }
 
   .location-picker {
