@@ -52,7 +52,7 @@ export async function POST(req: Request) {
   }
 
   const payload = parseLinePayload(body);
-  await Promise.all((payload.events || []).map((event) => handleLineEvent(event).catch((error) => console.warn("LINE event failed", { message: error instanceof Error ? error.message : "Unknown error" }))));
+  await Promise.all((payload.events || []).map(handleLineEvent));
   return NextResponse.json({ ok: true });
 }
 
@@ -61,6 +61,15 @@ async function handleLineEvent(event: LineEvent) {
   const lineUserId = event.source?.userId;
   if (!replyToken || !lineUserId) return;
 
+  try {
+    await handleLineEventCore(event, replyToken, lineUserId);
+  } catch (error) {
+    console.warn("LINE event failed", { message: error instanceof Error ? error.message : "Unknown error" });
+    await replyLineText(replyToken, [buildLineSystemErrorReply()]);
+  }
+}
+
+async function handleLineEventCore(event: LineEvent, replyToken: string, lineUserId: string) {
   if (event.type === "follow") {
     await replyLineText(replyToken, [
       "HOSHIYOMIを追加してくれてありがとうございます。\n\nWebで星を読んでLINE登録まで済ませると、このトーク画面からそのまま相談できます。\n\n登録済みの方は、いつもの言葉で質問を送ってください。"
@@ -112,10 +121,11 @@ async function handleLineEvent(event: LineEvent) {
   const chart = calculateChart(birth);
   const transits = calculateTransits(chart);
   const intent = resolveQuestionIntent(normalizedQuestion).key;
-  const storedMessages = (await listChatMessages(user.id, plan.key === "luxury" ? 80 : 40)).map((message) => ({ role: message.role, content: message.content }));
+  const storedMessages =
+    (await safeLineStore("read stored messages", () => listChatMessages(user.id, plan.key === "luxury" ? 80 : 40)))?.map((message) => ({ role: message.role, content: message.content })) ?? [];
   const clientMessages = normalizeChatMessages([{ role: "user", content: normalizedQuestion }], normalizedQuestion, plan.key);
   const conversationMessages = mergeConversationMessages(storedMessages, clientMessages, normalizedQuestion, plan.key);
-  const freeAnswerCount = plan.key === "free" ? await countLifetimeUserMessages(user.id) : 0;
+  const freeAnswerCount = plan.key === "free" ? (await safeLineStore("count lifetime messages", () => countLifetimeUserMessages(user.id))) ?? 0 : 0;
 
   let answer = "";
   try {
@@ -141,9 +151,8 @@ async function handleLineEvent(event: LineEvent) {
     return;
   }
 
-  await insertChatTurn({ answer, question: normalizedQuestion, userId: user.id });
-  const updatedUser = quotaDisabled ? user : await consumeQuota(user, quota);
-  await replyLineText(replyToken, [answer, buildShortUsageFooter(await getUsageSnapshot(updatedUser))]);
+  const usage = await persistLineChatTurnAndQuota({ answer, normalizedQuestion, quota, quotaDisabled, user });
+  await replyLineText(replyToken, usage ? [answer, buildShortUsageFooter(usage)] : [answer, buildLinePersistenceWarning()]);
 }
 
 function parseLinePayload(body: string): LineWebhookBody {
@@ -209,9 +218,40 @@ function buildLineAiErrorReply(error: unknown) {
   return "鑑定文の生成で一時的な問題が起きました。相談回数は消費していません。少し時間をおいて、もう一度送ってください。";
 }
 
+function buildLineSystemErrorReply() {
+  return `会員情報または相談枠の確認で一時的な問題が起きました。\n\nWebで登録情報を確認してから、少し時間をおいてもう一度送ってください。\n${appUrl("/account")}`;
+}
+
+function buildLinePersistenceWarning() {
+  return `今回の鑑定は送信できましたが、履歴と残り回数の反映を確認できませんでした。\n\n続けて相談する前に、Webの登録情報で状態を確認してください。\n${appUrl("/account")}`;
+}
+
 function formatRetryAfter(seconds: number) {
   if (seconds < 60) return `${Math.ceil(seconds)}秒`;
   return `${Math.ceil(seconds / 60)}分`;
+}
+
+async function persistLineChatTurnAndQuota(input: {
+  answer: string;
+  normalizedQuestion: string;
+  quota: Awaited<ReturnType<typeof getQuotaState>>;
+  quotaDisabled: boolean;
+  user: StoredUser;
+}) {
+  return safeLineStore("persist line chat turn and quota", async () => {
+    await insertChatTurn({ answer: input.answer, question: input.normalizedQuestion, userId: input.user.id });
+    const updatedUser = input.quotaDisabled ? input.user : await consumeQuota(input.user, input.quota);
+    return getUsageSnapshot(updatedUser);
+  });
+}
+
+async function safeLineStore<T>(label: string, action: () => Promise<T>) {
+  try {
+    return await action();
+  } catch (error) {
+    console.warn(`LINE store skipped: ${label}`, { message: error instanceof Error ? error.message : "Unknown error" });
+    return null;
+  }
 }
 
 function resolveLineReaderStyle(question: string, planKey: "free" | "standard" | "luxury"): { blockedReply?: string; normalizedQuestion: string; readerStyle: ReaderStyleKey } {
