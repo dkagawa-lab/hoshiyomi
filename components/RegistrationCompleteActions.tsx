@@ -26,6 +26,7 @@ export function RegistrationCompleteActions() {
   const primary = resolvePrimaryAction(returnTo);
   const lineFriendUrl = getLineFriendUrl();
   const isLineMethod = method === "line";
+  const showConsultationAction = returnTo !== "/consultation";
 
   return (
     <div className="registration-complete-card">
@@ -43,9 +44,11 @@ export function RegistrationCompleteActions() {
         <Link className="button primary" href={primary.href}>
           {primary.label}
         </Link>
-        <Link className="button" href="/consultation">
-          この星で相談する
-        </Link>
+        {showConsultationAction ? (
+          <Link className="button" href="/consultation">
+            この星で相談する
+          </Link>
+        ) : null}
         {isLineMethod && lineFriendUrl ? (
           <a className="button auth-provider-button line" href={lineFriendUrl} rel="noreferrer" target="_blank">
             LINEで友だち追加
