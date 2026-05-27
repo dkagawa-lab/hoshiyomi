@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { resolveReturnTo } from "@/lib/authRegistrationClient";
+import { ensureClientUserId } from "@/lib/clientIdentity";
 import { getLineFriendUrl } from "@/lib/lineLinks";
 
 const signupMethodLabels: Record<string, string> = {
@@ -19,6 +21,7 @@ const loginMethodLabels: Record<string, string> = {
 
 export function RegistrationCompleteActions() {
   const searchParams = useSearchParams();
+  const [lineConnectHref, setLineConnectHref] = useState("");
   const returnTo = resolveReturnTo(searchParams.get("returnTo"));
   const method = searchParams.get("method") || "mail";
   const flow = searchParams.get("flow") === "login" ? "login" : "signup";
@@ -27,6 +30,15 @@ export function RegistrationCompleteActions() {
   const lineFriendUrl = getLineFriendUrl();
   const isLineMethod = method === "line";
   const showConsultationAction = returnTo !== "/consultation";
+
+  useEffect(() => {
+    const params = new URLSearchParams({
+      clientUserId: ensureClientUserId(),
+      mode: "signup",
+      returnTo: "/account"
+    });
+    setLineConnectHref(`/api/auth/line/login?${params.toString()}`);
+  }, []);
 
   return (
     <div className="registration-complete-card">
@@ -65,6 +77,14 @@ export function RegistrationCompleteActions() {
             ? "友だち追加後は、登録済みの星と鑑定履歴を引き継いだまま、LINEのメッセージで質問できます。"
             : "メール・Googleで登録した場合も、登録情報画面でLINE連携を済ませると、あなたの星の記憶をLINEに引き継げます。"}
         </p>
+        {!isLineMethod && lineConnectHref ? (
+          <div className="registration-line-actions">
+            <a className="button primary auth-provider-button line" href={lineConnectHref}>
+              LINEと連携する
+            </a>
+            <span>連携後は、Webで登録した星の情報を使ってLINEから相談できます。</span>
+          </div>
+        ) : null}
       </div>
     </div>
   );

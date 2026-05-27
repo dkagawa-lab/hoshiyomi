@@ -1778,7 +1778,8 @@ textarea:focus {
 }
 
 .line-consultation-actions,
-.line-friend-actions {
+.line-friend-actions,
+.registration-line-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
@@ -1786,6 +1787,7 @@ textarea:focus {
 }
 
 .line-consultation-actions > span,
+.registration-line-actions > span,
 .line-friend-missing {
   color: rgba(247, 241, 223, 0.72);
   font-size: 0.86rem;
