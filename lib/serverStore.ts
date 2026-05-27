@@ -621,9 +621,10 @@ function periodStartIso(plan: PlanKey, date = new Date()) {
 
 async function supabaseJson<T>(path: string, init: RequestInit = {}) {
   const response = await supabaseFetch(path, init);
-  if (!response.ok) throw new Error(await response.text());
-  if (response.status === 204) return null as T;
-  return (await response.json()) as T;
+  const text = await response.text();
+  if (!response.ok) throw new Error(text);
+  if (!text) return null as T;
+  return JSON.parse(text) as T;
 }
 
 async function supabaseFetch(path: string, init: RequestInit = {}) {
