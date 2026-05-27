@@ -7,7 +7,7 @@ import { ensureClientUserId } from "@/lib/clientIdentity";
 import { AuthMethod, authClientCookieName, authMethodKey, getSupabaseAuthClient, readAuthMethod } from "@/lib/authRegistrationClient";
 import { getLineFriendUrl } from "@/lib/lineLinks";
 import { genderLabel, romanticInterestLabel } from "@/lib/profileOptions";
-import { addAddOnCredits, planQuotaLabel, planStatusLabel, PlanKey, readAddOnCredits, readFreeBonusRemaining, readPlanFromStorage, readPlanUsage, referralRewardCredits, resolvePlan, usageLimitsDisabled } from "@/lib/plans";
+import { addAddOnCredits, planQuotaLabel, planStatusLabel, PlanKey, readAddOnCredits, readFreeBonusRemaining, readPlanFromStorage, readPlanUsage, referralRewardCredits, resolvePlan, reviewCommentRewardCredits, reviewRatingRewardCredits, usageLimitsDisabled } from "@/lib/plans";
 
 type AccountState = {
   addOnCredits: number;
@@ -21,6 +21,14 @@ type AccountState = {
   referralCode: string;
   serverSynced: boolean;
   used: number;
+};
+
+type ReviewState = {
+  comment: string;
+  commentRewarded: boolean;
+  rating: number;
+  ratingRewarded: boolean;
+  updatedAt: string | null;
 };
 
 const initialAccountState: AccountState = {
@@ -37,6 +45,14 @@ const initialAccountState: AccountState = {
   used: 0
 };
 
+const initialReviewState: ReviewState = {
+  comment: "",
+  commentRewarded: false,
+  rating: 0,
+  ratingRewarded: false,
+  updatedAt: null
+};
+
 export function AccountPanel() {
   const [account, setAccount] = useState<AccountState>(initialAccountState);
   const [copiedReferral, setCopiedReferral] = useState(false);
@@ -47,6 +63,9 @@ export function AccountPanel() {
   const [referralInput, setReferralInput] = useState("");
   const [referralLoading, setReferralLoading] = useState(false);
   const [referralMessage, setReferralMessage] = useState("");
+  const [review, setReview] = useState<ReviewState>(initialReviewState);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewMessage, setReviewMessage] = useState("");
   const [shareOrigin, setShareOrigin] = useState("");
 
   useEffect(() => {
@@ -95,6 +114,7 @@ export function AccountPanel() {
         window.localStorage.removeItem("hoshiyomi:member");
         window.sessionStorage.removeItem("hoshiyomi:member");
       }
+      setReview(normalizeReviewState(data.review));
       setAccount((current) => ({
         ...current,
         addOnCredits: typeof data.usage?.addOnCredits === "number" ? data.usage.addOnCredits : current.addOnCredits,
@@ -194,6 +214,54 @@ export function AccountPanel() {
     }
   }
 
+  async function submitReview() {
+    if (!account.member) {
+      setReviewMessage("評価特典を受け取るには、先に新規登録またはログインが必要です。");
+      return;
+    }
+    if (!review.rating) {
+      setReviewMessage("星評価を1〜5で選んでください。");
+      return;
+    }
+
+    setReviewLoading(true);
+    setReviewMessage("");
+    try {
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clientUserId: account.clientUserId || ensureClientUserId(),
+          comment: review.comment,
+          rating: review.rating
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) {
+        throw new Error(data.error || "評価を保存できませんでした。");
+      }
+      const creditsAwarded = typeof data.creditsAwarded === "number" ? data.creditsAwarded : 0;
+      if (data.mode === "local" && creditsAwarded > 0) {
+        addAddOnCredits(readAddOnCredits(), creditsAwarded);
+      }
+      if (data.review) setReview(normalizeReviewState(data.review));
+      setAccount((current) => ({
+        ...current,
+        addOnCredits: typeof data.usage?.addOnCredits === "number" ? data.usage.addOnCredits : current.addOnCredits + creditsAwarded,
+        freeBonusRemaining: typeof data.usage?.freeBonusRemaining === "number" ? data.usage.freeBonusRemaining : current.freeBonusRemaining,
+        member: typeof data.usage?.isMember === "boolean" ? data.usage.isMember : current.member,
+        plan: isPlanKey(data.usage?.plan) ? data.usage.plan : current.plan,
+        serverSynced: data.mode === "server" ? true : current.serverSynced,
+        used: typeof data.usage?.used === "number" ? data.usage.used : current.used
+      }));
+      setReviewMessage(creditsAwarded > 0 ? `評価特典として${creditsAwarded}回分の相談枠を追加しました。` : "評価を更新しました。特典の付与は各項目につき1回までです。");
+    } catch (error) {
+      setReviewMessage(error instanceof Error ? error.message : "評価を保存できませんでした。");
+    } finally {
+      setReviewLoading(false);
+    }
+  }
+
   async function logout() {
     setLogoutLoading(true);
     setLogoutMessage("");
@@ -209,6 +277,7 @@ export function AccountPanel() {
       clientUserId: nextClientUserId,
       referralCode: ensureLocalReferralCode(nextClientUserId)
     });
+    setReview(initialReviewState);
     setLogoutLoading(false);
     setLogoutMessage("ログアウトしました。保存済みの星の情報はこの端末に残っています。");
   }
@@ -342,6 +411,56 @@ export function AccountPanel() {
           ))}
         </div>
         <p className="small">{account.serverSynced ? "登録した星の情報は保存されています。" : "登録前でも、この端末に残っている星の情報を確認できます。"}</p>
+      </div>
+
+      <div className="panel account-detail-card review-reward-card">
+        <div className="eyebrow">Review Gift</div>
+        <h2>評価して相談枠を受け取る</h2>
+        <p>
+          星評価で{reviewRatingRewardCredits}回分、8文字以上の口コミでさらに{reviewCommentRewardCredits}回分の相談枠をプレゼントします。
+          口コミは個人が特定されないよう、名前の最初の1文字だけを表示して掲載します。
+        </p>
+        <div className="review-form">
+          <div className="review-stars-input" aria-label="5段階評価">
+            {[1, 2, 3, 4, 5].map((value) => (
+              <button
+                aria-label={`${value}つ星`}
+                aria-pressed={review.rating === value}
+                className={value <= review.rating ? "star-button active" : "star-button"}
+                disabled={!account.member || reviewLoading}
+                key={value}
+                onClick={() => setReview((current) => ({ ...current, rating: value }))}
+                type="button"
+              >
+                ★
+              </button>
+            ))}
+          </div>
+          <div className="review-reward-status">
+            <span>{review.ratingRewarded ? "星評価特典は受け取り済み" : `星評価で+${reviewRatingRewardCredits}回`}</span>
+            <span>{review.commentRewarded ? "口コミ特典は受け取り済み" : `口コミで+${reviewCommentRewardCredits}回`}</span>
+          </div>
+          <label htmlFor="review-comment">口コミを書く</label>
+          <textarea
+            id="review-comment"
+            maxLength={420}
+            onChange={(event) => setReview((current) => ({ ...current, comment: event.target.value }))}
+            placeholder="例: 恋愛の悩みで相談しました。星の根拠をもとに、今すぐ動くことと少し待つことを分けてくれたのがよかったです。"
+            value={review.comment}
+          />
+          <div className="review-form-footer">
+            <span>{Array.from(review.comment.trim()).length}/420</span>
+            <button className="button primary" disabled={!account.member || reviewLoading} onClick={submitReview} type="button">
+              {reviewLoading ? "保存中" : "評価を送信する"}
+            </button>
+          </div>
+          {!account.member ? (
+            <p className="small referral-message">
+              評価特典を受け取るには、先に<Link className="text-link" href="/register?returnTo=/account">新規登録</Link>またはログインが必要です。
+            </p>
+          ) : null}
+          {reviewMessage ? <p className="small referral-message">{reviewMessage}</p> : null}
+        </div>
       </div>
 
       <div className="panel account-detail-card referral-card">
@@ -568,6 +687,25 @@ function normalizeLocalReferralCode(value: string) {
   const normalized = value.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
   const body = normalized.startsWith("HSY") ? normalized.slice(3) : normalized;
   return body ? `HSY-${body}` : "";
+}
+
+function normalizeReviewState(value: unknown): ReviewState {
+  if (!value || typeof value !== "object") return initialReviewState;
+  const review = value as {
+    comment?: unknown;
+    commentRewarded?: unknown;
+    rating?: unknown;
+    ratingRewarded?: unknown;
+    updatedAt?: unknown;
+  };
+  const rating = Number(review.rating);
+  return {
+    comment: typeof review.comment === "string" ? review.comment : "",
+    commentRewarded: Boolean(review.commentRewarded),
+    rating: Number.isInteger(rating) && rating >= 1 && rating <= 5 ? rating : 0,
+    ratingRewarded: Boolean(review.ratingRewarded),
+    updatedAt: typeof review.updatedAt === "string" ? review.updatedAt : null
+  };
 }
 
 function isPlanKey(value: unknown): value is PlanKey {

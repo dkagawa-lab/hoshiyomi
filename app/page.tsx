@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { BirthChartApp } from "@/components/BirthChartApp";
 import { GlobalNav } from "@/components/GlobalNav";
+import { PublicReviewList } from "@/components/PublicReviewList";
 
 const testimonials = [
   {
@@ -224,19 +225,7 @@ export default function Home() {
             <small>/ 5.0</small>
           </div>
         </div>
-        <div className="testimonial-grid">
-          {testimonials.map((testimonial) => (
-            <article className="testimonial-card" key={`${testimonial.name}-${testimonial.theme}`}>
-              <div className="testimonial-meta">
-                <span>{testimonial.theme}</span>
-                <strong>{testimonial.rating}</strong>
-              </div>
-              <p>{testimonial.text}</p>
-              <div className="testimonial-name">{testimonial.name}</div>
-            </article>
-          ))}
-        </div>
-        <p className="review-note">リリース前の掲載イメージです。正式公開時には実際のレビューに差し替えます。</p>
+        <PublicReviewList fallback={testimonials} />
       </section>
 
       <footer className="footer">

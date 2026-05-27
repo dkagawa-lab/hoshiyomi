@@ -103,6 +103,23 @@ create index if not exists non_billable_events_key_created_idx
 create index if not exists non_billable_events_created_idx
   on non_billable_events(created_at desc);
 
+create table if not exists user_reviews (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null unique references users(id) on delete cascade,
+  rating integer not null check (rating between 1 and 5),
+  comment text,
+  display_name text,
+  display_area text,
+  rating_rewarded_at timestamptz,
+  comment_rewarded_at timestamptz,
+  updated_at timestamptz not null default now(),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists user_reviews_public_idx
+  on user_reviews(updated_at desc)
+  where comment is not null;
+
 create view monthly_user_chat_counts as
 select
   user_id,

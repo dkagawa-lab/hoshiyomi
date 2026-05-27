@@ -1,6 +1,6 @@
 import { createHash } from "crypto";
 import { Chart } from "@/lib/astrology";
-import { PlanKey, planRank, referralRewardCredits, registeredFreeBonusLimit, resolvePlan } from "@/lib/plans";
+import { PlanKey, planRank, referralRewardCredits, registeredFreeBonusLimit, resolvePlan, reviewCommentRewardCredits, reviewRatingRewardCredits } from "@/lib/plans";
 import type { GenderKey, RomanticInterestKey } from "@/lib/profileOptions";
 
 export type StoredUser = {
@@ -65,6 +65,36 @@ export type PublicUserSnapshot = {
   plan: PlanKey;
   referralCode: string | null;
   romanticInterest: RomanticInterestKey | null;
+};
+
+export type StoredReview = {
+  id: string;
+  comment: string | null;
+  comment_rewarded_at: string | null;
+  created_at: string;
+  display_area: string | null;
+  display_name: string | null;
+  rating: number;
+  rating_rewarded_at: string | null;
+  updated_at: string;
+  user_id: string;
+};
+
+export type UserReviewSnapshot = {
+  comment: string;
+  commentRewarded: boolean;
+  rating: number | null;
+  ratingRewarded: boolean;
+  updatedAt: string | null;
+};
+
+export type PublicReviewSnapshot = {
+  comment: string;
+  createdAt: string;
+  displayArea: string;
+  displayName: string;
+  id: string;
+  rating: number;
 };
 
 export type ContactInquiryInput = {
@@ -259,10 +289,11 @@ export async function getUserSnapshotByClientUserId(clientUserId: string) {
   const existingUser = await getUserByClientUserId(clientUserId);
   const user = existingUser?.is_member ? await ensureReferralCodeForUser(existingUser) : existingUser;
   if (!user) return null;
-  const [usage, messages] = await Promise.all([getUsageSnapshot(user), listChatMessages(user.id)]);
+  const [usage, messages, review] = await Promise.all([getUsageSnapshot(user), listChatMessages(user.id), getUserReviewSnapshot(user.id)]);
   return {
     history: buildStoredHistory(messages, user),
     messages: messages.map((message) => ({ content: message.content, role: message.role })),
+    review,
     usage,
     user: toPublicUserSnapshot(user)
   };
@@ -410,6 +441,16 @@ export class ReferralCodeError extends Error {
   }
 }
 
+export class ReviewSubmissionError extends Error {
+  status: number;
+
+  constructor(message: string, status = 400) {
+    super(message);
+    this.name = "ReviewSubmissionError";
+    this.status = status;
+  }
+}
+
 export function normalizeReferralCode(value: unknown) {
   if (typeof value !== "string") return null;
   const normalized = value.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -484,6 +525,61 @@ export async function insertContactInquiry(input: ContactInquiryInput) {
   return inquiries[0] ?? null;
 }
 
+export async function submitUserReview(input: { clientUserId: string; comment?: string | null; rating: number }) {
+  const user = await getUserByClientUserId(input.clientUserId);
+  if (!user || !user.is_member) {
+    throw new ReviewSubmissionError("評価特典を受け取るには、先に会員登録またはログインが必要です。", 401);
+  }
+
+  const rating = normalizeReviewRating(input.rating);
+  const comment = normalizeReviewComment(input.comment);
+  if (!rating) throw new ReviewSubmissionError("星評価は1〜5の範囲で選択してください。", 400);
+  if (input.comment && !comment) {
+    throw new ReviewSubmissionError("口コミ特典を受け取るには、8文字以上で感想を書いてください。", 400);
+  }
+
+  const now = new Date().toISOString();
+  const payload = {
+    comment,
+    display_area: buildReviewDisplayArea(user.birth_city),
+    display_name: user.name || "HOSHIYOMIユーザー",
+    rating,
+    updated_at: now
+  };
+
+  await upsertUserReview(user.id, payload);
+
+  let creditsAwarded = 0;
+  if (await markReviewRatingRewarded(user.id, now)) creditsAwarded += reviewRatingRewardCredits;
+  if (comment && (await markReviewCommentRewarded(user.id, now))) creditsAwarded += reviewCommentRewardCredits;
+
+  const updatedUser =
+    creditsAwarded > 0
+      ? await updateUser(user.id, {
+          add_on_credits: Math.max(0, Number(user.add_on_credits || 0)) + creditsAwarded
+        })
+      : user;
+
+  return {
+    creditsAwarded,
+    review: await getUserReviewSnapshot(user.id),
+    usage: await getUsageSnapshot(updatedUser)
+  };
+}
+
+export async function getUserReviewSnapshot(userId: string): Promise<UserReviewSnapshot> {
+  const review = await getReviewByUserId(userId);
+  return toUserReviewSnapshot(review);
+}
+
+export async function listPublicReviews(limit = 6): Promise<PublicReviewSnapshot[]> {
+  const safeLimit = Math.max(1, Math.min(12, Math.floor(limit) || 6));
+  const reviews = await supabaseJson<StoredReview[]>(
+    `user_reviews?comment=not.is.null&select=id,rating,comment,display_name,display_area,created_at,updated_at&order=updated_at.desc&limit=${safeLimit}`
+  );
+  return reviews.filter((review) => typeof review.comment === "string" && review.comment.trim()).map(toPublicReviewSnapshot);
+}
+
 export async function checkNonBillableRateLimit(input: { identifier: string; kind: string; scope: string }): Promise<NonBillableRateLimitResult> {
   const now = Date.now();
   const windowStart = new Date(now - nonBillableRateLimit.windowMs);
@@ -519,6 +615,104 @@ export async function checkNonBillableRateLimit(input: { identifier: string; kin
     console.warn("Non-billable rate limit fell back to local memory", { message: error instanceof Error ? error.message : "Unknown error" });
     return checkLocalNonBillableRateLimit(`${normalizedScope}:${keyHash}`, now);
   }
+}
+
+async function upsertUserReview(userId: string, payload: { comment: string | null; display_area: string; display_name: string; rating: number; updated_at: string }) {
+  const existing = await getReviewByUserId(userId);
+  if (existing) {
+    const reviews = await supabaseJson<StoredReview[]>(`user_reviews?user_id=eq.${encodeURIComponent(userId)}&select=*`, {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify(payload)
+    });
+    return reviews[0] ?? existing;
+  }
+
+  try {
+    const reviews = await supabaseJson<StoredReview[]>("user_reviews?select=*", {
+      method: "POST",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify({ ...payload, user_id: userId })
+    });
+    return reviews[0];
+  } catch {
+    const reviews = await supabaseJson<StoredReview[]>(`user_reviews?user_id=eq.${encodeURIComponent(userId)}&select=*`, {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify(payload)
+    });
+    return reviews[0];
+  }
+}
+
+async function markReviewRatingRewarded(userId: string, now: string) {
+  const reviews = await supabaseJson<StoredReview[]>(`user_reviews?user_id=eq.${encodeURIComponent(userId)}&rating_rewarded_at=is.null&select=*`, {
+    method: "PATCH",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify({ rating_rewarded_at: now })
+  });
+  return reviews.length > 0;
+}
+
+async function markReviewCommentRewarded(userId: string, now: string) {
+  const reviews = await supabaseJson<StoredReview[]>(`user_reviews?user_id=eq.${encodeURIComponent(userId)}&comment_rewarded_at=is.null&comment=not.is.null&select=*`, {
+    method: "PATCH",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify({ comment_rewarded_at: now })
+  });
+  return reviews.length > 0;
+}
+
+async function getReviewByUserId(userId: string) {
+  const reviews = await supabaseJson<StoredReview[]>(`user_reviews?user_id=eq.${encodeURIComponent(userId)}&select=*&limit=1`);
+  return reviews[0] ?? null;
+}
+
+function normalizeReviewRating(value: unknown) {
+  const rating = Number(value);
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) return null;
+  return rating;
+}
+
+function normalizeReviewComment(value: unknown) {
+  if (typeof value !== "string") return null;
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (!normalized) return null;
+  if (Array.from(normalized).length < 8) return null;
+  return Array.from(normalized).slice(0, 420).join("");
+}
+
+function toUserReviewSnapshot(review: StoredReview | null): UserReviewSnapshot {
+  return {
+    comment: review?.comment ?? "",
+    commentRewarded: Boolean(review?.comment_rewarded_at),
+    rating: typeof review?.rating === "number" ? review.rating : null,
+    ratingRewarded: Boolean(review?.rating_rewarded_at),
+    updatedAt: review?.updated_at ?? null
+  };
+}
+
+function toPublicReviewSnapshot(review: StoredReview): PublicReviewSnapshot {
+  return {
+    comment: review.comment ?? "",
+    createdAt: review.updated_at || review.created_at,
+    displayArea: review.display_area || "",
+    displayName: maskReviewDisplayName(review.display_name),
+    id: review.id,
+    rating: review.rating
+  };
+}
+
+function maskReviewDisplayName(value: string | null | undefined) {
+  const source = Array.from((value || "HOSHIYOMIユーザー").trim()).filter((char) => char.trim());
+  const first = source[0] || "H";
+  return `${first}＊＊`;
+}
+
+function buildReviewDisplayArea(value: string | null | undefined) {
+  const city = (value || "").trim();
+  if (!city) return "";
+  return city.split(/\s+/)[0] || city;
 }
 
 export async function getUserByClientUserId(clientUserId: string) {
