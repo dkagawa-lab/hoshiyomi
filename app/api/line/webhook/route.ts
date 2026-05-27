@@ -6,7 +6,7 @@ import { canUseReaderStyle, resolvePlan, usageLimitsDisabled } from "@/lib/plans
 import { ReaderStyleKey, resolveReaderStyle } from "@/lib/readerStyles";
 import { resolveQuestionIntent } from "@/lib/questionIntents";
 import { buildConversationContext, generateAstrologyAnswer, isAnthropicApiError, isAnthropicRateLimitError, isProductionAiConfigured, mergeConversationMessages, normalizeChatMessages } from "@/lib/aiRuntime";
-import { consumeQuota, countLifetimeUserMessages, getQuotaState, getUsageSnapshot, getUserByLineUserId, insertChatTurn, isServerStoreConfigured, listChatMessages, StoredUser } from "@/lib/serverStore";
+import { consumeQuota, countLifetimeUserMessages, getQuotaState, getUsageSnapshot, getUserByLineUserId, insertChatTurn, isServerStoreConfigured, listChatMessages, StoredUser, UsageSnapshot } from "@/lib/serverStore";
 
 type LineWebhookBody = {
   events?: LineEvent[];
@@ -27,6 +27,13 @@ type LineEvent = {
 type LineTextMessage = {
   text: string;
   type: "text";
+};
+
+type LinePersistenceResult = {
+  historySaved: boolean;
+  quotaSaved: boolean;
+  usage: UsageSnapshot | null;
+  usageLoaded: boolean;
 };
 
 function verifyLineSignature(body: string, signature: string | null) {
@@ -151,8 +158,13 @@ async function handleLineEventCore(event: LineEvent, replyToken: string, lineUse
     return;
   }
 
-  const usage = await persistLineChatTurnAndQuota({ answer, normalizedQuestion, quota, quotaDisabled, user });
-  await replyLineText(replyToken, usage ? [answer, buildShortUsageFooter(usage)] : [answer, buildLinePersistenceWarning()]);
+  const persistence = await persistLineChatTurnAndQuota({ answer, normalizedQuestion, quota, quotaDisabled, user });
+  const statusFooter = buildLineStatusFooter({
+    persistence,
+    readerStyle,
+    usage: persistence.usage ?? usageSnapshotFromQuota(quota)
+  });
+  await replyLineText(replyToken, [answer, statusFooter]);
 }
 
 function parseLinePayload(body: string): LineWebhookBody {
@@ -187,15 +199,57 @@ function isUsageQuestion(question: string) {
 }
 
 async function buildUsageReply(user: StoredUser) {
-  return buildShortUsageFooter(await getUsageSnapshot(user), true);
+  return buildLineStatusFooter({
+    readerStyle: "normal",
+    usage: await getUsageSnapshot(user),
+    verbose: true
+  });
 }
 
-function buildShortUsageFooter(usage: Awaited<ReturnType<typeof getUsageSnapshot>>, verbose = false) {
-  const plan = resolvePlan(usage.plan);
-  const base = `${verbose ? "現在の利用状況\n\n" : ""}${plan.label}: 残り${usage.remaining}回`;
-  const details = usage.addOnCredits > 0 ? `\n追加分: 残り${usage.addOnCredits}回` : "";
-  const bonus = usage.freeBonusRemaining > 0 && usage.plan === "free" ? `\n登録特典: 残り${usage.freeBonusRemaining}回` : "";
-  return `${base}${bonus}${details}`;
+function buildLineStatusFooter(input: { persistence?: LinePersistenceResult; readerStyle: ReaderStyleKey; usage: UsageSnapshot; verbose?: boolean }) {
+  const plan = resolvePlan(input.usage.plan);
+  const reader = resolveReaderStyle(input.readerStyle);
+  const periodLabel = plan.usagePeriod === "day" ? "今日" : "今月";
+  const lines = [
+    input.verbose ? "現在の利用状況" : "今回の鑑定情報",
+    "",
+    `プラン: ${plan.label}`,
+    `占い師: ${reader.readerName}（${reader.label}）`,
+    `残り回数: ${input.usage.remaining}回`
+  ];
+
+  if (input.usage.freeBonusRemaining > 0 && input.usage.plan === "free") {
+    lines.push(`登録特典: 残り${input.usage.freeBonusRemaining}回`);
+  }
+  if (input.usage.addOnCredits > 0) {
+    lines.push(`追加分: 残り${input.usage.addOnCredits}回`);
+  }
+  if (!input.verbose) {
+    lines.push(`集計期間: ${periodLabel}`);
+  }
+  if (input.persistence && (!input.persistence.historySaved || !input.persistence.quotaSaved || !input.persistence.usageLoaded)) {
+    const unresolved = [
+      !input.persistence.historySaved ? "履歴保存" : "",
+      !input.persistence.quotaSaved ? "回数反映" : "",
+      !input.persistence.usageLoaded ? "残り回数の再取得" : ""
+    ].filter(Boolean);
+    lines.push("");
+    lines.push(`反映状況: ${unresolved.join("・")}を確認できませんでした。鑑定文は送信済みです。`);
+    lines.push(`確認: ${appUrl("/account")}`);
+  }
+
+  return lines.join("\n");
+}
+
+function usageSnapshotFromQuota(quota: Awaited<ReturnType<typeof getQuotaState>>): UsageSnapshot {
+  return {
+    addOnCredits: quota.addOnCredits,
+    freeBonusRemaining: quota.freeBonusRemaining,
+    isMember: quota.isMember,
+    plan: quota.plan,
+    remaining: quota.remaining,
+    used: quota.used
+  };
 }
 
 function buildLimitReply(user: StoredUser, quota: Awaited<ReturnType<typeof getQuotaState>>) {
@@ -222,10 +276,6 @@ function buildLineSystemErrorReply() {
   return `会員情報または相談枠の確認で一時的な問題が起きました。\n\nWebで登録情報を確認してから、少し時間をおいてもう一度送ってください。\n${appUrl("/account")}`;
 }
 
-function buildLinePersistenceWarning() {
-  return `今回の鑑定は送信できましたが、履歴と残り回数の反映を確認できませんでした。\n\n続けて相談する前に、Webの登録情報で状態を確認してください。\n${appUrl("/account")}`;
-}
-
 function formatRetryAfter(seconds: number) {
   if (seconds < 60) return `${Math.ceil(seconds)}秒`;
   return `${Math.ceil(seconds / 60)}分`;
@@ -238,11 +288,17 @@ async function persistLineChatTurnAndQuota(input: {
   quotaDisabled: boolean;
   user: StoredUser;
 }) {
-  return safeLineStore("persist line chat turn and quota", async () => {
-    await insertChatTurn({ answer: input.answer, question: input.normalizedQuestion, userId: input.user.id });
-    const updatedUser = input.quotaDisabled ? input.user : await consumeQuota(input.user, input.quota);
-    return getUsageSnapshot(updatedUser);
-  });
+  const historyResult = await safeLineStoreResult("insert line chat turn", () => insertChatTurn({ answer: input.answer, question: input.normalizedQuestion, userId: input.user.id }));
+  const quotaResult = input.quotaDisabled ? { ok: true as const, value: input.user } : await safeLineStoreResult("consume line quota", () => consumeQuota(input.user, input.quota));
+  const usageUser = quotaResult.ok ? quotaResult.value : input.user;
+  const usageResult = await safeLineStoreResult("read usage after line reply", () => getUsageSnapshot(usageUser));
+
+  return {
+    historySaved: historyResult.ok,
+    quotaSaved: input.quotaDisabled || quotaResult.ok,
+    usage: usageResult.ok ? usageResult.value : null,
+    usageLoaded: usageResult.ok
+  };
 }
 
 async function safeLineStore<T>(label: string, action: () => Promise<T>) {
@@ -251,6 +307,15 @@ async function safeLineStore<T>(label: string, action: () => Promise<T>) {
   } catch (error) {
     console.warn(`LINE store skipped: ${label}`, { message: error instanceof Error ? error.message : "Unknown error" });
     return null;
+  }
+}
+
+async function safeLineStoreResult<T>(label: string, action: () => Promise<T>) {
+  try {
+    return { ok: true as const, value: await action() };
+  } catch (error) {
+    console.warn(`LINE store failed: ${label}`, { message: error instanceof Error ? error.message : "Unknown error" });
+    return { ok: false as const };
   }
 }
 
