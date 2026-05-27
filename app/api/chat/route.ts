@@ -28,16 +28,19 @@ export async function POST(req: Request) {
   const readerStyle = resolveReaderStyle(body.readerStyle).key;
   const questionIntent = resolveQuestionIntent(body.question, body.questionIntent).key;
   const clientUserId = normalizeClientUserId(body.clientUserId);
-  const storedUser = isServerStoreConfigured() && clientUserId ? await upsertUserForChart({ chart: body.chart, clientUserId, isMember: Boolean(body.isMember) }) : null;
-  const quota = storedUser ? await getQuotaState(storedUser) : null;
+  const storedUser = isServerStoreConfigured() && clientUserId ? await safeServerStore("upsert user for chat", () => upsertUserForChart({ chart: body.chart, clientUserId, isMember: Boolean(body.isMember) })) : null;
+  const quota = storedUser ? await safeServerStore("read quota for chat", () => getQuotaState(storedUser)) : null;
   const plan = resolvePlan(quota?.plan ?? body.plan);
   const quotaDisabled = usageLimitsDisabled();
   const clientMessages = normalizeChatMessages(body.messages, body.question, plan.key);
   const storedMessages = storedUser
-    ? (await listChatMessages(storedUser.id, plan.key === "luxury" ? 80 : 40)).map((message) => ({ role: message.role, content: message.content }))
+    ? (await safeServerStore("read stored chat messages", () => listChatMessages(storedUser.id, plan.key === "luxury" ? 80 : 40)))?.map((message) => ({ role: message.role, content: message.content })) ?? []
     : [];
   const conversationMessages = mergeConversationMessages(storedMessages, clientMessages, body.question, plan.key);
-  const freeAnswerCount = plan.key === "free" && storedUser ? await countLifetimeUserMessages(storedUser.id) : countPreviousClientUserQuestions(body.messages);
+  const freeAnswerCount =
+    plan.key === "free" && storedUser
+      ? (await safeServerStore("count lifetime user messages", () => countLifetimeUserMessages(storedUser.id))) ?? countPreviousClientUserQuestions(body.messages)
+      : countPreviousClientUserQuestions(body.messages);
 
   if (!quotaDisabled && storedUser && quota && quota.remaining <= 0) {
     return NextResponse.json(
@@ -52,10 +55,8 @@ export async function POST(req: Request) {
   if (!isProductionAiConfigured()) {
     const answer = demoAnswer(body.question, body.chart, transits, readerStyle, plan.key, questionIntent);
     if (storedUser && quota) {
-      await insertChatTurn({ answer, question: body.question, userId: storedUser.id });
-      if (quotaDisabled) return NextResponse.json({ answer, mode: "demo", usage: await getUsageSnapshot(storedUser) });
-      const updatedUser = await consumeQuota(storedUser, quota);
-      return NextResponse.json({ answer, mode: "demo", usage: await getUsageSnapshot(updatedUser) });
+      const usage = await persistChatTurnAndQuota({ answer, question: body.question, quota, quotaDisabled, storedUser });
+      return NextResponse.json({ answer, mode: "demo", ...(usage ? { usage } : {}) });
     }
     return NextResponse.json({ answer, mode: "demo" });
   }
@@ -119,12 +120,35 @@ export async function POST(req: Request) {
   }
 
   if (storedUser && quota) {
-    await insertChatTurn({ answer, question: body.question, userId: storedUser.id });
-    if (quotaDisabled) return NextResponse.json({ answer, mode: aiMode, model: aiModel, usage: await getUsageSnapshot(storedUser) });
-    const updatedUser = await consumeQuota(storedUser, quota);
-    return NextResponse.json({ answer, mode: aiMode, model: aiModel, usage: await getUsageSnapshot(updatedUser) });
+    const usage = await persistChatTurnAndQuota({ answer, question: body.question, quota, quotaDisabled, storedUser });
+    return NextResponse.json({ answer, mode: aiMode, model: aiModel, ...(usage ? { usage } : {}) });
   }
   return NextResponse.json({ answer, mode: aiMode, model: aiModel });
+}
+
+async function persistChatTurnAndQuota(input: {
+  answer: string;
+  question: string;
+  quota: Awaited<ReturnType<typeof getQuotaState>>;
+  quotaDisabled: boolean;
+  storedUser: Awaited<ReturnType<typeof upsertUserForChart>>;
+}) {
+  if (!input.storedUser) return null;
+  return safeServerStore("persist chat turn and quota", async () => {
+    await insertChatTurn({ answer: input.answer, question: input.question, userId: input.storedUser.id });
+    if (input.quotaDisabled) return getUsageSnapshot(input.storedUser);
+    const updatedUser = await consumeQuota(input.storedUser, input.quota);
+    return getUsageSnapshot(updatedUser);
+  });
+}
+
+async function safeServerStore<T>(label: string, action: () => Promise<T>) {
+  try {
+    return await action();
+  } catch (error) {
+    console.warn(`Server store skipped: ${label}`, { message: error instanceof Error ? error.message : "Unknown error" });
+    return null;
+  }
 }
 
 function countPreviousClientUserQuestions(messages: ChatRequest["messages"]) {

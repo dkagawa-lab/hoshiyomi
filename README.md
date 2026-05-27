@@ -26,6 +26,8 @@ npm run dev
 
 `http://localhost:3000` を開きます。
 
+このプロジェクトではローカル確認で `3001` を使っている場合があります。その場合は `http://localhost:3001`、スマホ確認では起動ログに出る `http://192.168.x.x:3001` のようなNetwork URLを開いてください。Next.jsの開発用クロスオリジン制限に対応するため、`next.config.ts` にローカルネットワーク向けの `allowedDevOrigins` を入れています。
+
 ## 本番化に必要な設定
 
 1. Vercelにデプロイ
@@ -43,6 +45,8 @@ npm run dev
 Supabaseを設定していないローカル環境では、これまで通りブラウザ内の保存でデモ動作します。Supabaseを設定すると、相談API側で回数判定と履歴保存を行います。
 
 紹介コード機能を本番で使う場合は、最新の `supabase/schema.sql` をSupabase SQL Editorで実行してください。`users.referral_code` と `referral_redemptions` が作成されると、アカウント画面で紹介コードが発行されます。
+
+Stripe決済を本番で使う場合も、最新の `supabase/schema.sql` を実行してください。`stripe_events` が作成されると、Stripe webhookの再送で追加100回パックが二重付与される事故を防げます。
 
 ## 会員登録/ログインの設定
 
@@ -84,6 +88,7 @@ LINE_CHANNEL_ACCESS_TOKEN=
 LINE_LOGIN_CHANNEL_ID=
 LINE_LOGIN_CHANNEL_SECRET=
 LINE_LOGIN_REDIRECT_URI=https://あなたのドメイン/api/auth/line/callback
+NEXT_PUBLIC_LINE_FRIEND_URL=https://lin.ee/あなたの友だち追加URL
 ```
 
 LINE DevelopersのMessaging API設定では、Webhook URLを次にします。

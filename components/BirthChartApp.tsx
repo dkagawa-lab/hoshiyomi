@@ -6,6 +6,7 @@ import { BirthInput, calculateChart, Chart } from "@/lib/astrology";
 import { ChartWheel } from "@/components/ChartWheel";
 import { PricingPanel } from "@/components/PricingPanel";
 import { ensureClientUserId } from "@/lib/clientIdentity";
+import { getLineFriendUrl } from "@/lib/lineLinks";
 import { findPrefecture, japanLocations, Municipality } from "@/lib/japanLocations";
 import { municipalityReadings } from "@/lib/municipalityReadings.generated";
 import { coerceAnswerText, normalizeAnswerText } from "@/lib/answerText";
@@ -76,6 +77,7 @@ type ServerProfile = {
   birthTime?: string | null;
   gender?: GenderKey | null;
   latitude?: number | null;
+  lineLinked?: boolean | null;
   longitude?: number | null;
   name?: string | null;
   romanticInterest?: RomanticInterestKey | null;
@@ -153,6 +155,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
   const [member, setMember] = useState(false);
   const [freeBonusRemaining, setFreeBonusRemaining] = useState(0);
   const [addOnCredits, setAddOnCredits] = useState(0);
+  const [lineLinked, setLineLinked] = useState(false);
   const [readerStyle, setReaderStyle] = useState<ReaderStyleKey>("normal");
   const [readerStyleNotice, setReaderStyleNotice] = useState("");
   const [readerStyleUpgradePlan, setReaderStyleUpgradePlan] = useState<Exclude<PlanKey, "free"> | null>(null);
@@ -163,6 +166,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
   const [streamingAnswer, setStreamingAnswer] = useState("");
   const [birthError, setBirthError] = useState("");
   const [showPaywallModal, setShowPaywallModal] = useState(false);
+  const [checkoutNotice, setCheckoutNotice] = useState("");
   const messagesRef = useRef<HTMLDivElement | null>(null);
   const messageEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -184,6 +188,8 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
   const followUpQuestions = useMemo(() => buildFollowUpQuestions(messages), [messages]);
   const selectedReaderStyle = readerStyles.find((style) => style.key === readerStyle) ?? readerStyles[0];
   const activeReaderStyle = readerStyleLocksDisabled || canUseReaderStyle(selectedReaderStyle.key, plan) ? selectedReaderStyle : readerStyles[0];
+  const lineFriendUrl = getLineFriendUrl();
+  const lineConnectHref = `/api/auth/line/login?returnTo=/consultation&mode=signup&clientUserId=${encodeURIComponent(clientUserId)}`;
   const readerStyleGroups = useMemo(
     () => [
       {
@@ -223,6 +229,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
     const nextClientUserId = ensureClientUserId();
     setClientUserId(nextClientUserId);
     syncServerState(nextClientUserId);
+    handleCheckoutReturn(nextClientUserId);
     const savedPlan = readPlanFromStorage();
     const savedMember = window.localStorage.getItem("hoshiyomi:member") === "true" || window.sessionStorage.getItem("hoshiyomi:member") === "true";
     setPlan(savedPlan);
@@ -267,6 +274,10 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
       return;
     }
     setLocationChoicePending(matches.some((item) => item.score <= 4));
+  }
+
+  function handleLocationQueryInput(event: FormEvent<HTMLInputElement>) {
+    updateLocationQuery(event.currentTarget.value);
   }
 
   function chooseLocationMatch(match: LocationSearchMatch) {
@@ -355,6 +366,14 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
     }
     try {
       const currentSelectedLocation = getSelectedLocation(prefecture, municipality);
+      const normalizedLocationQuery = normalizeLocationSearchText(locationQuery);
+      const normalizedSelectedLocation = normalizeLocationSearchText(
+        `${currentSelectedLocation.location.prefecture}${currentSelectedLocation.municipality.name}`
+      );
+      if (normalizedLocationQuery && input.city !== "手入力" && !normalizedSelectedLocation.includes(normalizedLocationQuery)) {
+        setBirthError("出生地の入力内容がまだ反映されていません。候補から該当する市区町村を選択してください。");
+        return;
+      }
       const normalizedInput = {
         ...input,
         city: input.city === "手入力" ? input.city : `${currentSelectedLocation.location.prefecture} ${currentSelectedLocation.municipality.name}`,
@@ -415,10 +434,11 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
         }, randomLoadingDelay());
       };
       scheduleNextLoadingStep();
+      const requestMessages = buildRequestMessagesForApi(nextMessages, currentPlan.key);
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chart: requestChart, question: trimmedQuestion, messages: nextMessages, readerStyle: activeReaderStyle.key, plan: currentPlan.key, questionIntent: resolvedIntent, clientUserId: activeClientUserId, isMember: member })
+        body: JSON.stringify({ chart: requestChart, question: trimmedQuestion, messages: requestMessages, readerStyle: activeReaderStyle.key, plan: currentPlan.key, questionIntent: resolvedIntent, clientUserId: activeClientUserId, isMember: member })
       });
       const data = await res.json().catch(() => ({}));
       if (data.usage) applyServerUsage(data.usage);
@@ -431,7 +451,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
         return;
       }
       if (!res.ok || data.error || !data.answer) {
-        throw new Error(data.error || "星からの返答を受け取れませんでした。");
+        throw new Error(data.error || chatResponseFallbackMessage(res.status));
       }
       const answer = normalizeAnswerText(data.answer);
       if (!answer) {
@@ -497,6 +517,10 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
     }
   }
 
+  function wait(ms: number) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
   async function checkout(nextPlan: Exclude<PlanKey, "free">) {
     const activeClientUserId = clientUserId || ensureClientUserId();
     if (!clientUserId) setClientUserId(activeClientUserId);
@@ -551,17 +575,18 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
   }
 
   async function syncServerState(nextClientUserId = clientUserId) {
-    if (!nextClientUserId) return;
+    if (!nextClientUserId) return null;
     try {
       const res = await fetch(`/api/me?clientUserId=${encodeURIComponent(nextClientUserId)}`);
       const data = (await res.json()) as ServerSnapshot;
-      if (!res.ok || data.mode !== "server") return;
+      if (!res.ok || data.mode !== "server") return null;
       if (!data.user && !data.usage) {
         setMember(false);
         window.localStorage.removeItem("hoshiyomi:member");
         window.sessionStorage.removeItem("hoshiyomi:member");
       }
       if (data.usage) applyServerUsage(data.usage);
+      if (data.user && typeof data.user.lineLinked === "boolean") setLineLinked(data.user.lineLinked);
       if (data.user) applyServerProfile(data.user);
       if (Array.isArray(data.messages)) {
         const normalizedMessages = normalizeStoredMessages(data.messages);
@@ -573,7 +598,46 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
         setHistory(normalizedHistory);
         window.localStorage.setItem("hoshiyomi:history", JSON.stringify(normalizedHistory));
       }
-    } catch {}
+      return data;
+    } catch {
+      return null;
+    }
+  }
+
+  function handleCheckoutReturn(nextClientUserId: string) {
+    const params = new URLSearchParams(window.location.search);
+    const checkoutStatus = params.get("checkout");
+    if (!checkoutStatus) return;
+
+    if (checkoutStatus === "cancel") {
+      setCheckoutNotice("決済はキャンセルされました。必要になったタイミングで、いつでもプランを選び直せます。");
+      return;
+    }
+
+    if (checkoutStatus !== "success") return;
+    const expectedPlan = isPlanKey(params.get("plan")) ? (params.get("plan") as PlanKey) : null;
+    const expectedProduct = params.get("product") === addOnPack.key ? addOnPack.key : null;
+    const initialAddOnCredits = readAddOnCredits();
+    setCheckoutNotice(expectedProduct ? "決済完了。追加相談枠への反映を確認しています。" : "決済完了。プラン反映を確認しています。");
+    void pollCheckoutSync(nextClientUserId, expectedPlan, expectedProduct, initialAddOnCredits);
+  }
+
+  async function pollCheckoutSync(nextClientUserId: string, expectedPlan: PlanKey | null, expectedProduct: typeof addOnPack.key | null, initialAddOnCredits: number) {
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      if (attempt > 0) await wait(1500);
+      const snapshot = await syncServerState(nextClientUserId);
+      const usage = snapshot?.usage;
+      if (!usage) continue;
+      if (expectedPlan && usage.plan === expectedPlan && usage.isMember) {
+        setCheckoutNotice(`${resolvePlan(expectedPlan).label}が反映されました。このまま相談を続けられます。`);
+        return;
+      }
+      if (expectedProduct && typeof usage.addOnCredits === "number" && usage.addOnCredits > initialAddOnCredits) {
+        setCheckoutNotice("追加100回パックが反映されました。このまま相談を続けられます。");
+        return;
+      }
+    }
+    setCheckoutNotice("決済は完了しています。反映に少し時間がかかる場合があります。数十秒後に画面を再読み込みしてください。");
   }
 
   function applyServerProfile(profile: ServerProfile) {
@@ -731,11 +795,13 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
               <input
                 autoComplete="off"
                 autoCorrect="off"
+                enterKeyHint="search"
                 id="birth-location-search"
-                onChange={(event) => updateLocationQuery(event.currentTarget.value)}
+                onChange={handleLocationQueryInput}
+                onInput={handleLocationQueryInput}
                 placeholder="例: 町田市 / 静岡市 / 札幌市中央区"
                 spellCheck={false}
-                type="search"
+                type="text"
                 value={locationQuery}
               />
               <span className="field-hint">
@@ -808,6 +874,12 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
         </div>
         {birthError ? <p className="form-error">{birthError}</p> : null}
       </form>
+      ) : null}
+
+      {checkoutNotice && consultationOnly && !chart ? (
+        <div className="panel checkout-notice-card">
+          <p className="form-status success">{checkoutNotice}</p>
+        </div>
       ) : null}
 
       {!compact && chart ? (
@@ -902,6 +974,8 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
                 プランを見る
               </Link>
             </div>
+            {checkoutNotice ? <p className="form-status success">{checkoutNotice}</p> : null}
+            {member ? <LineConsultationGuide lineConnectHref={lineConnectHref} lineFriendUrl={lineFriendUrl} lineLinked={lineLinked} /> : null}
             <div className="consultation-profile-card">
               <div className="consultation-profile-heading">
                 <span>プロフィール</span>
@@ -1223,6 +1297,56 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
           onClose={() => setShowPaywallModal(false)}
         />
       ) : null}
+    </div>
+  );
+}
+
+function buildRequestMessagesForApi(messages: Message[], planKey: PlanKey): Message[] {
+  const limit = planKey === "luxury" ? 28 : planKey === "standard" ? 18 : 8;
+  return messages
+    .slice(-limit)
+    .map((message) => {
+      const content = coerceAnswerText(message.content).replace(/\s+/g, " ").trim().slice(0, 2400);
+      return content ? { role: message.role, content } : null;
+    })
+    .filter((message): message is Message => message !== null);
+}
+
+function chatResponseFallbackMessage(status: number) {
+  if (status === 413) {
+    return "相談履歴が長くなりすぎて送信できませんでした。直近の相談だけで読み直します。もう一度送ってください。";
+  }
+  if (status >= 500) {
+    return "鑑定文の生成で一時的な問題が起きました。相談回数は消費していません。少し時間をおいて、もう一度質問してみてください。";
+  }
+  return "星からの返答を受け取れませんでした。少し時間をおいて、もう一度送ってください。";
+}
+
+function LineConsultationGuide({ lineConnectHref, lineFriendUrl, lineLinked }: { lineConnectHref: string; lineFriendUrl: string; lineLinked: boolean }) {
+  return (
+    <div className={`line-consultation-guide ${lineLinked ? "linked" : ""}`}>
+      <div>
+        <span>LINEでも相談できます</span>
+        <strong>{lineLinked ? "メッセージで、そのまま星に質問できます" : "LINE連携をすると、Webの記憶をLINEに引き継げます"}</strong>
+        <p>
+          {lineLinked
+            ? "LINEで友だちになると、登録済みのあなたの星と鑑定履歴を使いながら、メッセージで質問できます。気になった瞬間に、ここでの相談の続きを送れます。"
+            : "登録情報とLINEを連携すると、保存した星の位置や相談履歴を引き継いだまま、LINEからも質問できるようになります。"}
+        </p>
+      </div>
+      <div className="line-consultation-actions">
+        {lineLinked && lineFriendUrl ? (
+          <a className="button primary auth-provider-button line" href={lineFriendUrl} rel="noreferrer" target="_blank">
+            LINEで友だち追加する
+          </a>
+        ) : lineLinked ? (
+          <span>友だち追加URLを設定すると、ここにボタンが表示されます。</span>
+        ) : (
+          <a className="button primary" href={lineConnectHref}>
+            LINEと連携する
+          </a>
+        )}
+      </div>
     </div>
   );
 }
@@ -1728,7 +1852,7 @@ function PaywallModal({
             </Link>
           </div>
         ) : (
-          <PricingPanel addOnCredits={addOnCredits} currentPlanKey={currentPlanKey} onBuyAddOn={onBuyAddOn} onCheckout={onCheckout} />
+          <PricingPanel addOnCredits={addOnCredits} currentPlanKey={currentPlanKey} isMember={isMember} onBuyAddOn={onBuyAddOn} onCheckout={onCheckout} />
         )}
       </div>
     </div>

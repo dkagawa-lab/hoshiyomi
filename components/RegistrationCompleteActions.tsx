@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { resolveReturnTo } from "@/lib/authRegistrationClient";
+import { getLineFriendUrl } from "@/lib/lineLinks";
 
 const signupMethodLabels: Record<string, string> = {
   google: "Google登録",
@@ -23,6 +24,8 @@ export function RegistrationCompleteActions() {
   const flow = searchParams.get("flow") === "login" ? "login" : "signup";
   const methodLabel = flow === "login" ? loginMethodLabels[method] || "ログイン" : signupMethodLabels[method] || "会員登録";
   const primary = resolvePrimaryAction(returnTo);
+  const lineFriendUrl = getLineFriendUrl();
+  const isLineMethod = method === "line";
 
   return (
     <div className="registration-complete-card">
@@ -43,9 +46,22 @@ export function RegistrationCompleteActions() {
         <Link className="button" href="/consultation">
           この星で相談する
         </Link>
+        {isLineMethod && lineFriendUrl ? (
+          <a className="button auth-provider-button line" href={lineFriendUrl} rel="noreferrer" target="_blank">
+            LINEで友だち追加
+          </a>
+        ) : null}
         <Link className="button" href="/account">
           登録情報を見る
         </Link>
+      </div>
+      <div className="registration-line-guide">
+        <strong>{isLineMethod ? "LINEで友だちになると、メッセージで相談できます。" : "LINEでも相談したい場合は、登録情報からLINE連携できます。"}</strong>
+        <p>
+          {isLineMethod
+            ? "友だち追加後は、登録済みの星と鑑定履歴を引き継いだまま、LINEのメッセージで質問できます。"
+            : "メール・Googleで登録した場合も、登録情報画面でLINE連携を済ませると、あなたの星の記憶をLINEに引き継げます。"}
+        </p>
       </div>
     </div>
   );

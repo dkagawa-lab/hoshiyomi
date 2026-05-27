@@ -14,6 +14,9 @@ export async function POST(req: Request) {
   try {
     const body = (await req.json()) as CheckoutRequest;
     const clientUserId = normalizeClientUserId(body.clientUserId);
+    if (!clientUserId) {
+      return NextResponse.json({ error: "決済を開始できませんでした。画面を再読み込みしてから、もう一度お試しください。" }, { status: 400 });
+    }
     const selectedProduct = body.product === addOnPack.key ? addOnPack.key : null;
     const selectedPlan = isPlanKey(body.plan) && body.plan !== "free" ? body.plan : "standard";
     const stripe = getStripe();
@@ -45,7 +48,7 @@ export async function POST(req: Request) {
     }
 
     const existingUser = clientUserId && isServerStoreConfigured() ? await withTimeout(getUserByClientUserId(clientUserId).catch(() => null), 1200, null) : null;
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const appUrl = resolveAppUrl(req);
     const clientMetadata: Record<string, string> = clientUserId ? { client_user_id: clientUserId } : {};
     const metadata: Record<string, string> = selectedProduct
       ? { ...clientMetadata, product: selectedProduct, credits: String(addOnPack.credits) }
@@ -58,6 +61,7 @@ export async function POST(req: Request) {
           ? `${appUrl}/consultation?checkout=success&product=${selectedProduct}`
           : `${appUrl}/consultation?checkout=success&plan=${selectedPlan}`,
         cancel_url: `${appUrl}/consultation?checkout=cancel`,
+        ...(clientUserId ? { client_reference_id: clientUserId } : {}),
         metadata,
         ...(existingUser?.stripe_customer_id ? { customer: existingUser.stripe_customer_id } : {}),
         ...(!selectedProduct ? { subscription_data: { metadata } } : {}),
@@ -116,4 +120,11 @@ function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T) {
       }
     );
   });
+}
+
+function resolveAppUrl(req: Request) {
+  const configured = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  const fallback = new URL(req.url).origin;
+  const shouldUseFallback = process.env.NODE_ENV === "production" && configured && /localhost|127\.0\.0\.1/.test(configured);
+  return (shouldUseFallback ? fallback : configured || fallback).replace(/\/$/, "");
 }

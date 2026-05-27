@@ -4,13 +4,15 @@ const stateCookieName = "hoshiyomi_line_oauth_state";
 const nextCookieName = "hoshiyomi_line_oauth_next";
 
 export async function GET(req: NextRequest) {
-  const channelId = process.env.LINE_LOGIN_CHANNEL_ID;
+  const channelId = readEnv("LINE_LOGIN_CHANNEL_ID");
   if (!channelId) {
-    return NextResponse.redirect(new URL("/register?authError=line_not_configured", req.url));
+    const fallbackPath = resolveAuthFlow(req.nextUrl.searchParams.get("mode")) === "login" ? "/login" : "/register";
+    const returnTo = resolveReturnTo(req.nextUrl.searchParams.get("returnTo"));
+    return NextResponse.redirect(new URL(`${fallbackPath}?returnTo=${encodeURIComponent(returnTo)}&authError=line_not_configured`, req.url));
   }
 
   const origin = new URL(req.url).origin;
-  const redirectUri = process.env.LINE_LOGIN_REDIRECT_URI || `${origin}/api/auth/line/callback`;
+  const redirectUri = readEnv("LINE_LOGIN_REDIRECT_URI") || `${origin}/api/auth/line/callback`;
   const state = createRandomValue();
   const nonce = createRandomValue();
   const nextPayload = Buffer.from(
@@ -35,6 +37,10 @@ export async function GET(req: NextRequest) {
   res.cookies.set(stateCookieName, state, { httpOnly: true, maxAge: 600, path: "/", sameSite: "lax", secure });
   res.cookies.set(nextCookieName, nextPayload, { httpOnly: true, maxAge: 600, path: "/", sameSite: "lax", secure });
   return res;
+}
+
+function readEnv(name: string) {
+  return process.env[name]?.trim() || "";
 }
 
 function createRandomValue() {

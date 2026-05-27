@@ -68,18 +68,18 @@ export class AnthropicApiError extends Error {
 }
 
 export function isProductionAiConfigured() {
-  return Boolean(process.env.ANTHROPIC_API_KEY);
+  return Boolean(readEnv("ANTHROPIC_API_KEY"));
 }
 
 export function resolveAnthropicModel(planKey: PlanKey, freeAnswerCount = 0) {
   if (planKey === "free") {
     if (freeAnswerCount < highPerformanceFreeTrialLimit) {
-      return process.env.ANTHROPIC_MODEL_FREE_TRIAL || process.env.ANTHROPIC_MODEL_STANDARD || process.env.ANTHROPIC_MODEL || defaultAnthropicModel;
+      return readEnv("ANTHROPIC_MODEL_FREE_TRIAL") || readEnv("ANTHROPIC_MODEL_STANDARD") || readEnv("ANTHROPIC_MODEL") || defaultAnthropicModel;
     }
-    return process.env.ANTHROPIC_MODEL_FREE_AFTER_TRIAL || process.env.ANTHROPIC_MODEL_FREE || process.env.ANTHROPIC_MODEL || defaultFreeAfterTrialModel;
+    return readEnv("ANTHROPIC_MODEL_FREE_AFTER_TRIAL") || readEnv("ANTHROPIC_MODEL_FREE") || readEnv("ANTHROPIC_MODEL") || defaultFreeAfterTrialModel;
   }
   const planSpecificKey = `ANTHROPIC_MODEL_${planKey.toUpperCase()}`;
-  return process.env[planSpecificKey] || process.env.ANTHROPIC_MODEL || defaultAnthropicModel;
+  return readEnv(planSpecificKey) || readEnv("ANTHROPIC_MODEL") || defaultAnthropicModel;
 }
 
 export function isAnthropicRateLimitError(error: unknown): error is AnthropicRateLimitError {
@@ -200,7 +200,7 @@ async function requestAnthropicMessage(input: {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "x-api-key": process.env.ANTHROPIC_API_KEY || "",
+      "x-api-key": readEnv("ANTHROPIC_API_KEY"),
       "anthropic-version": "2023-06-01"
     },
     body: JSON.stringify({
@@ -222,6 +222,10 @@ async function requestAnthropicMessage(input: {
   }
 
   return (await response.json()) as AnthropicMessageResponse;
+}
+
+function readEnv(name: string) {
+  return process.env[name]?.trim() || "";
 }
 
 function extractAnthropicText(data: AnthropicMessageResponse) {

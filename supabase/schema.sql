@@ -72,6 +72,12 @@ create index if not exists referral_redemptions_referrer_idx
 create index if not exists referral_redemptions_code_idx
   on referral_redemptions(referral_code);
 
+create table if not exists stripe_events (
+  id text primary key,
+  type text not null,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists chat_messages (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references users(id) on delete cascade,

@@ -2,17 +2,19 @@
 
 import { useEffect, useState } from "react";
 import { ensureClientUserId } from "@/lib/clientIdentity";
-import { addOnPack, PlanKey, readAddOnCredits, readPlanFromStorage, resolvePlan, servicePlans, writeAddOnCredits } from "@/lib/plans";
+import { addOnPack, PlanKey, planStatusLabel, readAddOnCredits, readPlanFromStorage, resolvePlan, servicePlans, writeAddOnCredits } from "@/lib/plans";
 
 type PricingPanelProps = {
   addOnCredits?: number;
   currentPlanKey?: PlanKey;
+  isMember?: boolean;
   onBuyAddOn?: () => void | Promise<void>;
   onCheckout?: (nextPlan: Exclude<PlanKey, "free">) => void | Promise<void>;
 };
 
-export function PricingPanel({ addOnCredits, currentPlanKey, onBuyAddOn, onCheckout }: PricingPanelProps) {
+export function PricingPanel({ addOnCredits, currentPlanKey, isMember, onBuyAddOn, onCheckout }: PricingPanelProps) {
   const [activePlanKey, setActivePlanKey] = useState<PlanKey>(currentPlanKey ?? "free");
+  const [activeMember, setActiveMember] = useState(isMember ?? false);
   const [activeAddOnCredits, setActiveAddOnCredits] = useState(addOnCredits ?? 0);
   const [checkoutLoading, setCheckoutLoading] = useState<string>("");
   const [checkoutMessage, setCheckoutMessage] = useState("");
@@ -23,10 +25,12 @@ export function PricingPanel({ addOnCredits, currentPlanKey, onBuyAddOn, onCheck
     } else {
       const localPlan = readPlanFromStorage();
       setActivePlanKey(localPlan);
+      setActiveMember(window.localStorage.getItem("hoshiyomi:member") === "true" || window.sessionStorage.getItem("hoshiyomi:member") === "true");
       syncServerPlan();
     }
+    if (typeof isMember === "boolean") setActiveMember(isMember);
     setActiveAddOnCredits(addOnCredits ?? readAddOnCredits());
-  }, [addOnCredits, currentPlanKey]);
+  }, [addOnCredits, currentPlanKey, isMember]);
 
   async function checkout(nextPlan: Exclude<PlanKey, "free">) {
     setCheckoutLoading(nextPlan);
@@ -51,6 +55,7 @@ export function PricingPanel({ addOnCredits, currentPlanKey, onBuyAddOn, onCheck
       }
       if (!data.demo) throw new Error("決済画面を開けませんでした。Stripeの設定を確認してください。");
       setActivePlanKey(nextPlan);
+      setActiveMember(true);
       window.localStorage.setItem("hoshiyomi:plan", nextPlan);
       window.sessionStorage.setItem("hoshiyomi:plan", nextPlan);
       window.localStorage.setItem("hoshiyomi:premium", "true");
@@ -85,6 +90,7 @@ export function PricingPanel({ addOnCredits, currentPlanKey, onBuyAddOn, onCheck
       if (!data.demo) throw new Error("追加相談枠の決済画面を開けませんでした。Stripeの設定を確認してください。");
       const nextCredits = activeAddOnCredits + addOnPack.credits;
       setActiveAddOnCredits(nextCredits);
+      setActiveMember(true);
       writeAddOnCredits(nextCredits);
     } catch (error) {
       setCheckoutMessage(error instanceof Error ? error.message : "追加相談枠の決済画面を開けませんでした。");
@@ -102,6 +108,7 @@ export function PricingPanel({ addOnCredits, currentPlanKey, onBuyAddOn, onCheck
       const serverPlan = data.usage?.plan ?? "free";
       if (serverPlan === "free" || serverPlan === "standard" || serverPlan === "luxury") {
         setActivePlanKey(serverPlan);
+        if (typeof data.usage?.isMember === "boolean") setActiveMember(data.usage.isMember);
         if (serverPlan === "free") {
           window.localStorage.removeItem("hoshiyomi:plan");
           window.sessionStorage.removeItem("hoshiyomi:plan");
@@ -138,7 +145,7 @@ export function PricingPanel({ addOnCredits, currentPlanKey, onBuyAddOn, onCheck
     <div className="plan-panel pricing-panel">
       <div className="plan-panel-heading">
         <span>Plans</span>
-        <strong>今のプラン: {resolvePlan(activePlanKey).label}</strong>
+        <strong>現在の状態: {planStatusLabel(resolvePlan(activePlanKey), activeMember)}</strong>
       </div>
       {checkoutMessage ? <p className="form-status error">{checkoutMessage}</p> : null}
       <div className="plan-grid">
@@ -162,7 +169,7 @@ export function PricingPanel({ addOnCredits, currentPlanKey, onBuyAddOn, onCheck
                 ))}
               </ul>
               {isCurrent ? (
-                <em>利用中</em>
+                <em>{activePlanKey === "free" && !activeMember ? "未登録" : "利用中"}</em>
               ) : canCheckout ? (
                 <button className="button primary" disabled={checkoutLoading === plan.key} type="button" onClick={() => checkout(plan.key as Exclude<PlanKey, "free">)}>
                   {checkoutLoading === plan.key ? "決済画面を開いています" : plan.ctaLabel}

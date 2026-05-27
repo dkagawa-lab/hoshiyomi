@@ -19,8 +19,8 @@ type LineVerifyResponse = {
 };
 
 export async function GET(req: NextRequest) {
-  const channelId = process.env.LINE_LOGIN_CHANNEL_ID;
-  const channelSecret = process.env.LINE_LOGIN_CHANNEL_SECRET;
+  const channelId = readEnv("LINE_LOGIN_CHANNEL_ID");
+  const channelSecret = readEnv("LINE_LOGIN_CHANNEL_SECRET");
   const url = new URL(req.url);
   const returnPayload = readReturnPayload(req.cookies.get(nextCookieName)?.value);
   const returnTo = returnPayload.returnTo;
@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
   }
 
   const origin = new URL(req.url).origin;
-  const redirectUri = process.env.LINE_LOGIN_REDIRECT_URI || `${origin}/api/auth/line/callback`;
+  const redirectUri = readEnv("LINE_LOGIN_REDIRECT_URI") || `${origin}/api/auth/line/callback`;
   const token = await exchangeLineCode({ channelId, channelSecret, code, redirectUri }).catch(() => null);
   if (!token?.id_token) return NextResponse.redirect(errorRedirect);
 
@@ -73,6 +73,10 @@ export async function GET(req: NextRequest) {
   res.cookies.delete(stateCookieName);
   res.cookies.delete(nextCookieName);
   return res;
+}
+
+function readEnv(name: string) {
+  return process.env[name]?.trim() || "";
 }
 
 async function exchangeLineCode(input: { channelId: string; channelSecret: string; code: string; redirectUri: string }) {

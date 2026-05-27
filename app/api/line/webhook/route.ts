@@ -30,7 +30,7 @@ type LineTextMessage = {
 };
 
 function verifyLineSignature(body: string, signature: string | null) {
-  const secret = process.env.LINE_CHANNEL_SECRET;
+  const secret = readEnv("LINE_CHANNEL_SECRET");
   if (!secret || !signature) return false;
   const expected = createHmac("sha256", secret).update(body).digest("base64");
   const left = Buffer.from(signature);
@@ -40,7 +40,10 @@ function verifyLineSignature(body: string, signature: string | null) {
 
 export async function POST(req: Request) {
   const body = await req.text();
-  if (process.env.LINE_CHANNEL_SECRET && !verifyLineSignature(body, req.headers.get("x-line-signature"))) {
+  if (!readEnv("LINE_CHANNEL_SECRET")) {
+    return NextResponse.json({ error: "LINE channel secret is not configured" }, { status: process.env.NODE_ENV === "production" ? 500 : 200 });
+  }
+  if (!verifyLineSignature(body, req.headers.get("x-line-signature"))) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
@@ -231,12 +234,14 @@ function resolveLineReaderStyle(question: string, planKey: "free" | "standard" |
 }
 
 async function replyLineText(replyToken: string, texts: string[]) {
-  const messages = texts.flatMap((text) => toLineTextMessages(text)).slice(0, 5);
-  if (messages.length === 0 || !process.env.LINE_CHANNEL_ACCESS_TOKEN) return;
+  const allMessages = texts.flatMap((text) => toLineTextMessages(text));
+  const messages = allMessages.length > 5 ? [...allMessages.slice(0, 4), allMessages[allMessages.length - 1]] : allMessages;
+  const accessToken = readEnv("LINE_CHANNEL_ACCESS_TOKEN");
+  if (messages.length === 0 || !accessToken) return;
   const response = await fetch("https://api.line.me/v2/bot/message/reply", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}`,
+      Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json"
     },
     body: JSON.stringify({ messages, replyToken })
@@ -245,11 +250,12 @@ async function replyLineText(replyToken: string, texts: string[]) {
 }
 
 async function startLineLoading(lineUserId: string) {
-  if (!process.env.LINE_CHANNEL_ACCESS_TOKEN) return;
+  const accessToken = readEnv("LINE_CHANNEL_ACCESS_TOKEN");
+  if (!accessToken) return;
   await fetch("https://api.line.me/v2/bot/chat/loading/start", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${process.env.LINE_CHANNEL_ACCESS_TOKEN}`,
+      Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json"
     },
     body: JSON.stringify({ chatId: lineUserId, loadingSeconds: 20 })
@@ -278,6 +284,10 @@ function splitLineText(text: string, limit: number) {
 }
 
 function appUrl(path: string) {
-  const origin = (process.env.NEXT_PUBLIC_APP_URL || "https://hoshiyomi4u.com").replace(/\/$/, "");
+  const origin = (readEnv("NEXT_PUBLIC_APP_URL") || "https://hoshiyomi4u.com").replace(/\/$/, "");
   return `${origin}${path}`;
+}
+
+function readEnv(name: string) {
+  return process.env[name]?.trim() || "";
 }

@@ -58,6 +58,7 @@ export type PublicUserSnapshot = {
   gender: GenderKey | null;
   isMember: boolean;
   latitude: number | null;
+  lineLinked: boolean;
   longitude: number | null;
   name: string | null;
   plan: PlanKey;
@@ -358,6 +359,24 @@ export async function addCreditsByClientUserId(input: { clientUserId: string; cr
   return users[0];
 }
 
+export async function markStripeEventProcessed(input: { id: string; type: string }) {
+  const eventId = typeof input.id === "string" ? input.id.trim() : "";
+  if (!eventId) return true;
+  const response = await supabaseFetch("stripe_events", {
+    method: "POST",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({ id: eventId, type: input.type || "unknown" })
+  });
+  if (response.ok) return true;
+  if (response.status === 409) return false;
+  const errorText = await response.text();
+  if (response.status === 404 || errorText.includes("stripe_events")) {
+    console.warn("stripe_events table is not available; processing Stripe webhook without event dedupe.");
+    return true;
+  }
+  throw new Error(errorText);
+}
+
 export async function getUserByLineUserId(lineUserId: string) {
   const normalized = normalizeLineUserId(lineUserId);
   if (!normalized) return null;
@@ -517,6 +536,7 @@ function toPublicUserSnapshot(user: StoredUser): PublicUserSnapshot {
     gender: user.gender,
     isMember: user.is_member,
     latitude: user.latitude === null ? null : Number(user.latitude),
+    lineLinked: Boolean(user.line_user_id),
     longitude: user.longitude === null ? null : Number(user.longitude),
     name: user.name,
     plan: resolvePlan(user.plan).key,
@@ -619,8 +639,12 @@ async function supabaseFetch(path: string, init: RequestInit = {}) {
 }
 
 function getSupabaseConfig(): SupabaseConfig | null {
-  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = readEnv("SUPABASE_URL") || readEnv("NEXT_PUBLIC_SUPABASE_URL");
+  const key = readEnv("SUPABASE_SERVICE_ROLE_KEY");
   if (!url || !key) return null;
   return { key, url: url.replace(/\/$/, "") };
+}
+
+function readEnv(name: string) {
+  return process.env[name]?.trim() || "";
 }

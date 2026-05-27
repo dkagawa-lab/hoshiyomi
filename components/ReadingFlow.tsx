@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { BirthInput, BodyPosition, calculateChart, calculateTransits, Chart, formatPosition, TransitSnapshot } from "@/lib/astrology";
 import { ChartWheel } from "@/components/ChartWheel";
+import { ensureClientUserId } from "@/lib/clientIdentity";
 import { ensureFreeBonusRemaining, planQuotaLabel, PlanKey, readFreeBonusRemaining, readPlanFromStorage, readPlanUsage, resolvePlan, usageLimitsDisabled } from "@/lib/plans";
 
 type Topic = {
@@ -27,6 +28,34 @@ const topics: Topic[] = [
 ];
 const defaultTopic = topics.find((topic) => topic.key === "self") ?? topics[0];
 
+type ReadingServerSnapshot = {
+  mode?: string;
+  usage?: {
+    freeBonusRemaining?: number;
+    isMember?: boolean;
+    plan?: PlanKey;
+    used?: number;
+  };
+  user?: {
+    birthCity?: string | null;
+    birthDate?: string | null;
+    birthTime?: string | null;
+    gender?: BirthInput["gender"] | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    name?: string | null;
+    romanticInterest?: BirthInput["romanticInterest"] | null;
+  } | null;
+};
+
+type ReadingServerStateSetters = {
+  setBirth: (birth: BirthInput) => void;
+  setFreeBonusRemaining: (remaining: number) => void;
+  setPlan: (plan: PlanKey) => void;
+  setUnlocked: (unlocked: boolean) => void;
+  setUsedChats: (used: number) => void;
+};
+
 export function ReadingFlow() {
   const [birth, setBirth] = useState<BirthInput | null>(null);
   const [unlocked, setUnlocked] = useState(false);
@@ -38,12 +67,14 @@ export function ReadingFlow() {
     const saved = readStoredBirth();
     if (saved) writeStoredBirth(saved);
     setBirth(saved);
+    const clientUserId = ensureClientUserId();
     const savedMember = readStorageValue("localStorage", "hoshiyomi:member") === "true" || readStorageValue("sessionStorage", "hoshiyomi:member") === "true";
     setUnlocked(savedMember);
     const savedPlan = readPlanFromStorage();
     setPlan(savedPlan);
     setUsedChats(readPlanUsage(savedPlan));
     setFreeBonusRemaining(savedMember ? ensureFreeBonusRemaining() : readFreeBonusRemaining());
+    void syncReadingServerState(clientUserId, saved, { setBirth, setFreeBonusRemaining, setPlan, setUnlocked, setUsedChats });
   }, []);
 
   const chart = useMemo(() => (birth ? calculateChart(birth) : null), [birth]);
@@ -296,6 +327,50 @@ function writeStorageValue(storageName: "localStorage" | "sessionStorage", key: 
   } catch {
     // Storage can be unavailable in private or embedded browsers. The page can still use the query fallback for the first read.
   }
+}
+
+async function syncReadingServerState(clientUserId: string, fallbackBirth: BirthInput | null, setters: ReadingServerStateSetters) {
+  if (!clientUserId) return;
+  try {
+    const res = await fetch(`/api/me?clientUserId=${encodeURIComponent(clientUserId)}`);
+    const data = (await res.json()) as ReadingServerSnapshot;
+    if (!res.ok || data.mode !== "server") return;
+    if (data.usage) {
+      if (data.usage.plan) {
+        setters.setPlan(data.usage.plan);
+      }
+      if (typeof data.usage.used === "number") {
+        setters.setUsedChats(data.usage.used);
+      }
+      if (typeof data.usage.freeBonusRemaining === "number") {
+        setters.setFreeBonusRemaining(data.usage.freeBonusRemaining);
+      }
+      if (typeof data.usage.isMember === "boolean") {
+        setters.setUnlocked(data.usage.isMember);
+      }
+    }
+    const serverBirth = buildReadingBirthFromServer(data.user, fallbackBirth);
+    if (serverBirth) {
+      writeStoredBirth(serverBirth);
+      setters.setBirth(serverBirth);
+    }
+  } catch {
+    // Reading still works from the locally stored chart if account sync is temporarily unavailable.
+  }
+}
+
+function buildReadingBirthFromServer(user: ReadingServerSnapshot["user"], fallbackBirth: BirthInput | null): BirthInput | null {
+  if (!user?.birthDate || !user.birthCity || typeof user.latitude !== "number" || typeof user.longitude !== "number") return fallbackBirth;
+  return {
+    city: user.birthCity,
+    date: user.birthDate,
+    gender: user.gender ?? fallbackBirth?.gender,
+    latitude: user.latitude,
+    longitude: user.longitude,
+    name: user.name ?? fallbackBirth?.name ?? "",
+    romanticInterest: user.romanticInterest ?? fallbackBirth?.romanticInterest,
+    time: user.birthTime ?? ""
+  };
 }
 
 function buildPersonalityProfile(chart: Chart) {

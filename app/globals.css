@@ -1722,6 +1722,76 @@ textarea:focus {
   line-height: 1.6;
 }
 
+.line-consultation-guide,
+.line-friend-card,
+.registration-line-guide {
+  display: grid;
+  gap: 12px;
+  border: 1px solid rgba(6, 199, 85, 0.32);
+  border-radius: 8px;
+  padding: 14px;
+  background:
+    linear-gradient(135deg, rgba(6, 199, 85, 0.12), rgba(226, 190, 103, 0.05)),
+    rgba(5, 8, 18, 0.32);
+}
+
+.line-consultation-guide,
+.line-friend-card {
+  margin: 14px 0 6px;
+}
+
+.line-friend-card {
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.line-friend-card.ready {
+  border-color: rgba(6, 199, 85, 0.48);
+}
+
+.line-consultation-guide span,
+.line-friend-card .eyebrow {
+  color: #85e7a9;
+}
+
+.line-consultation-guide strong,
+.line-friend-card h2,
+.registration-line-guide strong {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.line-friend-card h2 {
+  margin: 4px 0 0;
+  font-size: clamp(1.55rem, 2.8vw, 2.3rem);
+  line-height: 1.15;
+}
+
+.line-consultation-guide p,
+.line-friend-card p,
+.registration-line-guide p {
+  margin: 0;
+  color: rgba(247, 241, 223, 0.78);
+  font-size: 0.9rem;
+  line-height: 1.68;
+}
+
+.line-consultation-actions,
+.line-friend-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.line-consultation-actions > span,
+.line-friend-missing {
+  color: rgba(247, 241, 223, 0.72);
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
 .consultation-profile-card {
   display: grid;
   gap: 12px;
@@ -2836,6 +2906,15 @@ textarea:focus {
   background: rgba(125, 199, 197, 0.08);
 }
 
+.checkout-notice-card {
+  padding: 14px;
+}
+
+.checkout-notice-card .form-status {
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
 .form-status.error {
   border-color: rgba(211, 138, 138, 0.42);
   color: #f0b4a8;
@@ -3687,6 +3766,7 @@ textarea:focus {
   .contact-form-grid,
   .legal-link-panel,
   .plan-entry-card,
+  .line-friend-card,
   .pricing-grid,
   .referral-layout,
   .glossary-search-row,
@@ -3755,6 +3835,8 @@ textarea:focus {
   }
 
   .plan-entry-card .button,
+  .line-friend-actions .button,
+  .line-consultation-actions .button,
   .limit-notice-card .button {
     width: 100%;
   }

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { BirthInput } from "@/lib/astrology";
 import { ensureClientUserId } from "@/lib/clientIdentity";
 import { getSupabaseAuthClient } from "@/lib/authRegistrationClient";
+import { getLineFriendUrl } from "@/lib/lineLinks";
 import { genderLabel, romanticInterestLabel } from "@/lib/profileOptions";
 import { addAddOnCredits, planQuotaLabel, planStatusLabel, PlanKey, readAddOnCredits, readFreeBonusRemaining, readPlanFromStorage, readPlanUsage, referralRewardCredits, resolvePlan, usageLimitsDisabled } from "@/lib/plans";
 
@@ -13,6 +14,7 @@ type AccountState = {
   birth: BirthInput | null;
   clientUserId: string;
   freeBonusRemaining: number;
+  lineLinked: boolean;
   member: boolean;
   plan: PlanKey;
   referralCode: string;
@@ -25,6 +27,7 @@ const initialAccountState: AccountState = {
   birth: null,
   clientUserId: "",
   freeBonusRemaining: 0,
+  lineLinked: false,
   member: false,
   plan: "free",
   referralCode: "",
@@ -57,6 +60,7 @@ export function AccountPanel() {
       birth: localBirth,
       clientUserId,
       freeBonusRemaining: readFreeBonusRemaining(),
+      lineLinked: false,
       member: localMember,
       plan: localPlan,
       referralCode: ensureLocalReferralCode(clientUserId),
@@ -92,6 +96,7 @@ export function AccountPanel() {
         addOnCredits: typeof data.usage?.addOnCredits === "number" ? data.usage.addOnCredits : current.addOnCredits,
         birth: mergeServerBirth(buildBirthFromServer(data.user), current.birth),
         freeBonusRemaining: typeof data.usage?.freeBonusRemaining === "number" ? data.usage.freeBonusRemaining : current.freeBonusRemaining,
+        lineLinked: Boolean(data.user?.lineLinked),
         member: serverMember,
         plan: serverPlan,
         referralCode: typeof data.user?.referralCode === "string" ? data.user.referralCode : current.referralCode,
@@ -112,9 +117,11 @@ export function AccountPanel() {
     : account.birth
       ? { href: "/consultation", label: "この星で相談する" }
       : { href: "/m", label: "ホロスコープを作成する" };
-  const nextStepLinks = buildAccountNextStepLinks(account);
+  const lineFriendUrl = getLineFriendUrl();
+  const nextStepLinks = buildAccountNextStepLinks(account, lineFriendUrl);
   const referralLink = account.referralCode && shareOrigin ? `${shareOrigin}/register?ref=${encodeURIComponent(account.referralCode)}&returnTo=/account` : "";
-  const registrationMethod = resolveRegistrationMethod(account.member, account.clientUserId);
+  const registrationMethod = resolveRegistrationMethod(account.member, account.clientUserId, account.lineLinked);
+  const lineConnectHref = `/api/auth/line/login?returnTo=/account&mode=signup&clientUserId=${encodeURIComponent(account.clientUserId || ensureClientUserId())}`;
 
   async function copyReferral() {
     if (!account.referralCode) return;
@@ -270,6 +277,16 @@ export function AccountPanel() {
           <Link className="button" href="/pricing">
             プランを見る
           </Link>
+          {account.member && !account.lineLinked ? (
+            <a className="button" href={lineConnectHref}>
+              LINEと連携する
+            </a>
+          ) : null}
+          {account.member && account.lineLinked && lineFriendUrl ? (
+            <a className="button auth-provider-button line" href={lineFriendUrl} rel="noreferrer" target="_blank">
+              LINEで友だち追加
+            </a>
+          ) : null}
           {account.member && account.plan !== "free" ? (
             <button className="button" disabled={billingLoading} onClick={openBillingPortal} type="button">
               {billingLoading ? "支払い管理を開いています" : "支払い管理"}
@@ -284,6 +301,8 @@ export function AccountPanel() {
         {billingMessage ? <p className="small logout-message">{billingMessage}</p> : null}
         {logoutMessage ? <p className="small logout-message">{logoutMessage}</p> : null}
       </div>
+
+      {account.member ? <LineFriendGuideCard account={account} lineConnectHref={lineConnectHref} lineFriendUrl={lineFriendUrl} /> : null}
 
       <div className="panel account-detail-card">
         <div className="eyebrow">Saved Birth Data</div>
@@ -361,7 +380,7 @@ export function AccountPanel() {
   );
 }
 
-function buildAccountNextStepLinks(account: AccountState) {
+function buildAccountNextStepLinks(account: AccountState, lineFriendUrl: string) {
   const links = [];
   if (account.birth) {
     links.push({
@@ -392,6 +411,18 @@ function buildAccountNextStepLinks(account: AccountState) {
       title: "ログインして登録情報を読み込む",
       description: "登録済みの方は、保存している星の情報や鑑定履歴を確認できます。"
     });
+  } else if (!account.lineLinked) {
+    links.push({
+      href: `/api/auth/line/login?returnTo=/account&mode=signup&clientUserId=${encodeURIComponent(account.clientUserId)}`,
+      title: "LINEと連携する",
+      description: "Webで保存した星の情報と相談履歴を、LINEからの相談にもつなげます。"
+    });
+  } else if (lineFriendUrl) {
+    links.push({
+      href: lineFriendUrl,
+      title: "LINEで友だち追加する",
+      description: "登録済みの星と鑑定履歴を引き継いだまま、LINEのメッセージで相談できます。"
+    });
   }
   links.push({
     href: "/pricing",
@@ -411,6 +442,45 @@ function buildAccountNextStepLinks(account: AccountState) {
   return links;
 }
 
+function LineFriendGuideCard({ account, lineConnectHref, lineFriendUrl }: { account: AccountState; lineConnectHref: string; lineFriendUrl: string }) {
+  const isReady = account.lineLinked && Boolean(lineFriendUrl);
+
+  return (
+    <div className={`panel line-friend-card ${isReady ? "ready" : ""}`}>
+      <div>
+        <div className="eyebrow">LINE Consultation</div>
+        <h2>LINEでも、この星のまま相談できます</h2>
+        {account.lineLinked ? (
+          <p>
+            登録済みの場合、LINEで友だちになると、保存したあなたの星と鑑定履歴を引き継いだまま、メッセージで質問できます。
+            Webを開かなくても、気になったタイミングでそのまま相談できます。
+          </p>
+        ) : (
+          <p>
+            LINEから相談するには、先にこの登録情報とLINEを連携します。連携後に公式アカウントを友だち追加すると、あなたの星の記憶を引き継いだままメッセージで質問できます。
+          </p>
+        )}
+      </div>
+      <div className="line-friend-actions">
+        {account.lineLinked && lineFriendUrl ? (
+          <a className="button primary auth-provider-button line" href={lineFriendUrl} rel="noreferrer" target="_blank">
+            LINEで友だち追加する
+          </a>
+        ) : account.lineLinked ? (
+          <span className="line-friend-missing">友だち追加URLを設定すると、ここにボタンが表示されます。</span>
+        ) : (
+          <a className="button primary" href={lineConnectHref}>
+            LINEと連携する
+          </a>
+        )}
+        <Link className="button" href="/consultation">
+          Webで相談を続ける
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 function AccountRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="account-row">
@@ -420,9 +490,11 @@ function AccountRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function resolveRegistrationMethod(member: boolean, clientUserId: string) {
+function resolveRegistrationMethod(member: boolean, clientUserId: string, lineLinked: boolean) {
   if (!member) return "未登録";
   if (!clientUserId) return "未確認";
+  if (lineLinked && clientUserId.startsWith("auth:")) return "メール / Google + LINE";
+  if (lineLinked) return "LINE連携済み";
   if (clientUserId.startsWith("line:")) return "LINE";
   if (clientUserId.startsWith("auth:")) return "メール / Google";
   return "端末保存";
