@@ -2,33 +2,7 @@ import Link from "next/link";
 import { BirthChartApp } from "@/components/BirthChartApp";
 import { GlobalNav } from "@/components/GlobalNav";
 import { PublicReviewList } from "@/components/PublicReviewList";
-
-const testimonials = [
-  {
-    name: "東京都世田谷区 / 34歳 / 広告代理店勤務",
-    theme: "恋愛・復縁",
-    rating: "5.0",
-    text: "別れた相手に連絡するか、夜中に何度も画面を開いては閉じていました。鑑定では、月と金星の位置から「寂しさ」と「本当に戻りたい理由」を分けて見てくれて、胸の中が急に静かになりました。結局すぐ連絡せず、少し時間を置いて短い言葉で送ると決められたのが大きかったです。"
-  },
-  {
-    name: "神奈川県横浜市 / 29歳 / Webデザイナー",
-    theme: "仕事・転職",
-    rating: "4.8",
-    text: "転職したいのに、怖くて求人を見るだけで終わっていました。太陽、水星、火星の並びから「今の職場が合わない」だけではなく、「どんな働き方なら才能が出るか」まで言われて、占いというより自分の取扱説明書を読んだ感覚でした。翌日、上司に担当領域の相談をする勇気が出ました。"
-  },
-  {
-    name: "長野県松本市 / 42歳 / カフェ経営",
-    theme: "人生の転機",
-    rating: "4.7",
-    text: "店を続けるか、街を離れるかで半年以上悩んでいました。木星と土星、今のトランジットを重ねて、短期では守るもの、中期では変えるもの、長期では手放していいものを分けてくれたのが刺さりました。派手な予言ではないのに、霧が晴れていくように次の一手が見えました。"
-  },
-  {
-    name: "高知県四万十町 / 37歳 / 介護職",
-    theme: "相性診断",
-    rating: "4.9",
-    text: "近くに相談できる占い師も少なく、相手のことを誰にも話せずにいました。相手の気持ちを勝手に決めつけるのではなく、私が我慢しすぎる癖や、関係が苦しくなる距離感を星から読んでくれたのが救いでした。読み終わった後、相手ではなく自分の心を初めて主語にできました。"
-  }
-];
+import { reviewFixtures } from "@/lib/reviewFixtures";
 
 export default function Home() {
   return (
@@ -218,14 +192,12 @@ export default function Home() {
           <div>
             <div className="eyebrow">Reviews</div>
             <h2 id="testimonial-title">星を読んだ人の声</h2>
-          </div>
-          <div className="rating-summary" aria-label="平均評価 4.8 / 5.0">
-            <span className="stars">★★★★★</span>
-            <strong>4.8</strong>
-            <small>/ 5.0</small>
+            <p>
+              恋愛、仕事、相性、人生の転機まで。鑑定後に残るのは、ただの答えではなく、自分を見直すための言葉です。
+            </p>
           </div>
         </div>
-        <PublicReviewList fallback={testimonials} />
+        <PublicReviewList fallback={reviewFixtures} />
       </section>
 
       <footer className="footer">

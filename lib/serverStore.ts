@@ -573,7 +573,7 @@ export async function getUserReviewSnapshot(userId: string): Promise<UserReviewS
 }
 
 export async function listPublicReviews(limit = 6): Promise<PublicReviewSnapshot[]> {
-  const safeLimit = Math.max(1, Math.min(12, Math.floor(limit) || 6));
+  const safeLimit = Math.max(1, Math.min(40, Math.floor(limit) || 6));
   const reviews = await supabaseJson<StoredReview[]>(
     `user_reviews?comment=not.is.null&select=id,rating,comment,display_name,display_area,created_at,updated_at&order=updated_at.desc&limit=${safeLimit}`
   );

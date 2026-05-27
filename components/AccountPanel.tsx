@@ -434,7 +434,7 @@ export function AccountPanel() {
         <p className="small">{account.serverSynced ? "登録した星の情報は保存されています。" : "登録前でも、この端末に残っている星の情報を確認できます。"}</p>
       </div>
 
-      <div className="panel account-detail-card review-reward-card">
+      <div className="panel account-detail-card review-reward-card" id="review">
         <div className="eyebrow">Review Gift</div>
         <h2>評価して相談枠を受け取る</h2>
         <p>
