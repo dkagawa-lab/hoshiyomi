@@ -14,10 +14,10 @@ type PublicReview = {
 };
 
 const initialReviewCount = 8;
+const canUseFixtureReviews = process.env.NODE_ENV !== "production";
 
 export function PublicReviewList({ fallback }: { fallback: ReviewFixture[] }) {
   const [reviews, setReviews] = useState<PublicReview[]>([]);
-  const [loaded, setLoaded] = useState(false);
   const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
@@ -31,9 +31,6 @@ export function PublicReviewList({ fallback }: { fallback: ReviewFixture[] }) {
       })
       .catch(() => {
         if (active) setReviews([]);
-      })
-      .finally(() => {
-        if (active) setLoaded(true);
       });
     return () => {
       active = false;
@@ -42,6 +39,7 @@ export function PublicReviewList({ fallback }: { fallback: ReviewFixture[] }) {
 
   const items = useMemo(() => {
     if (reviews.length > 0) return reviews;
+    if (!canUseFixtureReviews) return [];
     return fallback.map((item, index) => ({
       comment: item.text,
       displayArea: "",
@@ -52,16 +50,27 @@ export function PublicReviewList({ fallback }: { fallback: ReviewFixture[] }) {
     }));
   }, [fallback, reviews]);
   const visibleItems = showAll ? items : items.slice(0, initialReviewCount);
-  const sourceLabel = reviews.length > 0 ? "投稿レビュー" : "掲載イメージ";
   const averageRating = useMemo(() => calculateAverageRating(items), [items]);
   const themeSummaries = useMemo(() => buildThemeSummaries(items), [items]);
   const featuredReview = items[0];
+
+  if (!items.length) {
+    return (
+      <div className="review-empty-card">
+        <h3>レビューはこれから掲載されます</h3>
+        <p>鑑定後に投稿された声だけを、個人が特定されない形で掲載します。</p>
+        <a className="button" href="/account#review">
+          評価を書いて相談枠を受け取る
+        </a>
+      </div>
+    );
+  }
 
   return (
     <>
       <div className="review-showcase">
         <div className="review-score-card">
-          <span>{sourceLabel}</span>
+          <span>Review Score</span>
           <div className="review-score">
             <strong>{averageRating}</strong>
             <small>/ 5.0</small>
@@ -115,9 +124,7 @@ export function PublicReviewList({ fallback }: { fallback: ReviewFixture[] }) {
       ) : null}
       {reviews.length > 0 ? (
         <p className="review-note">投稿された口コミを、個人が特定されない形で掲載しています。</p>
-      ) : (
-        <p className="review-note">{loaded ? "現在はリリース前の掲載イメージです。正式公開時には、実際に投稿されたレビューだけを掲載します。" : "口コミを読み込んでいます。"}</p>
-      )}
+      ) : null}
     </>
   );
 }

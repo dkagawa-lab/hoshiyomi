@@ -927,7 +927,8 @@ p {
 
 .review-score-card,
 .review-featured-card,
-.review-theme-cloud {
+.review-theme-cloud,
+.review-empty-card {
   border: 1px solid rgba(226, 190, 103, 0.16);
   border-radius: 8px;
   background: rgba(5, 8, 18, 0.42);
@@ -976,6 +977,28 @@ p {
 .review-score-card p {
   margin: 0;
   line-height: 1.65;
+}
+
+.review-empty-card {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+}
+
+.review-empty-card h3 {
+  color: var(--text);
+  font-size: clamp(1.45rem, 2.5vw, 2rem);
+  line-height: 1.18;
+}
+
+.review-empty-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.review-empty-card .button {
+  justify-self: start;
 }
 
 .review-score-card .button {
