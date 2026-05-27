@@ -4,13 +4,14 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { BirthInput } from "@/lib/astrology";
 import { ensureClientUserId } from "@/lib/clientIdentity";
-import { getSupabaseAuthClient } from "@/lib/authRegistrationClient";
+import { AuthMethod, authClientCookieName, authMethodKey, getSupabaseAuthClient, readAuthMethod } from "@/lib/authRegistrationClient";
 import { getLineFriendUrl } from "@/lib/lineLinks";
 import { genderLabel, romanticInterestLabel } from "@/lib/profileOptions";
 import { addAddOnCredits, planQuotaLabel, planStatusLabel, PlanKey, readAddOnCredits, readFreeBonusRemaining, readPlanFromStorage, readPlanUsage, referralRewardCredits, resolvePlan, usageLimitsDisabled } from "@/lib/plans";
 
 type AccountState = {
   addOnCredits: number;
+  authMethod: AuthMethod | "";
   birth: BirthInput | null;
   clientUserId: string;
   freeBonusRemaining: number;
@@ -24,6 +25,7 @@ type AccountState = {
 
 const initialAccountState: AccountState = {
   addOnCredits: 0,
+  authMethod: "",
   birth: null,
   clientUserId: "",
   freeBonusRemaining: 0,
@@ -52,11 +54,13 @@ export function AccountPanel() {
     const params = new URLSearchParams(window.location.search);
     const localPlan = readPlanFromStorage();
     const localMember = readStorageValue("localStorage", "hoshiyomi:member") === "true" || readStorageValue("sessionStorage", "hoshiyomi:member") === "true";
+    const localAuthMethod = readAuthMethod();
     const localBirth = readStoredBirth();
     setShareOrigin(window.location.origin);
     setReferralInput(params.get("ref") || "");
     const localState: AccountState = {
       addOnCredits: readAddOnCredits(),
+      authMethod: localAuthMethod,
       birth: localBirth,
       clientUserId,
       freeBonusRemaining: readFreeBonusRemaining(),
@@ -120,7 +124,7 @@ export function AccountPanel() {
   const lineFriendUrl = getLineFriendUrl();
   const nextStepLinks = buildAccountNextStepLinks(account, lineFriendUrl);
   const referralLink = account.referralCode && shareOrigin ? `${shareOrigin}/register?ref=${encodeURIComponent(account.referralCode)}&returnTo=/account` : "";
-  const registrationMethod = resolveRegistrationMethod(account.member, account.clientUserId, account.lineLinked);
+  const loginMethod = resolveLoginMethod(account.member, account.authMethod, account.clientUserId, account.lineLinked);
   const lineConnectHref = `/api/auth/line/login?returnTo=/account&mode=signup&clientUserId=${encodeURIComponent(account.clientUserId || ensureClientUserId())}`;
 
   async function copyReferral() {
@@ -245,8 +249,8 @@ export function AccountPanel() {
             <strong>{account.member ? "会員登録済み" : "未登録"}</strong>
           </div>
           <div>
-            <span>登録方法</span>
-            <strong>{registrationMethod}</strong>
+            <span>ログイン状態</span>
+            <strong>{loginMethod}</strong>
           </div>
           <div>
             <span>現在のプラン</span>
@@ -490,14 +494,17 @@ function AccountRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function resolveRegistrationMethod(member: boolean, clientUserId: string, lineLinked: boolean) {
-  if (!member) return "未登録";
-  if (!clientUserId) return "未確認";
-  if (lineLinked && clientUserId.startsWith("auth:")) return "メール / Google + LINE";
-  if (lineLinked) return "LINE連携済み";
-  if (clientUserId.startsWith("line:")) return "LINE";
-  if (clientUserId.startsWith("auth:")) return "メール / Google";
-  return "端末保存";
+function resolveLoginMethod(member: boolean, authMethod: AuthMethod | "", clientUserId: string, lineLinked: boolean) {
+  if (!member) return "未ログイン";
+  if (!clientUserId) return "ログイン確認中";
+  if (authMethod === "line") return "LINEでログイン中";
+  if (authMethod === "google") return lineLinked ? "Googleでログイン中 / LINE連携済み" : "Googleでログイン中";
+  if (authMethod === "mail") return lineLinked ? "メールでログイン中 / LINE連携済み" : "メールでログイン中";
+  if (authMethod === "local") return "開発用登録でログイン中";
+  if (lineLinked && clientUserId.startsWith("auth:")) return "メール / Googleでログイン中 / LINE連携済み";
+  if (lineLinked || clientUserId.startsWith("line:")) return "LINEでログイン中";
+  if (clientUserId.startsWith("auth:")) return "メール / Googleでログイン中";
+  return "端末保存でログイン中";
 }
 
 function clearAccountSession() {
@@ -510,7 +517,8 @@ function clearAccountSession() {
     "hoshiyomi:addOnCredits",
     "hoshiyomi:messages",
     "hoshiyomi:history",
-    "hoshiyomi:referralRedeemedCode"
+    "hoshiyomi:referralRedeemedCode",
+    authMethodKey
   ];
   for (const key of keys) {
     try {
@@ -518,6 +526,9 @@ function clearAccountSession() {
       window.sessionStorage.removeItem(key);
     } catch {}
   }
+  try {
+    document.cookie = `${authClientCookieName}=; Max-Age=0; Path=/; SameSite=Lax`;
+  } catch {}
 }
 
 function readStoredBirth() {

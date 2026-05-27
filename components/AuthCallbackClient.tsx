@@ -46,6 +46,7 @@ export function AuthCallbackClient() {
 
       setMessage(flow === "login" ? "保存されている星の情報を読み込んでいます。" : "あなたの星と登録情報を結びつけています。");
       await completeClientRegistration({
+        authMethod: "google",
         birth: readStoredBirth(),
         clientUserId: authClientUserId(sessionResult.data.session.user.id),
         referralCode: flow === "login" ? "" : referralCode

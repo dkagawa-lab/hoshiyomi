@@ -40,8 +40,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(errorRedirect);
   }
 
-  const origin = new URL(req.url).origin;
-  const redirectUri = readEnv("LINE_LOGIN_REDIRECT_URI") || `${origin}/api/auth/line/callback`;
+  const redirectUri = resolveLineRedirectUri(req.url);
   const token = await exchangeLineCode({ channelId, channelSecret, code, redirectUri }).catch(() => null);
   if (!token?.id_token) return NextResponse.redirect(errorRedirect);
 
@@ -77,6 +76,19 @@ export async function GET(req: NextRequest) {
 
 function readEnv(name: string) {
   return process.env[name]?.trim() || "";
+}
+
+function resolveLineRedirectUri(requestUrl: string) {
+  const origin = new URL(requestUrl).origin;
+  const fallback = `${origin}/api/auth/line/callback`;
+  const configured = readEnv("LINE_LOGIN_REDIRECT_URI");
+  if (!configured) return fallback;
+  try {
+    const configuredUrl = new URL(configured);
+    return configuredUrl.origin === origin ? configured : fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 async function exchangeLineCode(input: { channelId: string; channelSecret: string; code: string; redirectUri: string }) {

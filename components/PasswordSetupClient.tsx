@@ -95,6 +95,7 @@ export function PasswordSetupClient() {
     }
 
     await completeClientRegistration({
+      authMethod: "mail",
       birth: readStoredBirth(),
       clientUserId: authClientUserId(sessionData.session.user.id),
       referralCode

@@ -36,6 +36,7 @@ export function LineAuthCompleteClient() {
       const currentClientUserId = ensureClientUserId();
       const shouldKeepWebClient = lineOrCanonicalClientUserId.startsWith("line:") && currentClientUserId && currentClientUserId !== lineOrCanonicalClientUserId;
       await completeClientRegistration({
+        authMethod: "line",
         birth: readStoredBirth(),
         clientUserId: shouldKeepWebClient ? currentClientUserId : lineOrCanonicalClientUserId,
         lineClientUserId: lineOrCanonicalClientUserId.startsWith("line:") ? lineOrCanonicalClientUserId : undefined,

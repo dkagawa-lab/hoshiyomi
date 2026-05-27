@@ -11,8 +11,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL(`${fallbackPath}?returnTo=${encodeURIComponent(returnTo)}&authError=line_not_configured`, req.url));
   }
 
-  const origin = new URL(req.url).origin;
-  const redirectUri = readEnv("LINE_LOGIN_REDIRECT_URI") || `${origin}/api/auth/line/callback`;
+  const redirectUri = resolveLineRedirectUri(req.url);
   const state = createRandomValue();
   const nonce = createRandomValue();
   const nextPayload = Buffer.from(
@@ -41,6 +40,19 @@ export async function GET(req: NextRequest) {
 
 function readEnv(name: string) {
   return process.env[name]?.trim() || "";
+}
+
+function resolveLineRedirectUri(requestUrl: string) {
+  const origin = new URL(requestUrl).origin;
+  const fallback = `${origin}/api/auth/line/callback`;
+  const configured = readEnv("LINE_LOGIN_REDIRECT_URI");
+  if (!configured) return fallback;
+  try {
+    const configuredUrl = new URL(configured);
+    return configuredUrl.origin === origin ? configured : fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 function createRandomValue() {

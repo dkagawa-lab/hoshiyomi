@@ -4,8 +4,10 @@ import { writeClientUserId } from "@/lib/clientIdentity";
 import { addAddOnCredits, ensureFreeBonusRemaining, readAddOnCredits, referralRewardCredits } from "@/lib/plans";
 
 export const authClientCookieName = "hoshiyomi_auth_client_user_id";
+export const authMethodKey = "hoshiyomi:authMethod";
 export const pendingReferralCodeKey = "hoshiyomi:pendingReferralCode";
 export type AuthFlowMode = "signup" | "login";
+export type AuthMethod = "google" | "line" | "local" | "mail";
 
 let supabaseBrowserClient: SupabaseClient | null = null;
 
@@ -113,9 +115,26 @@ export function readCookieValue(name: string) {
   return value ? decodeURIComponent(value) : "";
 }
 
-export async function completeClientRegistration(input: { birth?: BirthInput | null; clientUserId: string; lineClientUserId?: string; referralCode?: string }) {
+export function readAuthMethod(): AuthMethod | "" {
+  if (typeof window === "undefined") return "";
+  const value = window.localStorage.getItem(authMethodKey) || window.sessionStorage.getItem(authMethodKey) || "";
+  return isAuthMethod(value) ? value : "";
+}
+
+export function writeAuthMethod(method: AuthMethod) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(authMethodKey, method);
+  window.sessionStorage.setItem(authMethodKey, method);
+}
+
+function isAuthMethod(value: string): value is AuthMethod {
+  return value === "mail" || value === "google" || value === "line" || value === "local";
+}
+
+export async function completeClientRegistration(input: { authMethod?: AuthMethod; birth?: BirthInput | null; clientUserId: string; lineClientUserId?: string; referralCode?: string }) {
   const previousClientUserId = readStoredClientUserId();
   writeClientUserId(input.clientUserId);
+  if (input.authMethod) writeAuthMethod(input.authMethod);
   window.localStorage.setItem("hoshiyomi:member", "true");
   window.sessionStorage.setItem("hoshiyomi:member", "true");
   ensureFreeBonusRemaining();

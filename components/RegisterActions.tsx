@@ -12,6 +12,7 @@ import {
   completeClientRegistration,
   getSupabaseAuthClient,
   isSupabaseAuthConfigured,
+  readAuthMethod,
   readStoredBirth,
   registerButtonLabel,
   rememberPendingReferralCode,
@@ -54,6 +55,13 @@ export function RegisterActions({ mode = "register" }: RegisterActionsProps) {
           ? "LINEログインは、LINE Developersのチャネル設定後に有効になります。先にメールまたはGoogleでログインできます。"
           : "LINE登録は、LINE Developersのチャネル設定後に有効になります。先にメールまたはGoogleで登録できます。"
       });
+    } else if (authError === "line_failed") {
+      setStatus({
+        kind: "error",
+        message: isLoginMode
+          ? "LINEログインを完了できませんでした。もう一度LINEでログインするか、メール・Googleでログインしてください。"
+          : "LINE登録を完了できませんでした。もう一度LINEで新規登録するか、メール・Googleで登録してください。"
+      });
     }
     setCurrentClientUserId(ensureClientUserId());
   }, [isLoginMode]);
@@ -64,8 +72,10 @@ export function RegisterActions({ mode = "register" }: RegisterActionsProps) {
     supabase.auth.getSession().then(async ({ data }) => {
       if (!data.session?.user) return;
       const clientUserId = authClientUserId(data.session.user.id);
+      const provider = typeof data.session.user.app_metadata?.provider === "string" ? data.session.user.app_metadata.provider : "";
+      const authMethod = provider === "google" ? "google" : readAuthMethod() || "mail";
       setCurrentClientUserId(clientUserId);
-      await completeClientRegistration({ birth: readStoredBirth(), clientUserId, referralCode });
+      await completeClientRegistration({ authMethod, birth: readStoredBirth(), clientUserId, referralCode });
     });
   }, [referralCode]);
 
@@ -123,7 +133,7 @@ export function RegisterActions({ mode = "register" }: RegisterActionsProps) {
       setStatus({ kind: "error", message: "メールアドレスまたはパスワードが違います。" });
       return;
     }
-    await completeClientRegistration({ birth: readStoredBirth(), clientUserId: authClientUserId(data.user.id), referralCode: isLoginMode ? "" : referralCode });
+    await completeClientRegistration({ authMethod: "mail", birth: readStoredBirth(), clientUserId: authClientUserId(data.user.id), referralCode: isLoginMode ? "" : referralCode });
     router.push(buildRegistrationCompleteUrl(returnTo, "mail", authFlow));
   }
 
@@ -149,7 +159,7 @@ export function RegisterActions({ mode = "register" }: RegisterActionsProps) {
   async function registerDemoMember() {
     const clientUserId = ensureClientUserId();
     setStatus({ kind: "loading", message: "開発用の登録として保存しています。" });
-    await completeClientRegistration({ birth: readStoredBirth(), clientUserId, referralCode });
+    await completeClientRegistration({ authMethod: "local", birth: readStoredBirth(), clientUserId, referralCode });
     router.push(buildRegistrationCompleteUrl(returnTo, "mail", "signup"));
   }
 
