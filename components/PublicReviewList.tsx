@@ -13,11 +13,14 @@ type PublicReview = {
   theme?: string;
 };
 
+type ReviewSortOrder = "high" | "low";
+
 const initialReviewCount = 8;
 
 export function PublicReviewList({ fallback }: { fallback: ReviewFixture[] }) {
   const [reviews, setReviews] = useState<PublicReview[]>([]);
   const [showAll, setShowAll] = useState(false);
+  const [sortOrder, setSortOrder] = useState<ReviewSortOrder>("high");
 
   useEffect(() => {
     let active = true;
@@ -56,10 +59,11 @@ export function PublicReviewList({ fallback }: { fallback: ReviewFixture[] }) {
       })
       .slice(0, 40);
   }, [fallback, reviews]);
-  const visibleItems = showAll ? items : items.slice(0, initialReviewCount);
+  const sortedItems = useMemo(() => sortReviews(items, sortOrder), [items, sortOrder]);
+  const visibleItems = showAll ? sortedItems : sortedItems.slice(0, initialReviewCount);
   const averageRating = useMemo(() => calculateAverageRating(items), [items]);
   const themeSummaries = useMemo(() => buildThemeSummaries(items), [items]);
-  const featuredReview = items[0];
+  const featuredReview = sortedItems[0];
 
   if (!items.length) {
     return (
@@ -110,6 +114,20 @@ export function PublicReviewList({ fallback }: { fallback: ReviewFixture[] }) {
           ))}
         </div>
       </div>
+      <div className="review-list-toolbar">
+        <div>
+          <span>レビュー一覧</span>
+          <p>評価順に並び替えて、実際の声を確認できます。</p>
+        </div>
+        <div className="review-sort-control" role="group" aria-label="レビューの並び替え">
+          <button className={sortOrder === "high" ? "active" : ""} onClick={() => setSortOrder("high")} type="button">
+            高い順
+          </button>
+          <button className={sortOrder === "low" ? "active" : ""} onClick={() => setSortOrder("low")} type="button">
+            低い順
+          </button>
+        </div>
+      </div>
       <div className="testimonial-grid">
         {visibleItems.map((review) => (
           <article className="testimonial-card" key={review.id}>
@@ -122,10 +140,10 @@ export function PublicReviewList({ fallback }: { fallback: ReviewFixture[] }) {
           </article>
         ))}
       </div>
-      {items.length > initialReviewCount ? (
+      {sortedItems.length > initialReviewCount ? (
         <div className="review-more-row">
           <button className="button" onClick={() => setShowAll((current) => !current)} type="button">
-            {showAll ? "レビューを閉じる" : `レビューをさらに見る（全${items.length}件）`}
+            {showAll ? "レビューを閉じる" : `レビューをさらに見る（全${sortedItems.length}件）`}
           </button>
         </div>
       ) : null}
@@ -149,6 +167,16 @@ function normalizePublicReview(value: unknown): PublicReview | null {
     rating,
     theme: typeof review.theme === "string" ? review.theme : undefined
   };
+}
+
+function sortReviews(items: PublicReview[], order: ReviewSortOrder) {
+  return items
+    .map((item, index) => ({ index, item }))
+    .sort((a, b) => {
+      const diff = order === "high" ? b.item.rating - a.item.rating : a.item.rating - b.item.rating;
+      return diff || a.index - b.index;
+    })
+    .map(({ item }) => item);
 }
 
 function calculateAverageRating(items: PublicReview[]) {
