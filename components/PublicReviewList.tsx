@@ -16,6 +16,7 @@ type PublicReview = {
 type ReviewSortOrder = "high" | "low";
 
 const initialReviewCount = 8;
+const maxReviewCount = 60;
 
 export function PublicReviewList({ fallback }: { fallback: ReviewFixture[] }) {
   const [reviews, setReviews] = useState<PublicReview[]>([]);
@@ -24,7 +25,7 @@ export function PublicReviewList({ fallback }: { fallback: ReviewFixture[] }) {
 
   useEffect(() => {
     let active = true;
-    fetch("/api/reviews?limit=40")
+    fetch(`/api/reviews?limit=${maxReviewCount}`)
       .then((res) => res.json())
       .then((data) => {
         if (!active) return;
@@ -57,7 +58,7 @@ export function PublicReviewList({ fallback }: { fallback: ReviewFixture[] }) {
         seen.add(key);
         return true;
       })
-      .slice(0, 40);
+      .slice(0, maxReviewCount);
   }, [fallback, reviews]);
   const sortedItems = useMemo(() => sortReviews(items, sortOrder), [items, sortOrder]);
   const visibleItems = showAll ? sortedItems : sortedItems.slice(0, initialReviewCount);
