@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { BirthInput, calculateChart, Chart } from "@/lib/astrology";
 import { ChartWheel } from "@/components/ChartWheel";
+import { notifyBirthUpdated } from "@/components/MobileStickyCta";
 import { PricingPanel } from "@/components/PricingPanel";
 import { ensureClientUserId } from "@/lib/clientIdentity";
 import { getLineFriendUrl } from "@/lib/lineLinks";
@@ -1561,6 +1562,7 @@ function writeStoredBirth(input: BirthInput) {
   const value = JSON.stringify(input);
   const savedLocal = writeStorageValue("localStorage", "hoshiyomi:birth", value);
   const savedSession = writeStorageValue("sessionStorage", "hoshiyomi:birth", value);
+  if (savedLocal || savedSession) notifyBirthUpdated();
   return savedLocal || savedSession;
 }
 

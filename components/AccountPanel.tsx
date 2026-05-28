@@ -439,7 +439,7 @@ export function AccountPanel() {
         <h2>評価して相談枠を受け取る</h2>
         <p>
           星評価と8文字以上の口コミをあわせて投稿すると、{reviewCombinedRewardCredits}回分の相談枠をプレゼントします。
-          口コミは個人が特定されないよう、名前の最初の1文字だけを表示して掲載します。
+          口コミは個人が特定されないよう、年齢・性別・居住地のみを表示して掲載します。
         </p>
         <div className="review-form">
           <div className="review-stars-input" aria-label="5段階評価">

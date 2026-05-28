@@ -3802,6 +3802,10 @@ textarea:focus {
   margin: 0;
 }
 
+.mobile-sticky-cta {
+  display: none;
+}
+
 @media (max-width: 900px) {
   body {
     background:
@@ -3956,8 +3960,76 @@ textarea:focus {
 }
 
 @media (max-width: 560px) {
+  body {
+    padding-bottom: calc(92px + env(safe-area-inset-bottom));
+  }
+
   body::before {
     background-size: 48px 48px, 48px 48px;
+  }
+
+  .mobile-sticky-cta {
+    position: fixed;
+    right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    left: 12px;
+    z-index: 1000;
+    display: block;
+    pointer-events: none;
+  }
+
+  .mobile-sticky-cta-button {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    min-height: 60px;
+    border: 1px solid rgba(255, 238, 188, 0.36);
+    border-radius: 14px;
+    padding: 10px 14px;
+    background:
+      linear-gradient(135deg, #f0cc71, #b88734),
+      #e2be67;
+    color: #09111f;
+    text-decoration: none;
+    box-shadow: 0 18px 46px rgba(0, 0, 0, 0.5);
+    pointer-events: auto;
+  }
+
+  .mobile-sticky-cta-copy {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+  }
+
+  .mobile-sticky-cta-copy strong {
+    overflow: hidden;
+    font-size: 1.02rem;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-sticky-cta-copy em {
+    overflow: hidden;
+    font-size: 0.74rem;
+    font-style: normal;
+    line-height: 1.2;
+    opacity: 0.82;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-sticky-cta-arrow {
+    display: grid;
+    width: 30px;
+    height: 30px;
+    place-items: center;
+    border: 1px solid rgba(9, 17, 31, 0.22);
+    border-radius: 999px;
+    background: rgba(9, 17, 31, 0.08);
+    font-size: 1.1rem;
+    line-height: 1;
   }
 
   .shell {

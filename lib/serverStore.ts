@@ -542,7 +542,7 @@ export async function submitUserReview(input: { clientUserId: string; comment?: 
   const payload = {
     comment,
     display_area: buildReviewDisplayArea(user.birth_city),
-    display_name: user.name || "HOSHIYOMIユーザー",
+    display_name: buildReviewProfileLabel(user),
     rating,
     updated_at: now
   };
@@ -696,22 +696,52 @@ function toPublicReviewSnapshot(review: StoredReview): PublicReviewSnapshot {
     comment: review.comment ?? "",
     createdAt: review.updated_at || review.created_at,
     displayArea: review.display_area || "",
-    displayName: maskReviewDisplayName(review.display_name),
+    displayName: publicReviewProfileLabel(review),
     id: review.id,
     rating: review.rating
   };
 }
 
-function maskReviewDisplayName(value: string | null | undefined) {
-  const source = Array.from((value || "HOSHIYOMIユーザー").trim()).filter((char) => char.trim());
-  const first = source[0] || "H";
-  return `${first}＊＊`;
+function publicReviewProfileLabel(review: StoredReview) {
+  const storedProfile = (review.display_name || "").trim();
+  if (isReviewProfileLabel(storedProfile)) return storedProfile;
+  return review.display_area || "居住地未設定";
+}
+
+function buildReviewProfileLabel(user: StoredUser) {
+  const parts = [buildReviewDisplayArea(user.birth_city), ageLabel(user.birth_date), reviewGenderLabel(user.gender)].filter(Boolean);
+  return parts.length ? parts.join(" / ") : "居住地未設定";
+}
+
+function isReviewProfileLabel(value: string) {
+  if (!value) return false;
+  return value.includes(" / ") && (value.includes("歳") || value.includes("男性") || value.includes("女性") || value.includes("回答しない"));
+}
+
+function ageLabel(value: string | null | undefined) {
+  if (!value) return "";
+  const birthDate = new Date(`${value}T00:00:00+09:00`);
+  if (Number.isNaN(birthDate.getTime())) return "";
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const hadBirthday =
+    today.getMonth() > birthDate.getMonth() ||
+    (today.getMonth() === birthDate.getMonth() && today.getDate() >= birthDate.getDate());
+  if (!hadBirthday) age -= 1;
+  return age >= 0 && age < 130 ? `${age}歳` : "";
+}
+
+function reviewGenderLabel(value: string | null | undefined) {
+  if (value === "male") return "男性";
+  if (value === "female") return "女性";
+  if (value === "no_answer") return "回答しない";
+  return "";
 }
 
 function buildReviewDisplayArea(value: string | null | undefined) {
   const city = (value || "").trim();
   if (!city) return "";
-  return city.split(/\s+/)[0] || city;
+  return city.replace(/\s+/g, " ");
 }
 
 export async function getUserByClientUserId(clientUserId: string) {
