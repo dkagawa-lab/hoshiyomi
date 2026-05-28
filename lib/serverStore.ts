@@ -1,6 +1,6 @@
 import { createHash } from "crypto";
 import { Chart } from "@/lib/astrology";
-import { PlanKey, planRank, referralRewardCredits, registeredFreeBonusLimit, resolvePlan, reviewCommentRewardCredits, reviewRatingRewardCredits } from "@/lib/plans";
+import { legacyReviewRatingRewardCredits, PlanKey, planRank, referralRewardCredits, registeredFreeBonusLimit, resolvePlan, reviewCombinedRewardCredits } from "@/lib/plans";
 import type { GenderKey, RomanticInterestKey } from "@/lib/profileOptions";
 
 export type StoredUser = {
@@ -535,7 +535,7 @@ export async function submitUserReview(input: { clientUserId: string; comment?: 
   const comment = normalizeReviewComment(input.comment);
   if (!rating) throw new ReviewSubmissionError("星評価は1〜5の範囲で選択してください。", 400);
   if (input.comment && !comment) {
-    throw new ReviewSubmissionError("口コミ特典を受け取るには、8文字以上で感想を書いてください。", 400);
+    throw new ReviewSubmissionError("相談枠特典を受け取るには、8文字以上で感想を書いてください。", 400);
   }
 
   const now = new Date().toISOString();
@@ -547,11 +547,16 @@ export async function submitUserReview(input: { clientUserId: string; comment?: 
     updated_at: now
   };
 
-  await upsertUserReview(user.id, payload);
+  const savedReview = await upsertUserReview(user.id, payload);
 
   let creditsAwarded = 0;
-  if (await markReviewRatingRewarded(user.id, now)) creditsAwarded += reviewRatingRewardCredits;
-  if (comment && (await markReviewCommentRewarded(user.id, now))) creditsAwarded += reviewCommentRewardCredits;
+  if (comment) {
+    const alreadyReceivedLegacyRatingReward = Boolean(savedReview?.rating_rewarded_at);
+    const rewardedReview = await markReviewCombinedRewarded(user.id, now, !alreadyReceivedLegacyRatingReward);
+    if (rewardedReview) {
+      creditsAwarded += alreadyReceivedLegacyRatingReward ? Math.max(0, reviewCombinedRewardCredits - legacyReviewRatingRewardCredits) : reviewCombinedRewardCredits;
+    }
+  }
 
   const updatedUser =
     creditsAwarded > 0
@@ -645,22 +650,16 @@ async function upsertUserReview(userId: string, payload: { comment: string | nul
   }
 }
 
-async function markReviewRatingRewarded(userId: string, now: string) {
-  const reviews = await supabaseJson<StoredReview[]>(`user_reviews?user_id=eq.${encodeURIComponent(userId)}&rating_rewarded_at=is.null&select=*`, {
-    method: "PATCH",
-    headers: { Prefer: "return=representation" },
-    body: JSON.stringify({ rating_rewarded_at: now })
-  });
-  return reviews.length > 0;
-}
-
-async function markReviewCommentRewarded(userId: string, now: string) {
+async function markReviewCombinedRewarded(userId: string, now: string, includeRatingMarker: boolean) {
   const reviews = await supabaseJson<StoredReview[]>(`user_reviews?user_id=eq.${encodeURIComponent(userId)}&comment_rewarded_at=is.null&comment=not.is.null&select=*`, {
     method: "PATCH",
     headers: { Prefer: "return=representation" },
-    body: JSON.stringify({ comment_rewarded_at: now })
+    body: JSON.stringify({
+      comment_rewarded_at: now,
+      ...(includeRatingMarker ? { rating_rewarded_at: now } : {})
+    })
   });
-  return reviews.length > 0;
+  return reviews[0] ?? null;
 }
 
 async function getReviewByUserId(userId: string) {

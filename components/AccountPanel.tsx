@@ -7,7 +7,7 @@ import { ensureClientUserId } from "@/lib/clientIdentity";
 import { AuthMethod, authClientCookieName, authMethodKey, getSupabaseAuthClient, readAuthMethod } from "@/lib/authRegistrationClient";
 import { getLineFriendUrl } from "@/lib/lineLinks";
 import { genderLabel, romanticInterestLabel } from "@/lib/profileOptions";
-import { addAddOnCredits, planQuotaLabel, planStatusLabel, PlanKey, readAddOnCredits, readFreeBonusRemaining, readPlanFromStorage, readPlanUsage, referralRewardCredits, resolvePlan, reviewCommentRewardCredits, reviewRatingRewardCredits, usageLimitsDisabled } from "@/lib/plans";
+import { addAddOnCredits, legacyReviewRatingRewardCredits, planQuotaLabel, planStatusLabel, PlanKey, readAddOnCredits, readFreeBonusRemaining, readPlanFromStorage, readPlanUsage, referralRewardCredits, resolvePlan, reviewCombinedRewardCredits, usageLimitsDisabled } from "@/lib/plans";
 
 type AccountState = {
   addOnCredits: number;
@@ -275,7 +275,7 @@ export function AccountPanel() {
         serverSynced: data.mode === "server" ? true : current.serverSynced,
         used: typeof data.usage?.used === "number" ? data.usage.used : current.used
       }));
-      setReviewMessage(creditsAwarded > 0 ? `評価特典として${creditsAwarded}回分の相談枠を追加しました。` : "評価を更新しました。特典の付与は各項目につき1回までです。");
+      setReviewMessage(creditsAwarded > 0 ? `投稿特典として${creditsAwarded}回分の相談枠を追加しました。` : buildReviewNoCreditMessage(review));
     } catch (error) {
       setReviewMessage(error instanceof Error ? error.message : "評価を保存できませんでした。");
     } finally {
@@ -438,7 +438,7 @@ export function AccountPanel() {
         <div className="eyebrow">Review Gift</div>
         <h2>評価して相談枠を受け取る</h2>
         <p>
-          星評価で{reviewRatingRewardCredits}回分、8文字以上の口コミでさらに{reviewCommentRewardCredits}回分の相談枠をプレゼントします。
+          星評価と8文字以上の口コミをあわせて投稿すると、{reviewCombinedRewardCredits}回分の相談枠をプレゼントします。
           口コミは個人が特定されないよう、名前の最初の1文字だけを表示して掲載します。
         </p>
         <div className="review-form">
@@ -458,8 +458,7 @@ export function AccountPanel() {
             ))}
           </div>
           <div className="review-reward-status">
-            <span>{review.ratingRewarded ? "星評価特典は受け取り済み" : `星評価で+${reviewRatingRewardCredits}回`}</span>
-            <span>{review.commentRewarded ? "口コミ特典は受け取り済み" : `口コミで+${reviewCommentRewardCredits}回`}</span>
+            <span>{buildReviewRewardStatus(review)}</span>
           </div>
           <label htmlFor="review-comment">口コミを書く</label>
           <textarea
@@ -600,6 +599,24 @@ function buildAccountNextStepLinks(account: AccountState, lineFriendUrl: string)
     description: "不具合、鑑定内容、決済や解約、欲しい機能について送れます。"
   });
   return links;
+}
+
+function buildReviewRewardStatus(review: ReviewState) {
+  if (review.commentRewarded) return "星評価＋口コミの特典は受け取り済み";
+  if (review.ratingRewarded) {
+    const remainingCredits = Math.max(0, reviewCombinedRewardCredits - legacyReviewRatingRewardCredits);
+    return `口コミ投稿で残り+${remainingCredits}回`;
+  }
+  return `星評価＋口コミで${reviewCombinedRewardCredits}回分`;
+}
+
+function buildReviewNoCreditMessage(review: ReviewState) {
+  const hasValidComment = Array.from(review.comment.trim()).length >= 8;
+  if (!hasValidComment && !review.commentRewarded) {
+    const remainingCredits = review.ratingRewarded ? Math.max(0, reviewCombinedRewardCredits - legacyReviewRatingRewardCredits) : reviewCombinedRewardCredits;
+    return `星評価を保存しました。8文字以上の口コミを書くと、星評価とあわせて${remainingCredits}回分の相談枠を受け取れます。`;
+  }
+  return "評価を更新しました。特典の付与は1回までです。";
 }
 
 function LineFriendGuideCard({ account, lineConnectHref, lineFriendUrl }: { account: AccountState; lineConnectHref: string; lineFriendUrl: string }) {
