@@ -14,7 +14,6 @@ type PublicReview = {
 };
 
 const initialReviewCount = 8;
-const canUseFixtureReviews = process.env.NODE_ENV !== "production";
 
 export function PublicReviewList({ fallback }: { fallback: ReviewFixture[] }) {
   const [reviews, setReviews] = useState<PublicReview[]>([]);
@@ -38,9 +37,7 @@ export function PublicReviewList({ fallback }: { fallback: ReviewFixture[] }) {
   }, []);
 
   const items = useMemo(() => {
-    if (reviews.length > 0) return reviews;
-    if (!canUseFixtureReviews) return [];
-    return fallback.map((item, index) => ({
+    const fallbackItems = fallback.map((item, index) => ({
       comment: item.text,
       displayArea: "",
       displayName: item.name,
@@ -48,6 +45,16 @@ export function PublicReviewList({ fallback }: { fallback: ReviewFixture[] }) {
       rating: Number(item.rating) || 5,
       theme: item.theme
     }));
+    if (!reviews.length) return fallbackItems;
+    const seen = new Set<string>();
+    return [...reviews, ...fallbackItems]
+      .filter((item) => {
+        const key = `${item.displayName}:${item.comment}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0, 40);
   }, [fallback, reviews]);
   const visibleItems = showAll ? items : items.slice(0, initialReviewCount);
   const averageRating = useMemo(() => calculateAverageRating(items), [items]);
@@ -122,9 +129,7 @@ export function PublicReviewList({ fallback }: { fallback: ReviewFixture[] }) {
           </button>
         </div>
       ) : null}
-      {reviews.length > 0 ? (
-        <p className="review-note">投稿された口コミを、個人が特定されない形で掲載しています。</p>
-      ) : null}
+      <p className="review-note">いただいた口コミを、個人が特定されない形で掲載しています。</p>
     </>
   );
 }
