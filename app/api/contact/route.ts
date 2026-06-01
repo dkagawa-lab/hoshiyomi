@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { insertContactInquiry, isServerStoreConfigured } from "@/lib/serverStore";
+import { checkNonBillableRateLimit, insertContactInquiry, isServerStoreConfigured } from "@/lib/serverStore";
 
 type ContactRequest = {
   category?: string;
@@ -24,6 +24,15 @@ export async function POST(req: Request) {
   if (!name) return NextResponse.json({ error: "お名前を入力してください。" }, { status: 400 });
   if (!isValidEmail(email)) return NextResponse.json({ error: "返信先メールアドレスを入力してください。" }, { status: 400 });
   if (message.length < 10) return NextResponse.json({ error: "お問い合わせ内容をもう少し詳しく入力してください。" }, { status: 400 });
+
+  const rateLimit = await checkNonBillableRateLimit({
+    identifier: contactRateLimitIdentifier(req),
+    kind: "contact",
+    scope: "contact"
+  });
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: "短時間に送信が続いています。少し時間をおいてください。" }, { status: 429 });
+  }
 
   if (!isServerStoreConfigured()) {
     return NextResponse.json({
@@ -53,4 +62,8 @@ function cleanText(value: unknown, maxLength: number) {
 
 function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function contactRateLimitIdentifier(req: Request) {
+  return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip")?.trim() || "unknown";
 }

@@ -1,5 +1,5 @@
 import { createHash } from "crypto";
-import { Chart } from "@/lib/astrology";
+import { BirthInput, Chart } from "@/lib/astrology";
 import { legacyReviewRatingRewardCredits, PlanKey, planRank, referralRewardCredits, registeredFreeBonusLimit, resolvePlan, reviewCombinedRewardCredits } from "@/lib/plans";
 import type { GenderKey, RomanticInterestKey } from "@/lib/profileOptions";
 
@@ -154,20 +154,43 @@ export async function upsertUserForChart(input: { chart: Chart; clientUserId: st
   const existing = await getUserByClientUserId(input.clientUserId);
   const nextIsMember = existing?.is_member || input.isMember;
   const nextFreeBonus = existing ? (existing.is_member ? existing.free_bonus_remaining : input.isMember ? registeredFreeBonusLimit : existing.free_bonus_remaining) : input.isMember ? registeredFreeBonusLimit : 0;
-  const payload = {
+  const payload = buildChartUserPayload(input.chart, {
     client_user_id: input.clientUserId,
-    name: input.chart.input.name || null,
-    birth_date: input.chart.input.date || null,
-    birth_time: input.chart.input.time || null,
-    birth_city: input.chart.input.city || null,
-    gender: input.chart.input.gender || null,
-    romantic_interest: input.chart.input.romanticInterest || null,
-    latitude: Number.isFinite(Number(input.chart.input.latitude)) ? Number(input.chart.input.latitude) : null,
-    longitude: Number.isFinite(Number(input.chart.input.longitude)) ? Number(input.chart.input.longitude) : null,
     is_member: nextIsMember,
+    free_bonus_remaining: nextFreeBonus
+  });
+
+  if (existing) {
+    const users = await supabaseJson<StoredUser[]>(`users?id=eq.${encodeURIComponent(existing.id)}&select=*`, {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify(payload)
+    });
+    return users[0] ?? existing;
+  }
+
+  const users = await supabaseJson<StoredUser[]>("users?select=*", {
+    method: "POST",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify({ ...payload, plan: "free", add_on_credits: 0 })
+  });
+  return users[0];
+}
+
+export async function upsertUserForLineChart(input: { chart: Chart; clientUserId: string; isMember: boolean; lineUserId: string }) {
+  const lineUserId = normalizeLineUserId(input.lineUserId);
+  const clientUserId = normalizeClientUserId(input.clientUserId);
+  if (!lineUserId || !clientUserId?.startsWith("line:")) throw new Error("Valid LINE identity is required");
+
+  const existing = await getUserByLineUserId(lineUserId);
+  const nextIsMember = existing?.is_member || input.isMember;
+  const nextFreeBonus = existing ? (existing.is_member ? existing.free_bonus_remaining : input.isMember ? registeredFreeBonusLimit : existing.free_bonus_remaining) : input.isMember ? registeredFreeBonusLimit : 0;
+  const payload = buildChartUserPayload(input.chart, {
+    client_user_id: existing?.client_user_id ?? clientUserId,
     free_bonus_remaining: nextFreeBonus,
-    updated_at: new Date().toISOString()
-  };
+    is_member: nextIsMember,
+    line_user_id: lineUserId
+  });
 
   if (existing) {
     const users = await supabaseJson<StoredUser[]>(`users?id=eq.${encodeURIComponent(existing.id)}&select=*`, {
@@ -287,6 +310,15 @@ export async function mergeClientUserRecords(input: { sourceClientUserId?: strin
 
 export async function getUserSnapshotByClientUserId(clientUserId: string) {
   const existingUser = await getUserByClientUserId(clientUserId);
+  return getUserSnapshot(existingUser);
+}
+
+export async function getUserSnapshotByLineUserId(lineUserId: string) {
+  const existingUser = await getUserByLineUserId(lineUserId);
+  return getUserSnapshot(existingUser);
+}
+
+async function getUserSnapshot(existingUser: StoredUser | null) {
   const user = existingUser?.is_member ? await ensureReferralCodeForUser(existingUser) : existingUser;
   if (!user) return null;
   const [usage, messages, review] = await Promise.all([getUsageSnapshot(user), listChatMessages(user.id), getUserReviewSnapshot(user.id)]);
@@ -418,10 +450,28 @@ export async function markStripeEventProcessed(input: { id: string; type: string
   if (response.status === 409) return false;
   const errorText = await response.text();
   if (response.status === 404 || errorText.includes("stripe_events")) {
-    console.warn("stripe_events table is not available; processing Stripe webhook without event dedupe.");
+    const message = "stripe_events table is not available; Stripe webhook event dedupe cannot be guaranteed.";
+    if (process.env.NODE_ENV === "production") throw new Error(message);
+    console.warn(`${message} Processing without event dedupe in non-production.`);
     return true;
   }
   throw new Error(errorText);
+}
+
+export async function deleteStripeEvent(id: string) {
+  const eventId = typeof id === "string" ? id.trim() : "";
+  if (!eventId) return;
+  try {
+    const response = await supabaseFetch(`stripe_events?id=eq.${encodeURIComponent(eventId)}`, {
+      method: "DELETE",
+      headers: { Prefer: "return=minimal" }
+    });
+    if (!response.ok) {
+      console.warn("Stripe event rollback failed", { body: await response.text(), status: response.status });
+    }
+  } catch (error) {
+    console.warn("Stripe event rollback skipped", { message: error instanceof Error ? error.message : "Unknown error" });
+  }
 }
 
 export async function getUserByLineUserId(lineUserId: string) {
@@ -460,13 +510,22 @@ export function normalizeReferralCode(value: unknown) {
 }
 
 export async function redeemReferralCode(input: { clientUserId: string; code: string }) {
-  const code = normalizeReferralCode(input.code);
+  const referred = await registerClientUser(input.clientUserId);
+  return redeemReferralCodeForRegisteredUser(referred, input.code);
+}
+
+export async function redeemReferralCodeForLineUser(input: { clientUserId: string; code: string; lineUserId: string }) {
+  const referred = await registerLineUser({ clientUserId: input.clientUserId, lineUserId: input.lineUserId });
+  return redeemReferralCodeForRegisteredUser(referred, input.code);
+}
+
+async function redeemReferralCodeForRegisteredUser(referred: StoredUser, inputCode: string) {
+  const code = normalizeReferralCode(inputCode);
   if (!code) throw new ReferralCodeError("紹介コードの形式が正しくありません。", 400);
 
   const referrer = await getUserByReferralCode(code);
   if (!referrer) throw new ReferralCodeError("紹介コードが見つかりませんでした。", 404);
 
-  const referred = await registerClientUser(input.clientUserId);
   if (referrer.id === referred.id) {
     throw new ReferralCodeError("自分の紹介コードは使用できません。", 400);
   }
@@ -527,6 +586,15 @@ export async function insertContactInquiry(input: ContactInquiryInput) {
 
 export async function submitUserReview(input: { clientUserId: string; comment?: string | null; rating: number }) {
   const user = await getUserByClientUserId(input.clientUserId);
+  return submitUserReviewForStoredUser(user, input);
+}
+
+export async function submitUserReviewForLineUser(input: { comment?: string | null; lineUserId: string; rating: number }) {
+  const user = await getUserByLineUserId(input.lineUserId);
+  return submitUserReviewForStoredUser(user, input);
+}
+
+async function submitUserReviewForStoredUser(user: StoredUser | null, input: { comment?: string | null; rating: number }) {
   if (!user || !user.is_member) {
     throw new ReviewSubmissionError("評価特典を受け取るには、先に会員登録またはログインが必要です。", 401);
   }
@@ -749,6 +817,13 @@ export async function getUserByClientUserId(clientUserId: string) {
   return users[0] ?? null;
 }
 
+export async function getUserByStripeCustomerId(customerId: string) {
+  const normalized = typeof customerId === "string" ? customerId.trim() : "";
+  if (!normalized) return null;
+  const users = await supabaseJson<StoredUser[]>(`users?stripe_customer_id=eq.${encodeURIComponent(normalized)}&select=*&limit=1`);
+  return users[0] ?? null;
+}
+
 async function getUserByReferralCode(referralCode: string) {
   const users = await supabaseJson<StoredUser[]>(`users?referral_code=eq.${encodeURIComponent(referralCode)}&select=*&limit=1`);
   return users[0] ?? null;
@@ -821,6 +896,23 @@ function toPublicUserSnapshot(user: StoredUser): PublicUserSnapshot {
   };
 }
 
+export function birthInputFromStoredUser(user: StoredUser): BirthInput | null {
+  if (!user.birth_date || user.latitude === null || user.longitude === null) return null;
+  const latitude = Number(user.latitude);
+  const longitude = Number(user.longitude);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  return {
+    city: user.birth_city || "",
+    date: user.birth_date,
+    gender: user.gender || undefined,
+    latitude,
+    longitude,
+    name: user.name || "あなた",
+    romanticInterest: user.romantic_interest || undefined,
+    time: user.birth_time ? String(user.birth_time).slice(0, 5) : ""
+  };
+}
+
 async function updateUser(userId: string, payload: Record<string, unknown>) {
   const users = await supabaseJson<StoredUser[]>(`users?id=eq.${encodeURIComponent(userId)}&select=*`, {
     method: "PATCH",
@@ -861,6 +953,29 @@ function buildMergedUserPayload(source: StoredUser, target: StoredUser, targetCl
     referred_by_user_id: target.referred_by_user_id ?? source.referred_by_user_id,
     stripe_customer_id: target.stripe_customer_id ?? source.stripe_customer_id,
     stripe_subscription_id: target.stripe_subscription_id ?? source.stripe_subscription_id
+  };
+}
+
+function buildChartUserPayload(
+  chart: Chart,
+  base: {
+    client_user_id?: string | null;
+    free_bonus_remaining: number;
+    is_member: boolean;
+    line_user_id?: string | null;
+  }
+) {
+  return {
+    ...base,
+    name: chart.input.name || null,
+    birth_date: chart.input.date || null,
+    birth_time: chart.input.time || null,
+    birth_city: chart.input.city || null,
+    gender: chart.input.gender || null,
+    romantic_interest: chart.input.romanticInterest || null,
+    latitude: Number.isFinite(Number(chart.input.latitude)) ? Number(chart.input.latitude) : null,
+    longitude: Number.isFinite(Number(chart.input.longitude)) ? Number(chart.input.longitude) : null,
+    updated_at: new Date().toISOString()
   };
 }
 

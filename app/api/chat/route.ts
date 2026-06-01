@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
-import { Chart, calculateTransits } from "@/lib/astrology";
+import { Chart, calculateChart, calculateTransits } from "@/lib/astrology";
 import { buildChartContext, buildTransitContext, demoAnswer, systemPrompt } from "@/lib/prompt";
 import { ReaderStyleKey, resolveReaderStyle } from "@/lib/readerStyles";
 import { PlanKey, resolvePlan, usageLimitsDisabled } from "@/lib/plans";
 import { classifyQuestionBilling, NonBillableQuestionKind, QuestionBilling } from "@/lib/questionBilling";
 import { QuestionIntentKey, resolveQuestionIntent } from "@/lib/questionIntents";
 import { buildConversationContext, generateAstrologyAnswer, isAnthropicApiError, isAnthropicRateLimitError, isProductionAiConfigured, mergeConversationMessages, normalizeChatMessages } from "@/lib/aiRuntime";
-import { checkNonBillableRateLimit, consumeQuota, countLifetimeUserMessages, getQuotaState, getUsageSnapshot, insertChatTurn, isServerStoreConfigured, listChatMessages, normalizeClientUserId, NonBillableRateLimitResult, upsertUserForChart } from "@/lib/serverStore";
+import { getAuthenticatedRequestUser } from "@/lib/serverAuth";
+import { birthInputFromStoredUser, checkNonBillableRateLimit, consumeQuota, countLifetimeUserMessages, getQuotaState, getUsageSnapshot, insertChatTurn, isServerStoreConfigured, listChatMessages, normalizeClientUserId, NonBillableRateLimitResult, StoredUser, upsertUserForChart, upsertUserForLineChart } from "@/lib/serverStore";
 
 type ChatRequest = {
   chart: Chart;
@@ -26,9 +27,31 @@ export async function POST(req: Request) {
   }
 
   const billing = classifyQuestionBilling(body.question);
-  const clientUserId = normalizeClientUserId(body.clientUserId);
-  const storedUser = isServerStoreConfigured() && clientUserId ? await safeServerStore("upsert user for chat", () => upsertUserForChart({ chart: body.chart, clientUserId, isMember: Boolean(body.isMember) })) : null;
-  const quota = storedUser ? await safeServerStore("read quota for chat", () => getQuotaState(storedUser)) : null;
+  const authUser = await getAuthenticatedRequestUser(req);
+  const requestClientUserId = normalizeClientUserId(body.clientUserId);
+  const clientUserId = authUser?.clientUserId ?? (process.env.NODE_ENV === "production" && isServerStoreConfigured() ? null : requestClientUserId);
+  const requiresServerBackedAi = billing.countable && isProductionAiConfigured() && process.env.NODE_ENV === "production";
+  if (requiresServerBackedAi && !isServerStoreConfigured()) {
+    return NextResponse.json({ error: "相談回数の確認ができないため、鑑定を開始できません。少し時間をおいてもう一度お試しください。" }, { status: 503 });
+  }
+  if (requiresServerBackedAi && !authUser) {
+    return NextResponse.json({ error: "この相談を続けるには、ログインまたは会員登録が必要です。" }, { status: 401 });
+  }
+
+  const storedUser =
+    isServerStoreConfigured() && clientUserId
+      ? requiresServerBackedAi
+        ? await requiredServerStore("upsert user for chat", () => upsertChatUser({ authUser, chart: body.chart, clientUserId, isMember: Boolean(authUser) }))
+        : await safeServerStore("upsert user for chat", () => upsertChatUser({ authUser, chart: body.chart, clientUserId, isMember: Boolean(authUser || body.isMember) }))
+      : null;
+  const quota = storedUser
+    ? requiresServerBackedAi
+      ? await requiredServerStore("read quota for chat", () => getQuotaState(storedUser))
+      : await safeServerStore("read quota for chat", () => getQuotaState(storedUser))
+    : null;
+  if (requiresServerBackedAi && (!storedUser || !quota)) {
+    return NextResponse.json({ error: "相談回数の確認ができないため、鑑定を開始できません。少し時間をおいてもう一度お試しください。" }, { status: 503 });
+  }
   const plan = resolvePlan(quota?.plan ?? body.plan);
   const quotaDisabled = usageLimitsDisabled();
   if (!billing.countable) {
@@ -60,7 +83,8 @@ export async function POST(req: Request) {
     });
   }
 
-  const transits = calculateTransits(body.chart);
+  const effectiveChart = resolveEffectiveChart(storedUser, body.chart);
+  const transits = calculateTransits(effectiveChart);
   const readerStyle = resolveReaderStyle(body.readerStyle).key;
   const questionIntent = resolveQuestionIntent(body.question, body.questionIntent).key;
   const clientMessages = normalizeChatMessages(body.messages, body.question, plan.key);
@@ -84,7 +108,7 @@ export async function POST(req: Request) {
   }
 
   if (!isProductionAiConfigured()) {
-    const answer = demoAnswer(body.question, body.chart, transits, readerStyle, plan.key, questionIntent);
+    const answer = demoAnswer(body.question, effectiveChart, transits, readerStyle, plan.key, questionIntent);
     if (storedUser && quota) {
       const usage = await persistChatTurnAndQuota({ answer, question: body.question, quota, quotaDisabled, storedUser });
       return NextResponse.json({ answer, mode: "demo", ...(usage ? { usage } : {}) });
@@ -106,7 +130,7 @@ export async function POST(req: Request) {
       system: [
         systemPrompt(readerStyle, plan.key, questionIntent, body.question),
         buildConversationContext(conversationMessages, plan.key),
-        `出生図データ:\n${buildChartContext(body.chart)}`,
+        `出生図データ:\n${buildChartContext(effectiveChart)}`,
         `現在のトランジットデータ:\n${buildTransitContext(transits)}`
       ].join("\n\n"),
       messages: conversationMessages
@@ -156,9 +180,32 @@ export async function POST(req: Request) {
 
   if (storedUser && quota) {
     const usage = await persistChatTurnAndQuota({ answer, question: body.question, quota, quotaDisabled, storedUser });
+    if (requiresServerBackedAi && !usage) {
+      return NextResponse.json({ error: "相談履歴を保存できなかったため、鑑定を完了できませんでした。相談回数は消費していません。" }, { status: 503 });
+    }
     return NextResponse.json({ answer, mode: aiMode, model: aiModel, ...(usage ? { usage } : {}) });
   }
+  if (requiresServerBackedAi) {
+    return NextResponse.json({ error: "相談履歴を保存できなかったため、鑑定を完了できませんでした。相談回数は消費していません。" }, { status: 503 });
+  }
   return NextResponse.json({ answer, mode: aiMode, model: aiModel });
+}
+
+function upsertChatUser(input: { authUser: Awaited<ReturnType<typeof getAuthenticatedRequestUser>>; chart: Chart; clientUserId: string; isMember: boolean }) {
+  if (input.authUser?.provider === "line" && input.authUser.lineUserId) {
+    return upsertUserForLineChart({
+      chart: input.chart,
+      clientUserId: input.clientUserId,
+      isMember: true,
+      lineUserId: input.authUser.lineUserId
+    });
+  }
+  return upsertUserForChart({ chart: input.chart, clientUserId: input.clientUserId, isMember: input.isMember });
+}
+
+function resolveEffectiveChart(storedUser: StoredUser | null, fallback: Chart) {
+  const birthInput = storedUser ? birthInputFromStoredUser(storedUser) : null;
+  return birthInput ? calculateChart(birthInput) : fallback;
 }
 
 async function persistChatTurnAndQuota(input: {
@@ -182,6 +229,15 @@ async function safeServerStore<T>(label: string, action: () => Promise<T>) {
     return await action();
   } catch (error) {
     console.warn(`Server store skipped: ${label}`, { message: error instanceof Error ? error.message : "Unknown error" });
+    return null;
+  }
+}
+
+async function requiredServerStore<T>(label: string, action: () => Promise<T>) {
+  try {
+    return await action();
+  } catch (error) {
+    console.warn(`Server store required but failed: ${label}`, { message: error instanceof Error ? error.message : "Unknown error" });
     return null;
   }
 }

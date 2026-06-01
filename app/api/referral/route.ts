@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { referralRewardCredits } from "@/lib/plans";
-import { isServerStoreConfigured, normalizeClientUserId, redeemReferralCode, ReferralCodeError } from "@/lib/serverStore";
+import { getAuthenticatedRequestUser } from "@/lib/serverAuth";
+import { isServerStoreConfigured, normalizeClientUserId, redeemReferralCode, redeemReferralCodeForLineUser, ReferralCodeError } from "@/lib/serverStore";
 
 type ReferralRequest = {
   clientUserId?: string;
@@ -9,17 +10,25 @@ type ReferralRequest = {
 
 export async function POST(req: Request) {
   const body = (await req.json()) as ReferralRequest;
-  const clientUserId = normalizeClientUserId(body.clientUserId);
-  if (!clientUserId) {
-    return NextResponse.json({ error: "clientUserId is required" }, { status: 400 });
-  }
+  const requestedClientUserId = normalizeClientUserId(body.clientUserId);
 
   if (!isServerStoreConfigured()) {
+    if (!requestedClientUserId) {
+      return NextResponse.json({ error: "clientUserId is required" }, { status: 400 });
+    }
     return NextResponse.json({ credits: referralRewardCredits, mode: "local", ok: true });
   }
 
+  const authUser = await getAuthenticatedRequestUser(req);
+  if (!authUser) {
+    return NextResponse.json({ error: "紹介コードを適用するにはログインが必要です。" }, { status: 401 });
+  }
+
   try {
-    const result = await redeemReferralCode({ clientUserId, code: body.code || "" });
+    const result =
+      authUser.provider === "line" && authUser.lineUserId
+        ? await redeemReferralCodeForLineUser({ clientUserId: authUser.clientUserId, code: body.code || "", lineUserId: authUser.lineUserId })
+        : await redeemReferralCode({ clientUserId: authUser.clientUserId, code: body.code || "" });
     return NextResponse.json({
       credits: result.credits,
       mode: "server",

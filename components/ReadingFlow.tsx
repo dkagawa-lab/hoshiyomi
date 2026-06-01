@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { BirthInput, BodyPosition, calculateChart, calculateTransits, Chart, formatPosition, TransitSnapshot } from "@/lib/astrology";
 import { ChartWheel } from "@/components/ChartWheel";
 import { notifyBirthUpdated } from "@/components/MobileStickyCta";
+import { buildAuthHeaders } from "@/lib/authRegistrationClient";
 import { ensureClientUserId } from "@/lib/clientIdentity";
 import { ensureFreeBonusRemaining, planQuotaLabel, PlanKey, readFreeBonusRemaining, readPlanFromStorage, readPlanUsage, resolvePlan, usageLimitsDisabled } from "@/lib/plans";
 
@@ -334,7 +335,9 @@ function writeStorageValue(storageName: "localStorage" | "sessionStorage", key: 
 async function syncReadingServerState(clientUserId: string, fallbackBirth: BirthInput | null, setters: ReadingServerStateSetters) {
   if (!clientUserId) return;
   try {
-    const res = await fetch(`/api/me?clientUserId=${encodeURIComponent(clientUserId)}`);
+    const res = await fetch(`/api/me?clientUserId=${encodeURIComponent(clientUserId)}`, {
+      headers: await buildAuthHeaders()
+    });
     const data = (await res.json()) as ReadingServerSnapshot;
     if (!res.ok || data.mode !== "server") return;
     if (data.usage) {

@@ -32,6 +32,18 @@ export function getSupabaseAuthClient() {
   return supabaseBrowserClient;
 }
 
+export async function getAuthAccessToken() {
+  const supabase = getSupabaseAuthClient();
+  if (!supabase) return "";
+  const { data } = await supabase.auth.getSession();
+  return data.session?.access_token || "";
+}
+
+export async function buildAuthHeaders(baseHeaders: Record<string, string> = {}) {
+  const token = await getAuthAccessToken();
+  return token ? { ...baseHeaders, Authorization: `Bearer ${token}` } : baseHeaders;
+}
+
 export function authClientUserId(userId: string) {
   return `auth:${userId}`;
 }
@@ -141,7 +153,7 @@ export async function completeClientRegistration(input: { authMethod?: AuthMetho
 
   await fetch("/api/register", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: await buildAuthHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({
       birth: input.birth ?? readStoredBirth(),
       clientUserId: input.clientUserId,
@@ -173,7 +185,7 @@ export async function applyReferralCode(clientUserId: string, code: string) {
   try {
     const res = await fetch("/api/referral", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await buildAuthHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ clientUserId, code })
     });
     const data = await res.json().catch(() => ({}));

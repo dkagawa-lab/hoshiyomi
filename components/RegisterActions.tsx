@@ -37,9 +37,11 @@ export function RegisterActions({ mode = "register" }: RegisterActionsProps) {
   const [referralCode, setReferralCode] = useState("");
   const [returnTo, setReturnTo] = useState("/account");
   const [status, setStatus] = useState<AuthStatus>({ kind: "idle", message: "" });
+  const [legalConsent, setLegalConsent] = useState(mode === "login");
   const supabaseConfigured = isSupabaseAuthConfigured();
   const isLoginMode = mode === "login";
   const authFlow = isLoginMode ? "login" : "signup";
+  const canStartAuth = isLoginMode || legalConsent;
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -88,6 +90,7 @@ export function RegisterActions({ mode = "register" }: RegisterActionsProps) {
 
   async function handleEmailSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!ensureLegalConsent()) return;
     if (!email.trim()) {
       setStatus({ kind: "error", message: "メールアドレスを入力してください。" });
       return;
@@ -138,6 +141,7 @@ export function RegisterActions({ mode = "register" }: RegisterActionsProps) {
   }
 
   async function handleGoogleSignIn() {
+    if (!ensureLegalConsent()) return;
     const supabase = getSupabaseAuthClient();
     if (!supabase) {
       setStatus({ kind: "error", message: isLoginMode ? "Googleログインを使うには、Supabase Authの公開キー設定が必要です。" : "Google登録を使うには、Supabase Authの公開キー設定が必要です。" });
@@ -157,14 +161,33 @@ export function RegisterActions({ mode = "register" }: RegisterActionsProps) {
   }
 
   async function registerDemoMember() {
+    if (!ensureLegalConsent()) return;
     const clientUserId = ensureClientUserId();
     setStatus({ kind: "loading", message: "開発用の登録として保存しています。" });
     await completeClientRegistration({ authMethod: "local", birth: readStoredBirth(), clientUserId, referralCode });
     router.push(buildRegistrationCompleteUrl(returnTo, "mail", "signup"));
   }
 
+  function ensureLegalConsent() {
+    if (isLoginMode || legalConsent) return true;
+    setStatus({ kind: "error", message: "新規登録には、利用規約・プライバシーポリシー・決済条件への同意が必要です。" });
+    return false;
+  }
+
   return (
     <div className={`auth-register ${isLoginMode ? "auth-login" : ""}`}>
+      {!isLoginMode ? (
+        <label className="contact-consent auth-consent">
+          <input checked={legalConsent} onChange={(event) => setLegalConsent(event.target.checked)} type="checkbox" />
+          <span>
+            <Link className="text-link" href="/terms">利用規約</Link>、
+            <Link className="text-link" href="/privacy">プライバシーポリシー</Link>、
+            <Link className="text-link" href="/legal/payment-terms">決済・サブスクリプション条件</Link>
+            に同意します。鑑定文作成のため、出生情報や相談内容が外部サービスへ送信される場合があることを確認しました。
+          </span>
+        </label>
+      ) : null}
+
       <div className="auth-method-grid">
         <div className="auth-referral-panel">
           <label htmlFor="auth-referral-code">紹介コード</label>
@@ -223,18 +246,29 @@ export function RegisterActions({ mode = "register" }: RegisterActionsProps) {
                 type="email"
                 value={email}
               />
-              <button className="button primary" disabled={status.kind === "loading"} type="submit">
+              <button className="button primary" disabled={status.kind === "loading" || !canStartAuth} type="submit">
                 登録メールを受け取る
               </button>
             </div>
           </form>
         )}
 
-        <button className="button auth-provider-button" disabled={status.kind === "loading"} onClick={handleGoogleSignIn} type="button">
+        <button className="button auth-provider-button" disabled={status.kind === "loading" || !canStartAuth} onClick={handleGoogleSignIn} type="button">
           {isLoginMode ? "Googleでログイン" : "Googleで新規登録"}
         </button>
 
-        <a className="button auth-provider-button line" href={lineHref} onClick={() => rememberPendingReferralCode(referralCode)}>
+        <a
+          aria-disabled={!canStartAuth || status.kind === "loading"}
+          className={`button auth-provider-button line ${!canStartAuth || status.kind === "loading" ? "disabled" : ""}`}
+          href={canStartAuth && status.kind !== "loading" ? lineHref : "#"}
+          onClick={(event) => {
+            if (!ensureLegalConsent() || status.kind === "loading") {
+              event.preventDefault();
+              return;
+            }
+            rememberPendingReferralCode(referralCode);
+          }}
+        >
           {isLoginMode ? "LINEでログイン" : "LINEで登録・友だち追加"}
         </a>
       </div>
@@ -263,7 +297,7 @@ export function RegisterActions({ mode = "register" }: RegisterActionsProps) {
       {!supabaseConfigured && !isLoginMode ? (
         <div className="auth-dev-fallback">
           <p>本番のメール・Google登録にはSupabase Authの設定が必要です。開発中だけ、下のボタンで現在の端末に保存して確認できます。</p>
-          <button className="button subtle" disabled={status.kind === "loading"} onClick={registerDemoMember} type="button">
+          <button className="button subtle" disabled={status.kind === "loading" || !canStartAuth} onClick={registerDemoMember} type="button">
             {registerButtonLabel(returnTo)}
           </button>
         </div>

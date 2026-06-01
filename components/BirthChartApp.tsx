@@ -6,6 +6,7 @@ import { BirthInput, calculateChart, Chart } from "@/lib/astrology";
 import { ChartWheel } from "@/components/ChartWheel";
 import { notifyBirthUpdated } from "@/components/MobileStickyCta";
 import { PricingPanel } from "@/components/PricingPanel";
+import { buildAuthHeaders } from "@/lib/authRegistrationClient";
 import { ensureClientUserId } from "@/lib/clientIdentity";
 import { getLineFriendUrl } from "@/lib/lineLinks";
 import { findPrefecture, japanLocations, Municipality } from "@/lib/japanLocations";
@@ -447,7 +448,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
       const requestMessages = buildRequestMessagesForApi(nextMessages, currentPlan.key);
       const res = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: await buildAuthHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ chart: requestChart, question: trimmedQuestion, messages: requestMessages, readerStyle: activeReaderStyle.key, plan: currentPlan.key, questionIntent: resolvedIntent, clientUserId: activeClientUserId, isMember: member })
       });
       const data = await res.json().catch(() => ({}));
@@ -572,7 +573,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
     try {
       const res = await fetch("/api/checkout", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: await buildAuthHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify(body),
         signal: controller.signal
       });
@@ -590,7 +591,9 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
   async function syncServerState(nextClientUserId = clientUserId) {
     if (!nextClientUserId) return null;
     try {
-      const res = await fetch(`/api/me?clientUserId=${encodeURIComponent(nextClientUserId)}`);
+      const res = await fetch(`/api/me?clientUserId=${encodeURIComponent(nextClientUserId)}`, {
+        headers: await buildAuthHeaders()
+      });
       const data = (await res.json()) as ServerSnapshot;
       if (!res.ok || data.mode !== "server") return null;
       if (!data.user && !data.usage) {

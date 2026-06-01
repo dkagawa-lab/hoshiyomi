@@ -2,13 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ensureClientUserId } from "@/lib/clientIdentity";
 import {
   AuthFlowMode,
-  authClientCookieName,
   buildRegistrationCompleteUrl,
   completeClientRegistration,
-  readCookieValue,
   readPendingReferralCode,
   readStoredBirth,
   resolveReturnTo
@@ -26,20 +23,18 @@ export function LineAuthCompleteClient() {
     async function finishRegistration() {
       const returnTo = resolveReturnTo(searchParams.get("returnTo"));
       const referralCode = searchParams.get("ref") || readPendingReferralCode();
-      const lineOrCanonicalClientUserId = readCookieValue(authClientCookieName);
-      if (!lineOrCanonicalClientUserId) {
+      const lineClientUserId = await readLineSessionClientUserId();
+      if (!lineClientUserId) {
         const fallbackPath = flow === "login" ? "/login" : "/register";
         setMessage(flow === "login" ? "LINEログインの情報を確認できませんでした。ログイン画面に戻ります。" : "LINE登録・友だち追加の情報を確認できませんでした。登録画面に戻ります。");
         setTimeout(() => router.replace(`${fallbackPath}?returnTo=${encodeURIComponent(returnTo)}`), 1200);
         return;
       }
-      const currentClientUserId = ensureClientUserId();
-      const shouldKeepWebClient = lineOrCanonicalClientUserId.startsWith("line:") && currentClientUserId && currentClientUserId !== lineOrCanonicalClientUserId;
       await completeClientRegistration({
         authMethod: "line",
         birth: readStoredBirth(),
-        clientUserId: shouldKeepWebClient ? currentClientUserId : lineOrCanonicalClientUserId,
-        lineClientUserId: lineOrCanonicalClientUserId.startsWith("line:") ? lineOrCanonicalClientUserId : undefined,
+        clientUserId: lineClientUserId,
+        lineClientUserId,
         referralCode
       });
       if (!cancelled) router.replace(buildRegistrationCompleteUrl(returnTo, "line", flow));
@@ -53,6 +48,16 @@ export function LineAuthCompleteClient() {
   }, [flow, router, searchParams]);
 
   return <p className="form-status">{message}</p>;
+}
+
+async function readLineSessionClientUserId() {
+  try {
+    const res = await fetch("/api/auth/line/session", { cache: "no-store" });
+    const data = (await res.json().catch(() => ({}))) as { clientUserId?: unknown };
+    return typeof data.clientUserId === "string" && data.clientUserId.startsWith("line:") ? data.clientUserId : "";
+  } catch {
+    return "";
+  }
 }
 
 function resolveAuthFlow(value: string | null): AuthFlowMode {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authClientCookieName } from "@/lib/authRegistrationClient";
+import { lineAuthSessionCookieName, signLineSessionValue } from "@/lib/serverAuth";
 import { isServerStoreConfigured, normalizeClientUserId, registerLineUser } from "@/lib/serverStore";
 
 const stateCookieName = "hoshiyomi_line_oauth_state";
@@ -49,13 +50,11 @@ export async function GET(req: NextRequest) {
   const lineClientUserId = toLineClientUserId(lineUserId);
   if (!lineClientUserId) return NextResponse.redirect(errorRedirect);
 
-  const requestedClientUserId = normalizeClientUserId(returnPayload.clientUserId);
-  let clientUserId = requestedClientUserId ?? lineClientUserId;
+  let clientUserId = lineClientUserId;
 
   if (isServerStoreConfigured()) {
     try {
-      const user = await registerLineUser({ clientUserId, lineUserId });
-      clientUserId = normalizeClientUserId(user?.client_user_id) ?? clientUserId;
+      await registerLineUser({ clientUserId, lineUserId });
     } catch (error) {
       console.warn("LINE registration could not be stored yet", { message: error instanceof Error ? error.message : "Unknown error" });
     }
@@ -68,7 +67,13 @@ export async function GET(req: NextRequest) {
 
   const res = NextResponse.redirect(completeUrl);
   const secure = process.env.NODE_ENV === "production";
-  res.cookies.set(authClientCookieName, clientUserId, { httpOnly: false, maxAge: 60 * 60 * 24 * 365, path: "/", sameSite: "lax", secure });
+  res.cookies.set(authClientCookieName, "line", { httpOnly: false, maxAge: 600, path: "/", sameSite: "lax", secure });
+  const lineSessionValue = signLineSessionValue(clientUserId);
+  if (lineSessionValue) {
+    res.cookies.set(lineAuthSessionCookieName, lineSessionValue, { httpOnly: true, maxAge: 60 * 60 * 24 * 90, path: "/", sameSite: "lax", secure });
+  } else {
+    console.warn("LINE session cookie was not set because LINE_SESSION_SECRET is not configured or the LINE identity is invalid.");
+  }
   res.cookies.delete(stateCookieName);
   res.cookies.delete(nextCookieName);
   return res;

@@ -23,8 +23,8 @@ export default function Home() {
             <span>あなたの運命を深く知るには、</span>
             <span>生まれ持った星を理解し、</span>
             <span>今この瞬間の星の流れと重ね、</span>
-            <span>本当に聞きたいことまで受け止める</span>
-            <span>専任の占い師が必要です。</span>
+            <span>本当に聞きたいことまで受け止める、</span>
+            <span>専任の占い師のような星読みが必要です。</span>
           </p>
           <p className="lead hero-copy-line">
             <span>HOSHIYOMIは、あなたの出生図と</span>

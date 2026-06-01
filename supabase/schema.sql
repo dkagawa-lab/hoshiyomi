@@ -36,25 +36,15 @@ alter table users add column if not exists stripe_customer_id text;
 alter table users add column if not exists stripe_subscription_id text;
 alter table users add column if not exists updated_at timestamptz not null default now();
 
-create unique index if not exists users_client_user_id_idx
-  on users(client_user_id)
-  where client_user_id is not null;
+create unique index if not exists users_client_user_id_idx on users(client_user_id) where client_user_id is not null;
 
-create unique index if not exists users_line_user_id_idx
-  on users(line_user_id)
-  where line_user_id is not null;
+create unique index if not exists users_line_user_id_idx on users(line_user_id) where line_user_id is not null;
 
-create index if not exists users_stripe_customer_idx
-  on users(stripe_customer_id)
-  where stripe_customer_id is not null;
+create index if not exists users_stripe_customer_idx on users(stripe_customer_id) where stripe_customer_id is not null;
 
-create index if not exists users_stripe_subscription_idx
-  on users(stripe_subscription_id)
-  where stripe_subscription_id is not null;
+create index if not exists users_stripe_subscription_idx on users(stripe_subscription_id) where stripe_subscription_id is not null;
 
-create unique index if not exists users_referral_code_idx
-  on users(referral_code)
-  where referral_code is not null;
+create unique index if not exists users_referral_code_idx on users(referral_code) where referral_code is not null;
 
 create table if not exists referral_redemptions (
   id uuid primary key default gen_random_uuid(),
@@ -66,11 +56,9 @@ create table if not exists referral_redemptions (
   unique(referred_user_id)
 );
 
-create index if not exists referral_redemptions_referrer_idx
-  on referral_redemptions(referrer_user_id, created_at desc);
+create index if not exists referral_redemptions_referrer_idx on referral_redemptions(referrer_user_id, created_at desc);
 
-create index if not exists referral_redemptions_code_idx
-  on referral_redemptions(referral_code);
+create index if not exists referral_redemptions_code_idx on referral_redemptions(referral_code);
 
 create table if not exists stripe_events (
   id text primary key,
@@ -86,8 +74,7 @@ create table if not exists chat_messages (
   created_at timestamptz not null default now()
 );
 
-create index if not exists chat_messages_user_created_idx
-  on chat_messages(user_id, created_at desc);
+create index if not exists chat_messages_user_created_idx on chat_messages(user_id, created_at desc);
 
 create table if not exists non_billable_events (
   id uuid primary key default gen_random_uuid(),
@@ -97,11 +84,9 @@ create table if not exists non_billable_events (
   created_at timestamptz not null default now()
 );
 
-create index if not exists non_billable_events_key_created_idx
-  on non_billable_events(scope, key_hash, created_at desc);
+create index if not exists non_billable_events_key_created_idx on non_billable_events(scope, key_hash, created_at desc);
 
-create index if not exists non_billable_events_created_idx
-  on non_billable_events(created_at desc);
+create index if not exists non_billable_events_created_idx on non_billable_events(created_at desc);
 
 create table if not exists user_reviews (
   id uuid primary key default gen_random_uuid(),
@@ -116,11 +101,10 @@ create table if not exists user_reviews (
   created_at timestamptz not null default now()
 );
 
-create index if not exists user_reviews_public_idx
-  on user_reviews(updated_at desc)
-  where comment is not null;
+create index if not exists user_reviews_public_idx on user_reviews(updated_at desc) where comment is not null;
 
-create or replace view monthly_user_chat_counts as
+create or replace view monthly_user_chat_counts
+with (security_invoker = true) as
 select
   user_id,
   date_trunc('month', created_at) as month,
@@ -141,8 +125,142 @@ create table if not exists contact_inquiries (
   created_at timestamptz not null default now()
 );
 
-create index if not exists contact_inquiries_created_idx
-  on contact_inquiries(created_at desc);
+create index if not exists contact_inquiries_created_idx on contact_inquiries(created_at desc);
 
-create index if not exists contact_inquiries_status_idx
-  on contact_inquiries(status);
+create index if not exists contact_inquiries_status_idx on contact_inquiries(status);
+
+alter table users enable row level security;
+alter table referral_redemptions enable row level security;
+alter table stripe_events enable row level security;
+alter table chat_messages enable row level security;
+alter table non_billable_events enable row level security;
+alter table user_reviews enable row level security;
+alter table contact_inquiries enable row level security;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies where schemaname = 'public' and tablename = 'users' and policyname = 'users_select_own_auth_profile'
+  ) then
+    create policy users_select_own_auth_profile
+      on users for select
+      to authenticated
+      using (client_user_id = ('auth:' || auth.uid()::text));
+  end if;
+
+  if not exists (
+    select 1 from pg_policies where schemaname = 'public' and tablename = 'users' and policyname = 'users_insert_own_auth_profile'
+  ) then
+    create policy users_insert_own_auth_profile
+      on users for insert
+      to authenticated
+      with check (client_user_id = ('auth:' || auth.uid()::text));
+  end if;
+
+  if not exists (
+    select 1 from pg_policies where schemaname = 'public' and tablename = 'users' and policyname = 'users_update_own_auth_profile'
+  ) then
+    create policy users_update_own_auth_profile
+      on users for update
+      to authenticated
+      using (client_user_id = ('auth:' || auth.uid()::text))
+      with check (client_user_id = ('auth:' || auth.uid()::text));
+  end if;
+
+  if not exists (
+    select 1 from pg_policies where schemaname = 'public' and tablename = 'chat_messages' and policyname = 'chat_messages_select_own'
+  ) then
+    create policy chat_messages_select_own
+      on chat_messages for select
+      to authenticated
+      using (
+        exists (
+          select 1 from users
+          where users.id = chat_messages.user_id
+            and users.client_user_id = ('auth:' || auth.uid()::text)
+        )
+      );
+  end if;
+
+  if not exists (
+    select 1 from pg_policies where schemaname = 'public' and tablename = 'chat_messages' and policyname = 'chat_messages_insert_own'
+  ) then
+    create policy chat_messages_insert_own
+      on chat_messages for insert
+      to authenticated
+      with check (
+        exists (
+          select 1 from users
+          where users.id = chat_messages.user_id
+            and users.client_user_id = ('auth:' || auth.uid()::text)
+        )
+      );
+  end if;
+
+  if not exists (
+    select 1 from pg_policies where schemaname = 'public' and tablename = 'user_reviews' and policyname = 'user_reviews_select_own'
+  ) then
+    create policy user_reviews_select_own
+      on user_reviews for select
+      to authenticated
+      using (
+        exists (
+          select 1 from users
+          where users.id = user_reviews.user_id
+            and users.client_user_id = ('auth:' || auth.uid()::text)
+        )
+      );
+  end if;
+
+  if not exists (
+    select 1 from pg_policies where schemaname = 'public' and tablename = 'user_reviews' and policyname = 'user_reviews_insert_own'
+  ) then
+    create policy user_reviews_insert_own
+      on user_reviews for insert
+      to authenticated
+      with check (
+        exists (
+          select 1 from users
+          where users.id = user_reviews.user_id
+            and users.client_user_id = ('auth:' || auth.uid()::text)
+        )
+      );
+  end if;
+
+  if not exists (
+    select 1 from pg_policies where schemaname = 'public' and tablename = 'user_reviews' and policyname = 'user_reviews_update_own'
+  ) then
+    create policy user_reviews_update_own
+      on user_reviews for update
+      to authenticated
+      using (
+        exists (
+          select 1 from users
+          where users.id = user_reviews.user_id
+            and users.client_user_id = ('auth:' || auth.uid()::text)
+        )
+      )
+      with check (
+        exists (
+          select 1 from users
+          where users.id = user_reviews.user_id
+            and users.client_user_id = ('auth:' || auth.uid()::text)
+        )
+      );
+  end if;
+
+  if not exists (
+    select 1 from pg_policies where schemaname = 'public' and tablename = 'referral_redemptions' and policyname = 'referral_redemptions_select_related'
+  ) then
+    create policy referral_redemptions_select_related
+      on referral_redemptions for select
+      to authenticated
+      using (
+        exists (
+          select 1 from users
+          where users.id in (referral_redemptions.referrer_user_id, referral_redemptions.referred_user_id)
+            and users.client_user_id = ('auth:' || auth.uid()::text)
+        )
+      );
+  end if;
+end $$;

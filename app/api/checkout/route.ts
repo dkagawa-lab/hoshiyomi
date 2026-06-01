@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { addOnPack, AddOnPackKey, isPlanKey, PlanKey } from "@/lib/plans";
-import { getUserByClientUserId, isServerStoreConfigured, normalizeClientUserId } from "@/lib/serverStore";
+import { getAuthenticatedRequestUser } from "@/lib/serverAuth";
+import { getUserByClientUserId, getUserByLineUserId, isServerStoreConfigured, normalizeClientUserId } from "@/lib/serverStore";
 import { getStripe } from "@/lib/stripe";
 import type Stripe from "stripe";
 
@@ -13,7 +14,11 @@ type CheckoutRequest = {
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as CheckoutRequest;
-    const clientUserId = normalizeClientUserId(body.clientUserId);
+    const authUser = await getAuthenticatedRequestUser(req);
+    const clientUserId = authUser?.clientUserId ?? normalizeClientUserId(body.clientUserId);
+    if (process.env.NODE_ENV === "production" && isServerStoreConfigured() && !authUser) {
+      return NextResponse.json({ error: "決済を開始するにはログインが必要です。" }, { status: 401 });
+    }
     if (!clientUserId) {
       return NextResponse.json({ error: "決済を開始できませんでした。画面を再読み込みしてから、もう一度お試しください。" }, { status: 400 });
     }
@@ -47,9 +52,17 @@ export async function POST(req: Request) {
       );
     }
 
-    const existingUser = clientUserId && isServerStoreConfigured() ? await withTimeout(getUserByClientUserId(clientUserId).catch(() => null), 1200, null) : null;
+    const existingUser =
+      clientUserId && isServerStoreConfigured()
+        ? await withTimeout(
+            (authUser?.provider === "line" && authUser.lineUserId ? getUserByLineUserId(authUser.lineUserId) : getUserByClientUserId(clientUserId)).catch(() => null),
+            1200,
+            null
+          )
+        : null;
     const appUrl = resolveAppUrl(req);
-    const clientMetadata: Record<string, string> = clientUserId ? { client_user_id: clientUserId } : {};
+    const billingClientUserId = existingUser?.client_user_id || clientUserId;
+    const clientMetadata: Record<string, string> = billingClientUserId ? { client_user_id: billingClientUserId } : {};
     const metadata: Record<string, string> = selectedProduct
       ? { ...clientMetadata, product: selectedProduct, credits: String(addOnPack.credits) }
       : { ...clientMetadata, plan: selectedPlan, intro_offer: selectedPlan === "standard" ? "first_month_480" : "none" };
@@ -61,7 +74,7 @@ export async function POST(req: Request) {
           ? `${appUrl}/consultation?checkout=success&product=${selectedProduct}`
           : `${appUrl}/consultation?checkout=success&plan=${selectedPlan}`,
         cancel_url: `${appUrl}/consultation?checkout=cancel`,
-        ...(clientUserId ? { client_reference_id: clientUserId } : {}),
+        ...(billingClientUserId ? { client_reference_id: billingClientUserId } : {}),
         metadata,
         ...(existingUser?.stripe_customer_id ? { customer: existingUser.stripe_customer_id } : {}),
         ...(!selectedProduct ? { subscription_data: { metadata } } : {}),

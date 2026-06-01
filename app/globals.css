@@ -1261,6 +1261,14 @@ p {
   color: rgba(247, 241, 223, 0.72);
 }
 
+.button:disabled,
+.button.disabled,
+.button[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.48;
+  pointer-events: none;
+}
+
 .text-link {
   display: inline-flex;
   margin-top: 12px;
@@ -3268,6 +3276,17 @@ textarea:focus {
 .auth-register {
   display: grid;
   gap: 14px;
+}
+
+.auth-consent {
+  border: 1px solid rgba(226, 190, 103, 0.16);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(226, 190, 103, 0.055);
+}
+
+.auth-consent .text-link {
+  display: inline;
 }
 
 .auth-method-grid {

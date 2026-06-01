@@ -1,13 +1,13 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { NextResponse } from "next/server";
-import { BirthInput, calculateChart, calculateTransits } from "@/lib/astrology";
+import { calculateChart, calculateTransits } from "@/lib/astrology";
 import { buildChartContext, buildTransitContext, demoAnswer, systemPrompt } from "@/lib/prompt";
 import { canUseReaderStyle, resolvePlan, usageLimitsDisabled } from "@/lib/plans";
 import { classifyQuestionBilling, NonBillableQuestionKind, QuestionBilling } from "@/lib/questionBilling";
 import { ReaderStyleKey, resolveReaderStyle } from "@/lib/readerStyles";
 import { resolveQuestionIntent } from "@/lib/questionIntents";
 import { buildConversationContext, generateAstrologyAnswer, isAnthropicApiError, isAnthropicRateLimitError, isProductionAiConfigured, mergeConversationMessages, normalizeChatMessages } from "@/lib/aiRuntime";
-import { checkNonBillableRateLimit, consumeQuota, countLifetimeUserMessages, getQuotaState, getUsageSnapshot, getUserByLineUserId, insertChatTurn, isServerStoreConfigured, listChatMessages, NonBillableRateLimitResult, StoredUser, UsageSnapshot } from "@/lib/serverStore";
+import { birthInputFromStoredUser, checkNonBillableRateLimit, consumeQuota, countLifetimeUserMessages, getQuotaState, getUsageSnapshot, getUserByLineUserId, insertChatTurn, isServerStoreConfigured, listChatMessages, NonBillableRateLimitResult, StoredUser, UsageSnapshot } from "@/lib/serverStore";
 
 type LineWebhookBody = {
   events?: LineEvent[];
@@ -125,7 +125,7 @@ async function handleLineEventCore(event: LineEvent, replyToken: string, lineUse
     return;
   }
 
-  const birth = birthInputFromUser(user);
+  const birth = birthInputFromStoredUser(user);
   if (!birth) {
     await replyLineText(replyToken, [
       `まだ出生情報が保存されていません。\n\nWebで「星を読む」から生年月日・出生地を登録すると、LINEでもあなたの星の文脈を使って相談できます。\n${appUrl("/#app")}`
@@ -206,20 +206,6 @@ function parseLinePayload(body: string): LineWebhookBody {
 function normalizeLineQuestion(value: unknown) {
   if (typeof value !== "string") return "";
   return value.trim().replace(/\r\n/g, "\n").slice(0, 1500);
-}
-
-function birthInputFromUser(user: StoredUser): BirthInput | null {
-  if (!user.birth_date || user.latitude === null || user.longitude === null) return null;
-  return {
-    city: user.birth_city || "",
-    date: user.birth_date,
-    gender: user.gender || undefined,
-    latitude: Number(user.latitude),
-    longitude: Number(user.longitude),
-    name: user.name || "あなた",
-    romanticInterest: user.romantic_interest || undefined,
-    time: user.birth_time ? String(user.birth_time).slice(0, 5) : ""
-  };
 }
 
 function buildNonBillableLineReply(billing: QuestionBilling, usage: UsageSnapshot | null) {

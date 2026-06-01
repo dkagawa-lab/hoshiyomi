@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { buildAuthHeaders } from "@/lib/authRegistrationClient";
 import { ensureClientUserId } from "@/lib/clientIdentity";
 import { addOnPack, PlanKey, planStatusLabel, readAddOnCredits, readPlanFromStorage, resolvePlan, servicePlans, writeAddOnCredits } from "@/lib/plans";
 
@@ -102,7 +103,9 @@ export function PricingPanel({ addOnCredits, currentPlanKey, isMember, onBuyAddO
   async function syncServerPlan() {
     const clientUserId = ensureClientUserId();
     try {
-      const res = await fetch(`/api/me?clientUserId=${encodeURIComponent(clientUserId)}`);
+      const res = await fetch(`/api/me?clientUserId=${encodeURIComponent(clientUserId)}`, {
+        headers: await buildAuthHeaders()
+      });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.mode !== "server") return;
       const serverPlan = data.usage?.plan ?? "free";
@@ -126,7 +129,7 @@ export function PricingPanel({ addOnCredits, currentPlanKey, isMember, onBuyAddO
     try {
       const res = await fetch("/api/checkout", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: await buildAuthHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify(body),
         signal: controller.signal
       });

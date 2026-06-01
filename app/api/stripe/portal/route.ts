@@ -1,19 +1,23 @@
 import { NextResponse } from "next/server";
+import { getAuthenticatedRequestUser } from "@/lib/serverAuth";
 import { getStripe } from "@/lib/stripe";
-import { getUserByClientUserId, isServerStoreConfigured, normalizeClientUserId } from "@/lib/serverStore";
-
-type PortalRequest = {
-  clientUserId?: string;
-};
+import { getUserByClientUserId, getUserByLineUserId, isServerStoreConfigured } from "@/lib/serverStore";
 
 export async function POST(req: Request) {
+  const authUser = await getAuthenticatedRequestUser(req);
+  if (!authUser) {
+    return NextResponse.json({ error: "支払い管理画面を開くにはログインが必要です。" }, { status: 401 });
+  }
+
   const stripe = getStripe();
-  const clientUserId = normalizeClientUserId(((await req.json()) as PortalRequest).clientUserId);
-  if (!stripe || !clientUserId || !isServerStoreConfigured()) {
+  if (!stripe || !isServerStoreConfigured()) {
     return NextResponse.json({ error: "支払い管理画面を開けませんでした。" }, { status: 400 });
   }
 
-  const user = await getUserByClientUserId(clientUserId);
+  const user =
+    authUser.provider === "line" && authUser.lineUserId
+      ? await getUserByLineUserId(authUser.lineUserId)
+      : await getUserByClientUserId(authUser.clientUserId);
   if (!user?.stripe_customer_id) {
     return NextResponse.json({ error: "まだStripeの支払い情報が見つかりません。プラン画面から購入を開始してください。" }, { status: 404 });
   }

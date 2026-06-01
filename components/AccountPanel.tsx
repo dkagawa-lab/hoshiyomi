@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { BirthInput } from "@/lib/astrology";
 import { ensureClientUserId } from "@/lib/clientIdentity";
-import { AuthMethod, authClientCookieName, authMethodKey, getSupabaseAuthClient, readAuthMethod } from "@/lib/authRegistrationClient";
+import { AuthMethod, authClientCookieName, authMethodKey, buildAuthHeaders, getSupabaseAuthClient, readAuthMethod } from "@/lib/authRegistrationClient";
 import { getLineFriendUrl } from "@/lib/lineLinks";
 import { genderLabel, romanticInterestLabel } from "@/lib/profileOptions";
 import { addAddOnCredits, legacyReviewRatingRewardCredits, planQuotaLabel, planStatusLabel, PlanKey, readAddOnCredits, readFreeBonusRemaining, readPlanFromStorage, readPlanUsage, referralRewardCredits, resolvePlan, reviewCombinedRewardCredits, usageLimitsDisabled } from "@/lib/plans";
@@ -96,7 +96,9 @@ export function AccountPanel() {
 
   async function syncServerAccount(clientUserId: string, fallback: AccountState) {
     try {
-      const res = await fetch(`/api/me?clientUserId=${encodeURIComponent(clientUserId)}`);
+      const res = await fetch(`/api/me?clientUserId=${encodeURIComponent(clientUserId)}`, {
+        headers: await buildAuthHeaders()
+      });
       const data = await res.json();
       if (!res.ok || data.mode !== "server") return;
       if (!data.user && !data.usage) {
@@ -200,7 +202,7 @@ export function AccountPanel() {
     try {
       const res = await fetch("/api/referral", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: await buildAuthHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ clientUserId: account.clientUserId || ensureClientUserId(), code })
       });
       const data = await res.json().catch(() => ({}));
@@ -250,7 +252,7 @@ export function AccountPanel() {
     try {
       const res = await fetch("/api/reviews", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: await buildAuthHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
           clientUserId: account.clientUserId || ensureClientUserId(),
           comment: review.comment,
@@ -290,6 +292,7 @@ export function AccountPanel() {
       const supabase = getSupabaseAuthClient();
       await supabase?.auth.signOut();
     } catch {}
+    await fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
     clearAccountSession();
     const nextClientUserId = ensureClientUserId();
     setAccount({
@@ -309,7 +312,7 @@ export function AccountPanel() {
     try {
       const res = await fetch("/api/stripe/portal", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: await buildAuthHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ clientUserId: account.clientUserId || ensureClientUserId() })
       });
       const data = await res.json().catch(() => ({}));
