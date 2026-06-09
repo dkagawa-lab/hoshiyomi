@@ -229,8 +229,20 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
     } else {
       setBirthFormExpanded(true);
     }
-    setMessages(normalizeStoredMessages(readJson<Message[]>("hoshiyomi:messages", [])));
-    setHistory(normalizeStoredHistory(readJson<HistoryEntry[]>("hoshiyomi:history", [])));
+    const storedMessages = normalizeStoredMessages(readJson<Message[]>("hoshiyomi:messages", []));
+    const visibleMessages = removeStaleAuthGateMessages(storedMessages);
+    if (visibleMessages.length !== storedMessages.length) {
+      writeStorageValue("localStorage", "hoshiyomi:messages", JSON.stringify(visibleMessages));
+      writeStorageValue("sessionStorage", "hoshiyomi:messages", JSON.stringify(visibleMessages));
+    }
+    setMessages(visibleMessages);
+    const storedHistory = normalizeStoredHistory(readJson<HistoryEntry[]>("hoshiyomi:history", []));
+    const visibleHistory = removeStaleAuthGateHistory(storedHistory);
+    if (visibleHistory.length !== storedHistory.length) {
+      writeStorageValue("localStorage", "hoshiyomi:history", JSON.stringify(visibleHistory));
+      writeStorageValue("sessionStorage", "hoshiyomi:history", JSON.stringify(visibleHistory));
+    }
+    setHistory(visibleHistory);
     const nextClientUserId = ensureClientUserId();
     setClientUserId(nextClientUserId);
     syncServerState(nextClientUserId);
@@ -402,7 +414,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
     const resolvedIntent = resolveQuestionIntent(trimmedQuestion, questionIntent).key;
     const billing = classifyQuestionBilling(trimmedQuestion);
     const isCountableQuestion = billing.countable;
-    if (isCountableQuestion && !quotaDisabled && remainingQuota <= 0) {
+    if (isCountableQuestion && member && !quotaDisabled && remainingQuota <= 0) {
       setShowPaywallModal(true);
       return;
     }
@@ -601,12 +613,12 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
       if (data.user && typeof data.user.lineLinked === "boolean") setLineLinked(data.user.lineLinked);
       if (data.user) applyServerProfile(data.user);
       if (Array.isArray(data.messages)) {
-        const normalizedMessages = normalizeStoredMessages(data.messages);
+        const normalizedMessages = removeStaleAuthGateMessages(normalizeStoredMessages(data.messages));
         setMessages(normalizedMessages);
         window.localStorage.setItem("hoshiyomi:messages", JSON.stringify(normalizedMessages));
       }
       if (Array.isArray(data.history)) {
-        const normalizedHistory = normalizeStoredHistory(data.history);
+        const normalizedHistory = removeStaleAuthGateHistory(normalizeStoredHistory(data.history));
         setHistory(normalizedHistory);
         window.localStorage.setItem("hoshiyomi:history", JSON.stringify(normalizedHistory));
       }
@@ -1370,6 +1382,29 @@ function normalizeStoredHistory(value: unknown): HistoryEntry[] {
       return normalized;
     })
     .filter((entry): entry is HistoryEntry => entry !== null);
+}
+
+const staleAuthGateMessageFragments = [
+  "この相談を続けるには",
+  "ログインまたは会員登録が必要",
+  "ログインまたは新規登録",
+  "見るためにログイン",
+  "見るにはログイン",
+  "会員登録が必要です",
+  "新規登録が必要です"
+];
+
+function isStaleAuthGateText(value: unknown) {
+  const text = normalizeAnswerText(value);
+  return staleAuthGateMessageFragments.some((fragment) => text.includes(fragment));
+}
+
+function removeStaleAuthGateMessages(messages: Message[]) {
+  return messages.filter((message) => message.role !== "assistant" || !isStaleAuthGateText(message.content));
+}
+
+function removeStaleAuthGateHistory(history: HistoryEntry[]) {
+  return history.filter((entry) => !isStaleAuthGateText(entry.answer));
 }
 
 function readStoredBirth() {
