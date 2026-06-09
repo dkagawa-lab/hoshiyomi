@@ -1774,7 +1774,7 @@ function PaywallModal({
               新規登録して続きを相談する
             </Link>
             <Link className="button" href="/pricing">
-              有料プランも見る
+              有料プランを見る
             </Link>
           </div>
         ) : (
