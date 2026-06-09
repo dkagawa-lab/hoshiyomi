@@ -1,6 +1,6 @@
 import { createHash } from "crypto";
 import { BirthInput, Chart } from "@/lib/astrology";
-import { legacyReviewRatingRewardCredits, PlanKey, planRank, referralRewardCredits, registeredFreeBonusLimit, resolvePlan, reviewCombinedRewardCredits } from "@/lib/plans";
+import { PlanKey, planRank, referralRewardCredits, registeredFreeBonusLimit, resolvePlan, reviewCommentRewardCredits, reviewRatingRewardCredits } from "@/lib/plans";
 import type { GenderKey, RomanticInterestKey } from "@/lib/profileOptions";
 
 export type StoredUser = {
@@ -603,7 +603,11 @@ async function submitUserReviewForStoredUser(user: StoredUser | null, input: { c
   const comment = normalizeReviewComment(input.comment);
   if (!rating) throw new ReviewSubmissionError("星評価は1〜5の範囲で選択してください。", 400);
   if (input.comment && !comment) {
-    throw new ReviewSubmissionError("相談枠特典を受け取るには、8文字以上で感想を書いてください。", 400);
+    throw new ReviewSubmissionError("口コミ特典を受け取るには、8文字以上で感想を書いてください。星評価だけでも送信できます。", 400);
+  }
+  if (comment) {
+    const moderationMessage = reviewCommentModerationMessage(comment);
+    if (moderationMessage) throw new ReviewSubmissionError(moderationMessage, 400);
   }
 
   const now = new Date().toISOString();
@@ -615,14 +619,17 @@ async function submitUserReviewForStoredUser(user: StoredUser | null, input: { c
     updated_at: now
   };
 
-  const savedReview = await upsertUserReview(user.id, payload);
+  await upsertUserReview(user.id, payload);
 
   let creditsAwarded = 0;
+  const ratingRewarded = await markReviewRatingRewarded(user.id, now);
+  if (ratingRewarded) {
+    creditsAwarded += reviewRatingRewardCredits;
+  }
   if (comment) {
-    const alreadyReceivedLegacyRatingReward = Boolean(savedReview?.rating_rewarded_at);
-    const rewardedReview = await markReviewCombinedRewarded(user.id, now, !alreadyReceivedLegacyRatingReward);
+    const rewardedReview = await markReviewCommentRewarded(user.id, now);
     if (rewardedReview) {
-      creditsAwarded += alreadyReceivedLegacyRatingReward ? Math.max(0, reviewCombinedRewardCredits - legacyReviewRatingRewardCredits) : reviewCombinedRewardCredits;
+      creditsAwarded += reviewCommentRewardCredits;
     }
   }
 
@@ -718,13 +725,23 @@ async function upsertUserReview(userId: string, payload: { comment: string | nul
   }
 }
 
-async function markReviewCombinedRewarded(userId: string, now: string, includeRatingMarker: boolean) {
+async function markReviewRatingRewarded(userId: string, now: string) {
+  const reviews = await supabaseJson<StoredReview[]>(`user_reviews?user_id=eq.${encodeURIComponent(userId)}&rating_rewarded_at=is.null&select=*`, {
+    method: "PATCH",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify({
+      rating_rewarded_at: now
+    })
+  });
+  return reviews[0] ?? null;
+}
+
+async function markReviewCommentRewarded(userId: string, now: string) {
   const reviews = await supabaseJson<StoredReview[]>(`user_reviews?user_id=eq.${encodeURIComponent(userId)}&comment_rewarded_at=is.null&comment=not.is.null&select=*`, {
     method: "PATCH",
     headers: { Prefer: "return=representation" },
     body: JSON.stringify({
-      comment_rewarded_at: now,
-      ...(includeRatingMarker ? { rating_rewarded_at: now } : {})
+      comment_rewarded_at: now
     })
   });
   return reviews[0] ?? null;
@@ -747,6 +764,28 @@ function normalizeReviewComment(value: unknown) {
   if (!normalized) return null;
   if (Array.from(normalized).length < 8) return null;
   return Array.from(normalized).slice(0, 420).join("");
+}
+
+function reviewCommentModerationMessage(comment: string) {
+  const text = comment.trim();
+  if (/(https?:\/\/|www\.|line\.me|lin\.ee|@[\w.-]{3,})/i.test(text)) {
+    return "口コミにはURLや外部連絡先を含めないでください。";
+  }
+  if (/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(text) || /\d[\d\s-]{8,}\d/.test(text)) {
+    return "口コミにはメールアドレスや電話番号などの連絡先を含めないでください。";
+  }
+  if (/死ね|殺す|消えろ|クソ|くそ|馬鹿|バカ|アホ|あほ/.test(text)) {
+    return "口コミには過度な暴言や攻撃的な表現を含めないでください。";
+  }
+  const chars = Array.from(text.replace(/\s/g, ""));
+  const uniqueChars = new Set(chars);
+  if (chars.length >= 12 && uniqueChars.size <= 3) {
+    return "口コミは、実際に感じた内容が伝わる文章で入力してください。";
+  }
+  if (!/[ぁ-んァ-ヶ一-龠a-zA-Z]/.test(text)) {
+    return "口コミは、実際に感じた内容が伝わる文章で入力してください。";
+  }
+  return "";
 }
 
 function toUserReviewSnapshot(review: StoredReview | null): UserReviewSnapshot {

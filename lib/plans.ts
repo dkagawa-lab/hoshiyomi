@@ -87,7 +87,9 @@ export const addOnPack = {
 };
 export const referralRewardCredits = 30;
 export const reviewCombinedRewardCredits = 30;
-export const legacyReviewRatingRewardCredits = 10;
+export const reviewRatingRewardCredits = 10;
+export const reviewCommentRewardCredits = reviewCombinedRewardCredits - reviewRatingRewardCredits;
+export const legacyReviewRatingRewardCredits = reviewRatingRewardCredits;
 
 export function usageLimitsDisabled() {
   return process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_DISABLE_USAGE_LIMITS === "true";

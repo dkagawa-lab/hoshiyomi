@@ -7,7 +7,7 @@ import { ensureClientUserId } from "@/lib/clientIdentity";
 import { AuthMethod, authClientCookieName, authMethodKey, buildAuthHeaders, getSupabaseAuthClient, readAuthMethod } from "@/lib/authRegistrationClient";
 import { getLineFriendUrl } from "@/lib/lineLinks";
 import { genderLabel, romanticInterestLabel } from "@/lib/profileOptions";
-import { addAddOnCredits, legacyReviewRatingRewardCredits, planQuotaLabel, planStatusLabel, PlanKey, readAddOnCredits, readFreeBonusRemaining, readPlanFromStorage, readPlanUsage, referralRewardCredits, resolvePlan, reviewCombinedRewardCredits, usageLimitsDisabled } from "@/lib/plans";
+import { addAddOnCredits, planQuotaLabel, planStatusLabel, PlanKey, readAddOnCredits, readFreeBonusRemaining, readPlanFromStorage, readPlanUsage, referralRewardCredits, resolvePlan, reviewCombinedRewardCredits, reviewCommentRewardCredits, reviewRatingRewardCredits, usageLimitsDisabled } from "@/lib/plans";
 
 type AccountState = {
   addOnCredits: number;
@@ -267,7 +267,8 @@ export function AccountPanel() {
       if (data.mode === "local" && creditsAwarded > 0) {
         addAddOnCredits(readAddOnCredits(), creditsAwarded);
       }
-      if (data.review) setReview(normalizeReviewState(data.review));
+      const nextReview = data.review ? normalizeReviewState(data.review) : review;
+      setReview(nextReview);
       setAccount((current) => ({
         ...current,
         addOnCredits: typeof data.usage?.addOnCredits === "number" ? data.usage.addOnCredits : current.addOnCredits + creditsAwarded,
@@ -277,7 +278,7 @@ export function AccountPanel() {
         serverSynced: data.mode === "server" ? true : current.serverSynced,
         used: typeof data.usage?.used === "number" ? data.usage.used : current.used
       }));
-      setReviewMessage(creditsAwarded > 0 ? `投稿特典として${creditsAwarded}回分の相談枠を追加しました。` : buildReviewNoCreditMessage(review));
+      setReviewMessage(creditsAwarded > 0 ? `投稿特典として${creditsAwarded}回分の相談枠を追加しました。` : buildReviewNoCreditMessage(nextReview));
     } catch (error) {
       setReviewMessage(error instanceof Error ? error.message : "評価を保存できませんでした。");
     } finally {
@@ -441,7 +442,8 @@ export function AccountPanel() {
         <div className="eyebrow">Review Gift</div>
         <h2>評価して相談枠を受け取る</h2>
         <p>
-          星評価と8文字以上の口コミをあわせて投稿すると、{reviewCombinedRewardCredits}回分の相談枠をプレゼントします。
+          星評価だけで{reviewRatingRewardCredits}回分、8文字以上の口コミも投稿すると合計{reviewCombinedRewardCredits}回分の相談枠をプレゼントします。
+          特典の付与は星評価・口コミそれぞれ1回きりです。
           口コミは個人が特定されないよう、年齢・性別・居住地のみを表示して掲載します。
         </p>
         <div className="review-form">
@@ -463,7 +465,7 @@ export function AccountPanel() {
           <div className="review-reward-status">
             <span>{buildReviewRewardStatus(review)}</span>
           </div>
-          <label htmlFor="review-comment">口コミを書く</label>
+          <label htmlFor="review-comment">口コミを書く（任意）</label>
           <textarea
             id="review-comment"
             maxLength={420}
@@ -472,11 +474,14 @@ export function AccountPanel() {
             value={review.comment}
           />
           <div className="review-form-footer">
-            <span>{Array.from(review.comment.trim()).length}/420</span>
+            <span>{Array.from(review.comment.trim()).length}/420・口コミ特典は8文字以上</span>
             <button className="button primary" disabled={!account.member || reviewLoading} onClick={submitReview} type="button">
               {reviewLoading ? "保存中" : "評価を送信する"}
             </button>
           </div>
+          <p className="small review-policy-note">
+            URL、連絡先、個人情報、過度な暴言、意味のない連続文字を含む口コミは保存・特典付与の対象外です。
+          </p>
           {!account.member ? (
             <p className="small referral-message">
               評価特典を受け取るには、先に<Link className="text-link" href="/register?returnTo=/account">新規登録</Link>またはログインが必要です。
@@ -605,21 +610,22 @@ function buildAccountNextStepLinks(account: AccountState, lineFriendUrl: string)
 }
 
 function buildReviewRewardStatus(review: ReviewState) {
-  if (review.commentRewarded) return "星評価＋口コミの特典は受け取り済み";
+  if (review.ratingRewarded && review.commentRewarded) return "星評価＋口コミの特典は受け取り済み";
   if (review.ratingRewarded) {
-    const remainingCredits = Math.max(0, reviewCombinedRewardCredits - legacyReviewRatingRewardCredits);
-    return `口コミ投稿で残り+${remainingCredits}回`;
+    return `星評価+${reviewRatingRewardCredits}回は受け取り済み。口コミ投稿でさらに+${reviewCommentRewardCredits}回`;
   }
-  return `星評価＋口コミで${reviewCombinedRewardCredits}回分`;
+  return `星評価のみで+${reviewRatingRewardCredits}回 / 口コミつきで合計${reviewCombinedRewardCredits}回`;
 }
 
 function buildReviewNoCreditMessage(review: ReviewState) {
   const hasValidComment = Array.from(review.comment.trim()).length >= 8;
-  if (!hasValidComment && !review.commentRewarded) {
-    const remainingCredits = review.ratingRewarded ? Math.max(0, reviewCombinedRewardCredits - legacyReviewRatingRewardCredits) : reviewCombinedRewardCredits;
-    return `星評価を保存しました。8文字以上の口コミを書くと、星評価とあわせて${remainingCredits}回分の相談枠を受け取れます。`;
+  if (!review.ratingRewarded) {
+    return `評価を保存しました。星評価特典は1回までです。`;
   }
-  return "評価を更新しました。特典の付与は1回までです。";
+  if (!hasValidComment && !review.commentRewarded) {
+    return `星評価を保存しました。8文字以上の口コミを書くと、追加で${reviewCommentRewardCredits}回分の相談枠を受け取れます。`;
+  }
+  return "評価を更新しました。星評価・口コミ特典の付与はそれぞれ1回までです。";
 }
 
 function LineFriendGuideCard({ account, lineConnectHref, lineFriendUrl }: { account: AccountState; lineConnectHref: string; lineFriendUrl: string }) {
