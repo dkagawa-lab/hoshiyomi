@@ -476,6 +476,11 @@ a.cv-quota-plan:hover {
   scroll-behavior: smooth;
 }
 
+.consultation-view.is-reading .cv-thread {
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+
 /* user — short bubble, right */
 .cv-msg-user {
   align-self: flex-end;
@@ -828,6 +833,11 @@ a.cv-quota-plan:hover {
   backdrop-filter: blur(10px);
 }
 
+.consultation-view.is-reading .cv-composer {
+  gap: 8px;
+  padding: 9px 14px calc(11px + env(safe-area-inset-bottom));
+}
+
 /* theme chips — horizontal scroll */
 .cv-themes-shell {
   position: relative;
@@ -964,6 +974,12 @@ a.cv-quota-plan:hover {
   line-height: 1.55;
 }
 
+.consultation-view.is-reading .cv-input-row textarea {
+  min-height: 54px;
+  padding: 13px 14px;
+  border-radius: 16px;
+}
+
 .cv-input-row textarea::placeholder {
   color: rgba(185, 178, 161, 0.7);
 }
@@ -985,6 +1001,11 @@ a.cv-quota-plan:hover {
   background: linear-gradient(135deg, #f0cf7c, #b9862d);
   color: #1a1206;
   transition: filter 0.18s ease, transform 0.12s ease;
+}
+
+.consultation-view.is-reading .cv-send {
+  width: 48px;
+  height: 48px;
 }
 
 .cv-send:hover { filter: brightness(1.06); }

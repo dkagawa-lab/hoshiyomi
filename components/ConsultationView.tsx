@@ -403,6 +403,7 @@ export function ConsultationView(props: ConsultationViewProps) {
   const threadRef = useRef<HTMLDivElement | null>(null);
   const activeReader = resolveReaderStyle(activeReaderStyleKey);
   const limitReached = !usage.unlimited && usage.remaining <= 0;
+  const hasReadingContent = messages.length > 0 || loading || Boolean(streamingAnswer) || pendingLoveQuestion;
 
   useEffect(() => {
     const el = threadRef.current;
@@ -442,7 +443,7 @@ export function ConsultationView(props: ConsultationViewProps) {
   const showHint = !messages.length && !loading;
 
   return (
-    <section className="consultation-view" data-screen-label="相談">
+    <section className={`consultation-view ${hasReadingContent ? "is-reading" : ""}`} data-screen-label="相談">
       <QuotaHeader usage={usage} activeReader={activeReader} onToggleReader={props.onToggleReaderStyleExpanded} pricingHref={pricingHref} />
       {usage.isMember && lineEntry ? <LineEntry entry={lineEntry} /> : null}
 
@@ -497,21 +498,23 @@ export function ConsultationView(props: ConsultationViewProps) {
           </div>
         ) : null}
 
-        <div className="cv-themes-shell">
-          <div className="cv-themes" role="group" aria-label="相談テーマ">
-            {starterQuestions.map((sample) => (
-              <button
-                key={sample.text}
-                type="button"
-                className={`cv-theme-chip ${question === sample.text ? "is-active" : ""}`}
-                onClick={() => props.onSelectStarter(sample.text, sample.intent)}
-              >
-                {sample.text}
-              </button>
-            ))}
+        {!hasReadingContent ? (
+          <div className="cv-themes-shell">
+            <div className="cv-themes" role="group" aria-label="相談テーマ">
+              {starterQuestions.map((sample) => (
+                <button
+                  key={sample.text}
+                  type="button"
+                  className={`cv-theme-chip ${question === sample.text ? "is-active" : ""}`}
+                  onClick={() => props.onSelectStarter(sample.text, sample.intent)}
+                >
+                  {sample.text}
+                </button>
+              ))}
+            </div>
+            <span className="cv-themes-cue" aria-hidden="true">›</span>
           </div>
-          <span className="cv-themes-cue" aria-hidden="true">›</span>
-        </div>
+        ) : null}
 
         {question ? (
           <div className="cv-selected">
