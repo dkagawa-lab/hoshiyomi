@@ -497,17 +497,20 @@ export function ConsultationView(props: ConsultationViewProps) {
           </div>
         ) : null}
 
-        <div className="cv-themes" role="group" aria-label="相談テーマ">
-          {starterQuestions.map((sample) => (
-            <button
-              key={sample.text}
-              type="button"
-              className={`cv-theme-chip ${question === sample.text ? "is-active" : ""}`}
-              onClick={() => props.onSelectStarter(sample.text, sample.intent)}
-            >
-              {sample.text}
-            </button>
-          ))}
+        <div className="cv-themes-shell">
+          <div className="cv-themes" role="group" aria-label="相談テーマ">
+            {starterQuestions.map((sample) => (
+              <button
+                key={sample.text}
+                type="button"
+                className={`cv-theme-chip ${question === sample.text ? "is-active" : ""}`}
+                onClick={() => props.onSelectStarter(sample.text, sample.intent)}
+              >
+                {sample.text}
+              </button>
+            ))}
+          </div>
+          <span className="cv-themes-cue" aria-hidden="true">›</span>
         </div>
 
         {question ? (

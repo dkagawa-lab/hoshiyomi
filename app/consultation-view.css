@@ -829,13 +829,49 @@ a.cv-quota-plan:hover {
 }
 
 /* theme chips — horizontal scroll */
+.cv-themes-shell {
+  position: relative;
+  min-width: 0;
+}
+
+.cv-themes-shell::after {
+  position: absolute;
+  top: 0;
+  right: -16px;
+  bottom: 0;
+  width: 76px;
+  content: "";
+  background: linear-gradient(90deg, rgba(9, 14, 26, 0), rgba(9, 14, 26, 0.94) 64%, rgba(9, 14, 26, 0.98));
+  pointer-events: none;
+}
+
+.cv-themes-cue {
+  position: absolute;
+  top: 50%;
+  right: -5px;
+  z-index: 2;
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border: 1px solid rgba(226, 190, 103, 0.3);
+  border-radius: 50%;
+  background: rgba(9, 14, 26, 0.72);
+  color: var(--cv-gold);
+  font-family: system-ui, sans-serif;
+  font-size: 1.25rem;
+  line-height: 1;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
 .cv-themes {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   overflow-x: auto;
   scrollbar-width: none;
   margin: 0 -16px;
-  padding: 0 16px;
+  padding: 0 52px 0 16px;
   scroll-snap-type: x proximity;
 }
 
@@ -844,13 +880,14 @@ a.cv-quota-plan:hover {
 .cv-theme-chip {
   flex-shrink: 0;
   scroll-snap-align: start;
-  min-height: 38px;
-  padding: 8px 15px;
+  min-height: 34px;
+  padding: 7px 12px;
   border: 1px solid rgba(226, 190, 103, 0.22);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.03);
   color: rgba(247, 241, 223, 0.9);
-  font-size: 0.85rem;
+  font-size: 0.78rem;
+  line-height: 1.2;
   white-space: nowrap;
   transition: border-color 0.18s ease, color 0.18s ease, background 0.18s ease;
 }
