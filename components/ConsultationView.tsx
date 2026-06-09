@@ -105,6 +105,7 @@ export function ConsultationView({
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const activeReader = useMemo(() => resolveReader(activeReaderStyleKey), [activeReaderStyleKey]);
   const quotaReached = hasChart && !usage.unlimited && usage.remaining <= 0;
+  const showIntro = messages.length === 0;
   const trimmedQuestion = question.trim();
   const canSend = hasChart && Boolean(trimmedQuestion) && !loading && !quotaReached;
   const quotaText = usage.unlimited
@@ -129,10 +130,7 @@ export function ConsultationView({
       <div className="consultation-view-header">
         <div className="consultation-view-title">
           <div className="eyebrow">Private Reading</div>
-          <h2>ここから先は、星の文脈を記憶し、あなた専用の占い師として未来を占います</h2>
-          <p>
-            出生図とこれまでの鑑定を引き継ぎながら、恋愛、仕事、相性、将来の迷いまで同じ星の文脈で見ていきます。
-          </p>
+          <h2 className="consultation-title-compact">星読み相談</h2>
         </div>
         <div className="consultation-view-actions">
           <Link className="consultation-plan-chip" href={pricingHref}>
@@ -157,7 +155,7 @@ export function ConsultationView({
         </div>
       </div>
 
-      {hasChart && lineEntry && usage.isMember ? <ConsultationLineBanner lineEntry={lineEntry} /> : null}
+      {showIntro && hasChart && lineEntry && usage.isMember ? <ConsultationLineBanner lineEntry={lineEntry} /> : null}
       {checkoutNotice ? <p className="consultation-notice success">{checkoutNotice}</p> : null}
       {error ? (
         <p className="consultation-notice error" role="alert">
@@ -386,7 +384,7 @@ function EmptyConsultationState() {
     <div className="consultation-empty-state">
       <span>Ask The Stars</span>
       <h3>いま知りたいことを占いましょう</h3>
-      <p>候補から選んでも、そのまま自由に書いても大丈夫です。星の配置と今の流れを重ねて、ここに最新の鑑定を表示します。</p>
+      <p>出生図とこれまでの鑑定を引き継ぎながら、恋愛、仕事、相性、将来の迷いまで同じ星の文脈で見ていきます。候補から選んでも、そのまま自由に書いても大丈夫です。</p>
     </div>
   );
 }

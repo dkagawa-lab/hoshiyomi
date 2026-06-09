@@ -164,7 +164,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
   const [readerStyle, setReaderStyle] = useState<ReaderStyleKey>("normal");
   const [readerStyleNotice, setReaderStyleNotice] = useState("");
   const [readerStyleUpgradePlan, setReaderStyleUpgradePlan] = useState<Exclude<PlanKey, "free"> | null>(null);
-  const [readerStyleExpanded, setReaderStyleExpanded] = useState(true);
+  const [readerStyleExpanded, setReaderStyleExpanded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingSequence, setLoadingSequence] = useState<string[]>(() => buildLoadingSequence("", "normal"));
   const [loadingStep, setLoadingStep] = useState(0);

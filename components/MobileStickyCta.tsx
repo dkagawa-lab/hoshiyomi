@@ -24,6 +24,8 @@ export function MobileStickyCta() {
     };
   }, [pathname]);
 
+  if (pathname === "/consultation") return null;
+
   const href = hasBirth ? "/consultation" : "/m";
   const label = hasBirth ? "相談する" : "星を読む";
   const subLabel = hasBirth ? "保存した星の文脈で続ける" : "まず出生図を作成する";
