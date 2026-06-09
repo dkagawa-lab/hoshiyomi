@@ -518,11 +518,13 @@ export function ConsultationView(props: ConsultationViewProps) {
 
         {question ? (
           <div className="cv-selected">
-            <span>選択中の相談</span>
+            <div className="cv-selected-head">
+              <span>選択中の相談</span>
+              <button className="cv-selected-close" type="button" onClick={props.onClearQuestion} aria-label="選択中の相談を解除">
+                ×
+              </button>
+            </div>
             <p>{question}</p>
-            <button type="button" onClick={props.onClearQuestion}>
-              内容を変更する
-            </button>
           </div>
         ) : null}
 

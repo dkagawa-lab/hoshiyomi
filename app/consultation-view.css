@@ -915,15 +915,23 @@ a.cv-quota-plan:hover {
 
 /* selected question preview */
 .cv-selected {
+  position: relative;
   display: grid;
-  gap: 4px;
-  padding: 10px 14px;
+  gap: 3px;
+  padding: 9px 44px 9px 12px;
   border: 1px solid var(--cv-gold-line);
   border-radius: var(--cv-radius-sm);
   background: rgba(226, 190, 103, 0.07);
 }
 
-.cv-selected span {
+.cv-selected-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.cv-selected-head span {
   font-size: 0.66rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -933,23 +941,36 @@ a.cv-quota-plan:hover {
 .cv-selected p {
   margin: 0;
   font-size: 0.92rem;
-  line-height: 1.5;
+  line-height: 1.38;
   color: var(--cv-text);
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
-.cv-selected button {
-  justify-self: start;
-  margin-top: 2px;
-  padding: 4px 0;
-  background: none;
-  border: none;
+.cv-selected-close {
+  position: absolute;
+  top: 7px;
+  right: 9px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(226, 190, 103, 0.22);
+  border-radius: 50%;
+  background: rgba(5, 8, 18, 0.36);
   color: var(--cv-muted);
-  font-size: 0.76rem;
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  font-size: 1.18rem;
+  line-height: 1;
+  transition: border-color 0.18s ease, color 0.18s ease, background 0.18s ease;
 }
 
-.cv-selected button:hover { color: var(--cv-gold); }
+.cv-selected-close:hover {
+  border-color: rgba(226, 190, 103, 0.48);
+  background: rgba(226, 190, 103, 0.1);
+  color: var(--cv-gold);
+}
 
 /* input row */
 .cv-input-row {
