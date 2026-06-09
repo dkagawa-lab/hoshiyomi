@@ -536,11 +536,17 @@ export function ConsultationView(props: ConsultationViewProps) {
           </div>
         ) : null}
 
+        {!question ? (
+          <p className="cv-input-help">
+            候補にないことでも大丈夫です。今気になっている相手、仕事、迷い、今日の流れなど、そのまま書いてください。
+          </p>
+        ) : null}
+
         <div className="cv-input-row">
           <textarea
             value={question}
             onChange={(e) => props.onQuestionChange(e.target.value)}
-            placeholder="候補にないことでも大丈夫です。例: あの人との今後は？ 今の仕事を続けるべき？"
+            placeholder="聞きたいことを自由に入力"
             aria-label="相談内容を入力"
             rows={1}
             disabled={limitReached}
