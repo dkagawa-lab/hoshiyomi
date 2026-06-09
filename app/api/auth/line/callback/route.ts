@@ -19,6 +19,11 @@ type LineVerifyResponse = {
   sub?: string;
 };
 
+type LineProfileResponse = {
+  displayName?: string;
+  userId?: string;
+};
+
 export async function GET(req: NextRequest) {
   const channelId = readEnv("LINE_LOGIN_CHANNEL_ID");
   const channelSecret = readEnv("LINE_LOGIN_CHANNEL_SECRET");
@@ -42,11 +47,13 @@ export async function GET(req: NextRequest) {
   }
 
   const redirectUri = resolveLineRedirectUri(req.url);
-  const token = await exchangeLineCode({ channelId, channelSecret, code, redirectUri }).catch(() => null);
-  if (!token?.id_token) return NextResponse.redirect(errorRedirect);
+  const token = await exchangeLineCode({ channelId, channelSecret, code, redirectUri }).catch((error) => {
+    console.warn("LINE token exchange failed", { message: error instanceof Error ? error.message : "Unknown error" });
+    return null;
+  });
+  if (!token?.access_token) return NextResponse.redirect(errorRedirect);
 
-  const profile = await verifyLineIdToken({ channelId, idToken: token.id_token }).catch(() => null);
-  const lineUserId = profile?.sub || "";
+  const lineUserId = await resolveLineUserId({ channelId, token });
   const lineClientUserId = toLineClientUserId(lineUserId);
   if (!lineClientUserId) return NextResponse.redirect(errorRedirect);
 
@@ -125,6 +132,31 @@ async function verifyLineIdToken(input: { channelId: string; idToken: string }) 
   });
   if (!res.ok) throw new Error(await res.text());
   return (await res.json()) as LineVerifyResponse;
+}
+
+async function resolveLineUserId(input: { channelId: string; token: LineTokenResponse }) {
+  if (input.token.id_token) {
+    const verified = await verifyLineIdToken({ channelId: input.channelId, idToken: input.token.id_token }).catch((error) => {
+      console.warn("LINE id token verification failed; falling back to profile API", { message: error instanceof Error ? error.message : "Unknown error" });
+      return null;
+    });
+    if (verified?.sub) return verified.sub;
+  }
+
+  const profile = await fetchLineProfile(input.token.access_token || "").catch((error) => {
+    console.warn("LINE profile fetch failed", { message: error instanceof Error ? error.message : "Unknown error" });
+    return null;
+  });
+  return profile?.userId || "";
+}
+
+async function fetchLineProfile(accessToken: string) {
+  if (!accessToken) throw new Error("Missing LINE access token");
+  const res = await fetch("https://api.line.me/v2/profile", {
+    headers: { Authorization: `Bearer ${accessToken}` }
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return (await res.json()) as LineProfileResponse;
 }
 
 function toLineClientUserId(sub: string) {

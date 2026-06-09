@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
   authorizeUrl.searchParams.set("client_id", channelId);
   authorizeUrl.searchParams.set("redirect_uri", redirectUri);
   authorizeUrl.searchParams.set("state", state);
-  authorizeUrl.searchParams.set("scope", "profile openid");
+  authorizeUrl.searchParams.set("scope", "profile");
   authorizeUrl.searchParams.set("nonce", nonce);
   authorizeUrl.searchParams.set("bot_prompt", "aggressive");
 
