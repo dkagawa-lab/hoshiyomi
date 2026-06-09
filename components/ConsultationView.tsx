@@ -23,6 +23,7 @@ import { PlanKey } from "@/lib/plans";
 import { QuestionIntentKey } from "@/lib/questionIntents";
 import { RomanticInterestKey, romanticInterestOptions } from "@/lib/profileOptions";
 import { coerceAnswerText, normalizeAnswerText } from "@/lib/answerText";
+import "@/app/consultation-view.css";
 
 /* ----------------------------------------------------------------------- */
 /* Types                                                                    */

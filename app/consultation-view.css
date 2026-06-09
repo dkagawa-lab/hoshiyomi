@@ -15,20 +15,39 @@
      .consultation-view まで height が伝わる）
    ------------------------------------------------------------------------- */
 .consultation-page-shell {
+  height: 100dvh;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
+  padding-bottom: 0;
+  overflow: hidden;
 }
 
 .consultation-page-body {
   flex: 1;
   min-height: 0;
   display: flex;
+  overflow: hidden;
 }
 
 .consultation-page-body > .consultation-grid {
   flex: 1;
   min-height: 0;
+  overflow: hidden;
+  grid-template-rows: minmax(0, 1fr);
+  align-items: stretch;
+}
+
+.consultation-page-body .consultation-view {
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+}
+
+@media (max-width: 560px) {
+  body:has(.consultation-page-shell) {
+    padding-bottom: 0;
+  }
 }
 
 .consultation-view {
@@ -276,6 +295,9 @@ a.cv-quota-plan:hover {
   padding: 14px 16px 18px;
   display: grid;
   gap: 16px;
+  max-height: min(54dvh, 460px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   animation: cv-sheet-in 0.22s ease;
 }
 
