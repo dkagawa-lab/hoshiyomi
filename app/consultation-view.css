@@ -1,763 +1,1043 @@
+/* =========================================================================
+   ConsultationView — 相談（チャット）画面リデザイン
+   既存 app/globals.css のトークン・作法に準拠:
+     --bg #09111f / --panel #111b2d / --panel-2 #18253b
+     --text #f7f1df / --muted #b9b2a1 / --line rgba(226,190,103,.24)
+     --gold #e2be67 / --rose #d38a8a / --aqua #7dc7c5
+   すべて .consultation-view 配下にスコープし、globals.css の既存クラスと衝突しない。
+   モバイル最優先・最小44pxタップ・コントラストAA。
+   ========================================================================= */
+
+/* -------------------------------------------------------------------------
+   Page shell helpers — app/consultation/page.tsx の
+   .consultation-page-shell > .consultation-page-body に高さを流す。
+   （consultationOnly の BirthChartApp ラッパ .consultation-grid 経由で
+     .consultation-view まで height が伝わる）
+   ------------------------------------------------------------------------- */
 .consultation-page-shell {
-  height: 100dvh;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  padding-bottom: 0;
-  overflow: hidden;
 }
 
 .consultation-page-body {
   flex: 1;
   min-height: 0;
   display: flex;
-  overflow: hidden;
 }
 
 .consultation-page-body > .consultation-grid {
   flex: 1;
   min-height: 0;
-  overflow: hidden;
 }
 
 .consultation-view {
+  --cv-gold: var(--gold, #e2be67);
+  --cv-gold-soft: rgba(226, 190, 103, 0.16);
+  --cv-gold-line: rgba(226, 190, 103, 0.26);
+  --cv-text: var(--text, #f7f1df);
+  --cv-muted: var(--muted, #b9b2a1);
+  --cv-panel: rgba(17, 27, 45, 0.72);
+  --cv-panel-2: rgba(24, 37, 59, 0.82);
+  --cv-ink: rgba(5, 8, 18, 0.55);
+  --cv-radius: 14px;
+  --cv-radius-sm: 10px;
+  --cv-tap: 44px;
+
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 0;
   min-height: 0;
   height: 100%;
-  max-height: calc(100dvh - 120px);
-  padding: 0;
+  /* 親から高さが来ない経路（.stack 等）でも自前で画面内に収め、会話だけ内側スクロール */
+  max-height: calc(100dvh - 92px);
   overflow: hidden;
-  border-color: rgba(226, 190, 103, 0.24);
-  background:
-    linear-gradient(180deg, rgba(12, 21, 37, 0.94), rgba(8, 13, 25, 0.98)),
-    radial-gradient(circle at 18% 0%, rgba(226, 190, 103, 0.13), transparent 30%);
+  color: var(--cv-text);
+  font-family: "Times New Roman", "Noto Serif JP", serif;
+  -webkit-font-smoothing: antialiased;
 }
 
-.consultation-view-header {
+.consultation-view *,
+.consultation-view *::before,
+.consultation-view *::after {
+  box-sizing: border-box;
+}
+
+/* shared label / eyebrow ------------------------------------------------- */
+.cv-eyebrow {
+  display: inline-block;
+  color: var(--cv-gold);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+}
+
+/* focus visibility (AA) -------------------------------------------------- */
+.consultation-view :focus-visible {
+  outline: 2px solid #ffe7ad;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* =========================================================================
+   1. QUOTA HEADER — 残回数の主指標を1つ大きく
+   ========================================================================= */
+.cv-quota {
   position: sticky;
   top: 0;
-  z-index: 4;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 8px 12px;
-  border-bottom: 1px solid rgba(226, 190, 103, 0.18);
-  background:
-    linear-gradient(180deg, rgba(9, 17, 31, 0.98), rgba(9, 17, 31, 0.9)),
-    linear-gradient(90deg, rgba(226, 190, 103, 0.08), transparent);
-  backdrop-filter: blur(18px);
-}
-
-.consultation-header-brand {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.consultation-quota-chip {
-  flex: 0 0 auto;
-  padding: 5px 11px;
-  border: 1px solid rgba(226, 190, 103, 0.2);
-  border-radius: 999px;
-  background: rgba(5, 8, 18, 0.5);
-  color: var(--muted);
-  font-size: 0.8rem;
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-.consultation-quota-chip:hover {
-  border-color: rgba(226, 190, 103, 0.4);
-  color: var(--text);
-}
-
-.consultation-view-title {
-  min-width: 0;
-}
-
-.consultation-view-title h2 {
-  max-width: 760px;
-  margin: 6px 0 8px;
-  font-size: clamp(1.18rem, 2.2vw, 1.7rem);
-  line-height: 1.45;
-}
-
-.consultation-view-title h2.consultation-title-compact {
-  margin: 2px 0 0;
-  font-size: 1.05rem;
-  line-height: 1.3;
-}
-
-.consultation-view-title p {
-  max-width: 760px;
-  margin: 0;
-  color: var(--muted);
-  line-height: 1.8;
-}
-
-.consultation-view-actions {
+  z-index: 6;
   display: flex;
   align-items: stretch;
-  justify-content: flex-end;
-  gap: 10px;
+  gap: 12px;
+  padding: 14px 16px;
+  background: linear-gradient(180deg, rgba(9, 14, 26, 0.96), rgba(9, 14, 26, 0.78));
+  border-bottom: 1px solid var(--cv-gold-line);
+  backdrop-filter: blur(8px);
 }
 
-.consultation-plan-chip,
-.consultation-reader-chip {
-  min-height: 46px;
-  border: 1px solid rgba(226, 190, 103, 0.24);
-  border-radius: 8px;
-  background: rgba(5, 8, 18, 0.58);
-  color: var(--text);
-}
-
-.consultation-plan-chip {
-  display: grid;
-  align-content: center;
+.cv-quota-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   min-width: 0;
-  padding: 7px 10px;
+  flex: 1;
+}
+
+.cv-quota-figure {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 3px;
+  line-height: 1;
+}
+
+.cv-quota-figure strong {
+  font-size: 2.5rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--cv-text);
+  text-shadow: 0 0 26px rgba(226, 190, 103, 0.28);
+  font-variant-numeric: tabular-nums;
+}
+
+.cv-quota-figure .cv-quota-unit {
+  font-size: 0.92rem;
+  color: var(--cv-muted);
+}
+
+.cv-quota-figure.is-unlimited strong {
+  font-size: 1.7rem;
+  letter-spacing: 0.04em;
+  color: var(--cv-gold);
+}
+
+.cv-quota-sub {
+  margin: 4px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 0.72rem;
+  color: var(--cv-muted);
+  line-height: 1.4;
+}
+
+.cv-quota-sub b {
+  font-weight: 600;
+  color: rgba(247, 241, 223, 0.86);
+  font-variant-numeric: tabular-nums;
+}
+
+.cv-quota-plan {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.74rem;
+  color: var(--cv-muted);
   text-decoration: none;
 }
 
-.consultation-plan-chip span,
-.consultation-reader-chip small {
-  color: var(--muted);
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+a.cv-quota-plan {
+  border-bottom: 1px solid transparent;
+  transition: color 0.18s ease, border-color 0.18s ease;
 }
 
-.consultation-plan-chip strong {
-  margin-top: 4px;
-  color: var(--gold);
-  font-size: 0.92rem;
+a.cv-quota-plan:hover {
+  color: var(--cv-text);
+  border-bottom-color: rgba(226, 190, 103, 0.5);
 }
 
-.consultation-reader-chip {
+.cv-quota-plan::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--cv-gold);
+  box-shadow: 0 0 8px rgba(226, 190, 103, 0.7);
+}
+
+/* slim LINE entry (members only) ---------------------------------------- */
+.cv-line-entry {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-width: 0;
-  padding: 6px 10px;
-  text-align: left;
+  gap: 12px;
+  min-height: var(--cv-tap);
+  padding: 9px 16px;
+  border-bottom: 1px solid var(--cv-gold-line);
+  background: linear-gradient(90deg, rgba(125, 199, 197, 0.1), rgba(9, 14, 26, 0.2));
+  color: var(--cv-text);
+  text-decoration: none;
+  font-size: 0.82rem;
 }
 
-.consultation-reader-chip img {
-  width: 30px;
-  height: 30px;
-  flex: 0 0 auto;
-  border: 1px solid rgba(226, 190, 103, 0.28);
+.cv-line-entry::before {
+  content: "";
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  background: #06c755;
+  box-shadow: 0 0 10px rgba(6, 199, 85, 0.45);
+}
+
+.cv-line-entry-text {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.45;
+  color: rgba(247, 241, 223, 0.92);
+}
+
+.cv-line-entry-cue {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  border: 1px solid var(--cv-gold-line);
+  border-radius: 999px;
+  font-size: 0.74rem;
+  color: var(--cv-gold);
+}
+
+.cv-line-entry:hover .cv-line-entry-cue {
+  border-color: rgba(226, 190, 103, 0.5);
+}
+
+/* reader chip (opens reader sheet) -------------------------------------- */
+.cv-reader-chip {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 84px;
+  min-height: var(--cv-tap);
+  padding: 8px 6px;
+  border: 1px solid var(--cv-gold-line);
+  border-radius: var(--cv-radius-sm);
+  background: var(--cv-panel);
+  color: var(--cv-text);
+  text-align: center;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.cv-reader-chip:hover {
+  border-color: rgba(226, 190, 103, 0.5);
+}
+
+.cv-reader-avatar {
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
-  background: rgba(226, 190, 103, 0.08);
+  object-fit: cover;
+  border: 1px solid var(--cv-gold-line);
+  background: radial-gradient(circle at 35% 30%, rgba(226, 190, 103, 0.4), rgba(9, 13, 31, 0.9));
 }
 
-.consultation-reader-chip span {
+.cv-reader-chip-name {
+  font-size: 0.7rem;
+  line-height: 1.1;
+  color: var(--cv-text);
+}
+
+.cv-reader-chip-cue {
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  color: var(--cv-gold);
+}
+
+/* =========================================================================
+   2. READER SHEET — 占い師タイプ選択（ロックは鍵＋必要プラン）
+   ========================================================================= */
+.cv-reader-sheet {
+  border-bottom: 1px solid var(--cv-gold-line);
+  background: linear-gradient(180deg, rgba(12, 19, 34, 0.92), rgba(9, 14, 26, 0.86));
+  padding: 14px 16px 18px;
   display: grid;
+  gap: 16px;
+  animation: cv-sheet-in 0.22s ease;
+}
+
+@keyframes cv-sheet-in {
+  from { transform: translateY(-8px); }
+  to { transform: translateY(0); }
+}
+
+.cv-reader-sheet-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cv-reader-sheet-head p {
+  margin: 4px 0 0;
+  font-size: 0.74rem;
+  color: var(--cv-muted);
+  line-height: 1.5;
+}
+
+.cv-reader-group {
+  display: grid;
+  gap: 8px;
+}
+
+.cv-reader-group-label {
+  font-size: 0.66rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(226, 190, 103, 0.78);
+}
+
+.cv-reader-options {
+  display: grid;
+  gap: 8px;
+}
+
+.cv-reader-option {
+  position: relative;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: var(--cv-tap);
+  padding: 10px 12px;
+  border: 1px solid rgba(226, 190, 103, 0.18);
+  border-radius: var(--cv-radius-sm);
+  background: var(--cv-panel);
+  color: var(--cv-text);
+  text-align: left;
+  transition: border-color 0.18s ease, background 0.18s ease, transform 0.12s ease;
+}
+
+.cv-reader-option:hover {
+  border-color: rgba(226, 190, 103, 0.42);
+}
+
+.cv-reader-option:active {
+  transform: scale(0.995);
+}
+
+.cv-reader-option img {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--cv-gold-line);
+  background: radial-gradient(circle at 35% 30%, rgba(226, 190, 103, 0.4), rgba(9, 13, 31, 0.9));
+}
+
+.cv-reader-option-copy {
+  display: grid;
+  gap: 1px;
   min-width: 0;
 }
 
-.consultation-reader-chip strong {
+.cv-reader-option-copy strong {
+  font-weight: 500;
+  font-size: 0.96rem;
+}
+
+.cv-reader-option-copy em {
+  font-style: normal;
+  font-size: 0.78rem;
+  color: var(--cv-gold);
+}
+
+.cv-reader-option-copy small {
+  font-size: 0.72rem;
+  color: var(--cv-muted);
+  line-height: 1.4;
   overflow: hidden;
-  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.cv-reader-flag {
+  align-self: center;
+  font-size: 0.66rem;
+  color: var(--cv-muted);
   white-space: nowrap;
 }
 
-.consultation-plan-chip:hover,
-.consultation-reader-chip:hover {
-  border-color: rgba(226, 190, 103, 0.45);
-  background: rgba(226, 190, 103, 0.1);
-}
-
-.consultation-line-banner,
-.consultation-notice,
-.consultation-limit-banner,
-.consultation-reader-sheet {
-  margin: 14px 22px 0;
-}
-
-.consultation-line-banner {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border: 1px solid rgba(125, 199, 197, 0.22);
-  border-radius: 8px;
-  background: rgba(125, 199, 197, 0.08);
-}
-
-.consultation-line-banner span {
-  color: var(--aqua);
-  font-weight: 700;
-}
-
-.consultation-line-banner p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.9rem;
-  line-height: 1.6;
-}
-
-.consultation-line-banner a {
-  min-height: 42px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 12px;
-  border: 1px solid rgba(125, 199, 197, 0.32);
-  border-radius: 999px;
-  color: var(--text);
-  text-decoration: none;
-}
-
-.consultation-notice,
-.consultation-limit-banner {
-  border-radius: 8px;
-  padding: 12px 14px;
-  line-height: 1.7;
-}
-
-.consultation-notice.success {
-  border: 1px solid rgba(125, 199, 197, 0.28);
-  background: rgba(125, 199, 197, 0.08);
-  color: var(--text);
-}
-
-.consultation-notice.error {
-  border: 1px solid rgba(211, 138, 138, 0.38);
-  background: rgba(211, 138, 138, 0.1);
-  color: #ffdede;
-}
-
-.consultation-limit-banner {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px 14px;
-  align-items: center;
-  border: 1px solid rgba(226, 190, 103, 0.28);
-  background: rgba(226, 190, 103, 0.08);
-}
-
-.consultation-limit-banner span {
-  color: var(--gold);
-  font-weight: 700;
-}
-
-.consultation-limit-banner p {
-  margin: 0;
-  color: var(--muted);
-}
-
-.consultation-limit-banner .button {
-  grid-row: span 2;
-}
-
-.consultation-reader-sheet {
-  max-height: min(44dvh, 420px);
-  overflow: auto;
-  padding: 14px;
-  border: 1px solid rgba(226, 190, 103, 0.2);
-  border-radius: 8px;
-  background: rgba(5, 8, 18, 0.42);
-}
-
-.consultation-reader-group + .consultation-reader-group {
-  margin-top: 18px;
-}
-
-.consultation-reader-group > span {
-  display: block;
-  margin-bottom: 10px;
-  color: var(--gold);
-  font-size: 0.78rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.consultation-reader-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-  gap: 10px;
-}
-
-.consultation-reader-card {
-  position: relative;
-  min-height: 128px;
-  display: grid;
-  grid-template-columns: 54px minmax(0, 1fr);
-  gap: 12px;
-  align-items: start;
-  padding: 12px;
-  border: 1px solid rgba(226, 190, 103, 0.18);
-  border-radius: 8px;
-  background: rgba(17, 27, 45, 0.76);
-  color: var(--text);
-  text-align: left;
-}
-
-.consultation-reader-card.private {
-  border-color: rgba(226, 190, 103, 0.36);
+/* luxury accent */
+.cv-reader-option.is-luxury {
+  border-color: rgba(226, 190, 103, 0.4);
   background:
-    linear-gradient(135deg, rgba(226, 190, 103, 0.14), transparent 42%),
-    rgba(17, 27, 45, 0.84);
-  box-shadow: inset 0 0 0 1px rgba(247, 241, 223, 0.04);
+    linear-gradient(140deg, rgba(226, 190, 103, 0.12), rgba(9, 13, 31, 0.5) 60%),
+    var(--cv-panel);
 }
 
-.consultation-reader-card.active {
-  border-color: rgba(226, 190, 103, 0.82);
-  box-shadow: 0 0 0 2px rgba(226, 190, 103, 0.16), 0 18px 42px rgba(0, 0, 0, 0.28);
+/* selected */
+.cv-reader-option.is-active {
+  border-color: #ffe7ad;
+  box-shadow: 0 0 0 1px rgba(255, 231, 173, 0.6), 0 0 22px rgba(226, 190, 103, 0.18);
 }
 
-.consultation-reader-card.locked {
-  opacity: 0.74;
+.cv-reader-option.is-active .cv-reader-flag {
+  color: var(--cv-gold);
 }
 
-.consultation-reader-card img {
-  width: 54px;
-  height: 54px;
-  border: 1px solid rgba(226, 190, 103, 0.26);
-  border-radius: 50%;
-  background: rgba(5, 8, 18, 0.52);
+/* locked */
+.cv-reader-option.is-locked {
+  color: rgba(247, 241, 223, 0.7);
 }
 
-.consultation-reader-card span {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
+.cv-reader-option.is-locked img,
+.cv-reader-option.is-locked .cv-reader-option-copy small {
+  opacity: 0.6;
 }
 
-.consultation-reader-card strong {
-  color: var(--text);
-}
-
-.consultation-reader-card em {
-  color: var(--gold);
-  font-style: normal;
-  font-size: 0.88rem;
-}
-
-.consultation-reader-card small {
-  color: var(--muted);
-  line-height: 1.55;
-}
-
-.consultation-reader-card b {
-  grid-column: 1 / -1;
-  min-height: 26px;
+.cv-reader-flag-lock {
   display: inline-flex;
   align-items: center;
-  width: fit-content;
-  padding: 0 9px;
-  border-radius: 999px;
-  background: rgba(226, 190, 103, 0.1);
-  color: var(--gold);
-  font-size: 0.75rem;
-  font-weight: 700;
+  gap: 4px;
+  color: rgba(226, 190, 103, 0.85);
 }
 
-.consultation-reader-notice {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 14px;
-  padding: 12px;
-  border: 1px solid rgba(226, 190, 103, 0.22);
-  border-radius: 8px;
-  background: rgba(226, 190, 103, 0.08);
+.cv-reader-flag-lock svg {
+  width: 12px;
+  height: 12px;
 }
 
-.consultation-reader-notice p {
+/* unlock notice */
+.cv-reader-notice {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--cv-gold-line);
+  border-radius: var(--cv-radius-sm);
+  background: rgba(226, 190, 103, 0.07);
+}
+
+.cv-reader-notice p {
   margin: 0;
-  color: var(--muted);
-  line-height: 1.7;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: rgba(247, 241, 223, 0.9);
 }
 
-.consultation-scroll {
+/* =========================================================================
+   3. CONVERSATION THREAD
+   ========================================================================= */
+.cv-thread {
   flex: 1;
   min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  overflow-y: auto;
-  padding: 18px;
+  gap: 18px;
+  padding: 20px 16px 8px;
   scroll-behavior: smooth;
 }
 
-.consultation-empty-state {
-  width: min(680px, 100%);
-  margin: auto;
-  padding: 22px;
-  border: 1px solid rgba(226, 190, 103, 0.2);
-  border-radius: 8px;
-  background:
-    linear-gradient(180deg, rgba(247, 241, 223, 0.05), rgba(247, 241, 223, 0.02)),
-    rgba(5, 8, 18, 0.38);
-  text-align: center;
-}
-
-.consultation-empty-state span {
-  color: var(--gold);
-  font-size: 0.78rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.consultation-empty-state h3 {
-  margin: 6px 0 8px;
-  font-size: 1.24rem;
-}
-
-.consultation-empty-state p {
-  margin: 0 auto 16px;
-  color: var(--muted);
-  line-height: 1.8;
-}
-
-.consultation-empty-starters {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 9px;
-  text-align: left;
-}
-
-.consultation-empty-starters button {
-  min-height: 46px;
-  border: 1px solid rgba(226, 190, 103, 0.22);
-  border-radius: 8px;
-  padding: 10px 12px;
-  background: rgba(5, 8, 18, 0.42);
-  color: var(--text);
-  text-align: left;
-  line-height: 1.45;
-}
-
-.consultation-empty-starters button:hover {
-  border-color: rgba(226, 190, 103, 0.48);
-  background: rgba(226, 190, 103, 0.1);
-}
-
-.consultation-message {
-  max-width: min(720px, 88%);
-}
-
-.consultation-message.user {
+/* user — short bubble, right */
+.cv-msg-user {
   align-self: flex-end;
-  width: fit-content;
-  min-height: 44px;
-  padding: 12px 14px;
-  border: 1px solid rgba(125, 199, 197, 0.22);
-  border-radius: 8px 8px 2px 8px;
-  background: rgba(125, 199, 197, 0.14);
-  color: var(--text);
+  max-width: 82%;
+  padding: 10px 14px;
+  border-radius: 16px 16px 4px 16px;
+  background: linear-gradient(135deg, rgba(226, 190, 103, 0.22), rgba(226, 190, 103, 0.12));
+  border: 1px solid rgba(226, 190, 103, 0.32);
+  color: var(--cv-text);
+  font-size: 0.95rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* assistant — letter (便箋) card, generous spacing */
+.cv-msg-reader {
+  align-self: stretch;
+  width: 100%;
+  border: 1px solid var(--cv-gold-line);
+  border-radius: var(--cv-radius);
+  background:
+    linear-gradient(180deg, rgba(20, 30, 49, 0.66), rgba(12, 19, 34, 0.72));
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+
+.cv-msg-reader.is-luxury {
+  border-color: rgba(255, 229, 166, 0.36);
+  background:
+    linear-gradient(180deg, rgba(40, 33, 20, 0.5), rgba(12, 19, 34, 0.72) 55%);
+}
+
+.cv-reader-head {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(226, 190, 103, 0.16);
+}
+
+.cv-reader-head img {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--cv-gold-line);
+  background: radial-gradient(circle at 35% 30%, rgba(226, 190, 103, 0.4), rgba(9, 13, 31, 0.9));
+}
+
+.cv-reader-head-text {
+  min-width: 0;
+}
+
+.cv-reader-head-text span {
+  display: block;
+  font-size: 0.64rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--cv-gold);
+}
+
+.cv-reader-head-text strong {
+  display: block;
+  margin-top: 2px;
+  font-weight: 500;
+  font-size: 0.98rem;
+  color: var(--cv-text);
+}
+
+.cv-reader-head-text p {
+  margin: 2px 0 0;
+  font-size: 0.74rem;
+  color: rgba(247, 241, 223, 0.66);
+  line-height: 1.4;
+}
+
+.cv-reader-letter {
+  padding: 18px 20px 20px;
+  font-size: 1rem;
+  line-height: 1.95;
+  letter-spacing: 0.01em;
+  color: rgba(247, 241, 223, 0.95);
+  white-space: pre-wrap;
+  word-break: break-word;
+  text-wrap: pretty;
+}
+
+/* follow-up under an answer */
+.cv-answer-followup {
+  display: grid;
+  gap: 8px;
+  padding: 0 20px 18px;
+}
+
+.cv-answer-followup > span {
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  color: var(--cv-gold);
+}
+
+.cv-answer-followup-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cv-followup-btn {
+  min-height: 38px;
+  padding: 7px 14px;
+  border: 1px solid rgba(226, 190, 103, 0.24);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(247, 241, 223, 0.92);
+  font-size: 0.82rem;
+  line-height: 1.3;
+  transition: border-color 0.18s ease, color 0.18s ease;
+}
+
+.cv-followup-btn:hover {
+  border-color: rgba(226, 190, 103, 0.5);
+  color: var(--cv-gold);
+}
+
+/* loading / thinking */
+.cv-thinking {
+  align-self: stretch;
+  width: 100%;
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--cv-gold-line);
+  border-radius: var(--cv-radius);
+  background: linear-gradient(180deg, rgba(20, 30, 49, 0.6), rgba(12, 19, 34, 0.7));
+  padding-bottom: 18px;
+}
+
+.cv-thinking-copy {
+  padding: 0 20px;
+  color: var(--cv-gold);
+  font-size: 0.9rem;
+  letter-spacing: 0.02em;
+}
+
+.cv-thinking-bar {
+  position: relative;
+  height: 3px;
+  margin: 0 20px;
+  border-radius: 999px;
+  background: rgba(226, 190, 103, 0.16);
+  overflow: hidden;
+}
+
+.cv-thinking-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, var(--cv-gold), transparent);
+  animation: cv-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes cv-shimmer {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(320%); }
+}
+
+.cv-thinking-stream {
+  margin: 0;
+  padding: 0 20px;
+  font-size: 1rem;
+  line-height: 1.95;
+  color: rgba(247, 241, 223, 0.92);
+  white-space: pre-wrap;
+  text-wrap: pretty;
+}
+
+/* empty state — has chart, no messages */
+.cv-thread-hint {
+  align-self: center;
+  max-width: 30ch;
+  margin: auto 0;
+  text-align: center;
+  color: var(--cv-muted);
+  font-size: 0.9rem;
   line-height: 1.7;
 }
 
-.consultation-message.assistant {
-  align-self: flex-start;
-  display: grid;
-  gap: 12px;
-  padding: 16px;
-  border: 1px solid rgba(226, 190, 103, 0.22);
-  border-radius: 8px 8px 8px 2px;
-  background:
-    linear-gradient(180deg, rgba(247, 241, 223, 0.08), rgba(247, 241, 223, 0.035)),
-    rgba(17, 27, 45, 0.86);
-  box-shadow: 0 18px 52px rgba(0, 0, 0, 0.28);
-}
-
-.consultation-reader-identity {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid rgba(226, 190, 103, 0.14);
-}
-
-.consultation-reader-identity.private {
-  border-bottom-color: rgba(226, 190, 103, 0.28);
-}
-
-.consultation-reader-identity img {
-  width: 42px;
-  height: 42px;
-  border: 1px solid rgba(226, 190, 103, 0.28);
-  border-radius: 50%;
-  background: rgba(5, 8, 18, 0.42);
-}
-
-.consultation-reader-identity span {
-  display: grid;
-}
-
-.consultation-reader-identity small {
-  color: var(--muted);
-  font-size: 0.75rem;
-}
-
-.consultation-reader-identity strong {
-  color: var(--gold);
-}
-
-.consultation-answer-body {
-  color: #fbf6e8;
-  line-height: 1.92;
-  white-space: pre-line;
-}
-
-.consultation-answer-follow-ups {
-  display: grid;
-  gap: 9px;
-  padding-top: 10px;
-  border-top: 1px solid rgba(226, 190, 103, 0.14);
-}
-
-.consultation-answer-follow-ups span,
-.consultation-follow-ups > span {
-  color: var(--muted);
-  font-size: 0.78rem;
-}
-
-.consultation-answer-follow-ups div,
-.consultation-follow-ups div,
-.consultation-starters {
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 8px;
-  overflow-x: auto;
-  padding-bottom: 2px;
-  -webkit-overflow-scrolling: touch;
-}
-
-.consultation-answer-follow-ups button,
-.consultation-follow-ups button,
-.consultation-starters button {
-  flex: 0 0 auto;
-  min-height: 40px;
-  border: 1px solid rgba(226, 190, 103, 0.2);
-  border-radius: 999px;
-  padding: 0 12px;
-  background: rgba(5, 8, 18, 0.38);
-  color: var(--text);
-}
-
-.consultation-answer-follow-ups button:hover,
-.consultation-follow-ups button:hover,
-.consultation-starters button:hover,
-.consultation-starters button.active {
-  border-color: rgba(226, 190, 103, 0.46);
-  background: rgba(226, 190, 103, 0.11);
-}
-
-.consultation-thinking p {
-  margin: 0;
-  color: var(--muted);
-  line-height: 1.8;
-}
-
-.consultation-shimmer {
-  width: min(360px, 100%);
-  height: 10px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: rgba(226, 190, 103, 0.1);
-}
-
-.consultation-shimmer::before {
+.cv-thread-hint .cv-star {
   display: block;
-  width: 35%;
-  height: 100%;
-  content: "";
-  border-radius: inherit;
-  background: linear-gradient(90deg, transparent, rgba(226, 190, 103, 0.52), transparent);
-  animation: consultation-shimmer 1.4s ease-in-out infinite;
+  font-size: 1.6rem;
+  color: var(--cv-gold);
+  margin-bottom: 10px;
+  opacity: 0.8;
 }
 
-.consultation-love-panel {
-  max-width: 760px;
+/* error banner (optional, transient) */
+.cv-error {
+  align-self: stretch;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border: 1px solid rgba(211, 138, 138, 0.5);
+  border-radius: var(--cv-radius-sm);
+  background: rgba(211, 138, 138, 0.12);
+  color: #f2dada;
+  font-size: 0.84rem;
+  line-height: 1.6;
+}
+
+.cv-error svg {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+}
+
+/* checkout notice */
+.cv-notice {
+  align-self: stretch;
+  padding: 11px 14px;
+  border: 1px solid rgba(125, 199, 197, 0.4);
+  border-radius: var(--cv-radius-sm);
+  background: rgba(125, 199, 197, 0.1);
+  color: #d6efee;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+/* =========================================================================
+   4. EMPTY STATE — チャート未作成（まず星を読む）
+   ========================================================================= */
+.cv-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 18px;
+  padding: 40px 28px;
+}
+
+.cv-empty-mark {
+  width: 76px;
+  height: 76px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--cv-gold-line);
+  background: radial-gradient(circle at 50% 38%, rgba(226, 190, 103, 0.22), rgba(9, 13, 31, 0.8));
+  color: var(--cv-gold);
+  font-size: 2rem;
+}
+
+.cv-empty h2 {
   margin: 0;
+  font-weight: 500;
+  font-size: 1.4rem;
+  line-height: 1.5;
+  color: var(--cv-text);
 }
 
-.consultation-compose-area {
+.cv-empty p {
+  margin: 0;
+  max-width: 32ch;
+  color: var(--cv-muted);
+  font-size: 0.92rem;
+  line-height: 1.75;
+}
+
+/* =========================================================================
+   5. LOVE PREFERENCE PANEL — 恋愛相談前の確認
+   ========================================================================= */
+.cv-love {
+  margin: 0 16px;
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid rgba(211, 138, 138, 0.4);
+  border-radius: var(--cv-radius);
+  background: linear-gradient(160deg, rgba(211, 138, 138, 0.12), rgba(12, 19, 34, 0.6));
+}
+
+.cv-love > span {
+  font-size: 0.68rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--cv-rose, #d38a8a);
+}
+
+.cv-love strong {
+  font-weight: 500;
+  font-size: 1.02rem;
+  line-height: 1.5;
+}
+
+.cv-love p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--cv-muted);
+  line-height: 1.6;
+}
+
+.cv-love-options {
+  display: grid;
+  gap: 8px;
+}
+
+.cv-love-option {
+  display: grid;
+  gap: 2px;
+  min-height: var(--cv-tap);
+  padding: 10px 14px;
+  border: 1px solid rgba(226, 190, 103, 0.22);
+  border-radius: var(--cv-radius-sm);
+  background: var(--cv-panel);
+  color: var(--cv-text);
+  text-align: left;
+}
+
+.cv-love-option:hover {
+  border-color: rgba(226, 190, 103, 0.46);
+}
+
+.cv-love-option strong {
+  font-size: 0.94rem;
+}
+
+.cv-love-option span {
+  font-size: 0.76rem;
+  color: var(--cv-muted);
+  line-height: 1.4;
+}
+
+/* =========================================================================
+   6. COMPOSER — 下部固定
+   ========================================================================= */
+.cv-composer {
   position: sticky;
   bottom: 0;
   z-index: 5;
   display: grid;
-  gap: 8px;
-  padding: 10px 16px 12px;
-  border-top: 1px solid rgba(226, 190, 103, 0.18);
-  background:
-    linear-gradient(180deg, rgba(9, 17, 31, 0.86), rgba(5, 8, 18, 0.98)),
-    rgba(5, 8, 18, 0.96);
-  backdrop-filter: blur(18px);
+  gap: 12px;
+  padding: 12px 16px calc(14px + env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, rgba(9, 14, 26, 0.4), rgba(9, 14, 26, 0.96) 32%);
+  border-top: 1px solid var(--cv-gold-line);
+  backdrop-filter: blur(10px);
 }
 
-.consultation-follow-ups {
-  display: grid;
-  gap: 7px;
+/* theme chips — horizontal scroll */
+.cv-themes {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: 0 -16px;
+  padding: 0 16px;
+  scroll-snap-type: x proximity;
 }
 
-.consultation-form {
-  display: grid;
-  gap: 8px;
+.cv-themes::-webkit-scrollbar { display: none; }
+
+.cv-theme-chip {
+  flex-shrink: 0;
+  scroll-snap-align: start;
+  min-height: 38px;
+  padding: 8px 15px;
+  border: 1px solid rgba(226, 190, 103, 0.22);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(247, 241, 223, 0.9);
+  font-size: 0.85rem;
+  white-space: nowrap;
+  transition: border-color 0.18s ease, color 0.18s ease, background 0.18s ease;
 }
 
-.consultation-input-row {
+.cv-theme-chip:hover {
+  border-color: rgba(226, 190, 103, 0.46);
+  color: var(--cv-text);
+}
+
+.cv-theme-chip.is-active {
+  border-color: rgba(226, 190, 103, 0.7);
+  background: var(--cv-gold-soft);
+  color: var(--cv-gold);
+}
+
+/* selected question preview */
+.cv-selected {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 108px;
-  gap: 8px;
+  gap: 4px;
+  padding: 10px 14px;
+  border: 1px solid var(--cv-gold-line);
+  border-radius: var(--cv-radius-sm);
+  background: rgba(226, 190, 103, 0.07);
+}
+
+.cv-selected span {
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--cv-gold);
+}
+
+.cv-selected p {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--cv-text);
+}
+
+.cv-selected button {
+  justify-self: start;
+  margin-top: 2px;
+  padding: 4px 0;
+  background: none;
+  border: none;
+  color: var(--cv-muted);
+  font-size: 0.76rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.cv-selected button:hover { color: var(--cv-gold); }
+
+/* input row */
+.cv-input-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
+  gap: 10px;
 }
 
-.consultation-input-row textarea {
+.cv-input-row textarea {
   width: 100%;
-  min-height: 58px;
-  max-height: 130px;
-  resize: vertical;
-  border: 1px solid rgba(226, 190, 103, 0.24);
-  border-radius: 8px;
-  padding: 12px 14px;
-  background: rgba(5, 8, 18, 0.58);
-  color: var(--text);
-  line-height: 1.7;
+  min-height: var(--cv-tap);
+  max-height: 132px;
+  resize: none;
+  padding: 11px 14px;
+  border: 1px solid rgba(226, 190, 103, 0.26);
+  border-radius: 14px;
+  background: rgba(5, 8, 18, 0.6);
+  color: var(--cv-text);
+  font-family: inherit;
+  font-size: 0.95rem;
+  line-height: 1.55;
 }
 
-.consultation-input-row textarea:disabled {
-  opacity: 0.62;
+.cv-input-row textarea::placeholder {
+  color: rgba(185, 178, 161, 0.7);
 }
 
-.consultation-input-row .button {
-  min-width: 0;
-  min-height: 50px;
+.cv-input-row textarea:focus {
+  outline: none;
+  border-color: rgba(226, 190, 103, 0.6);
+  box-shadow: 0 0 0 1px rgba(226, 190, 103, 0.4);
 }
 
-.consultation-starter-strip {
+.cv-send {
+  flex-shrink: 0;
+  width: var(--cv-tap);
+  height: var(--cv-tap);
   display: grid;
-  gap: 6px;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f0cf7c, #b9862d);
+  color: #1a1206;
+  transition: filter 0.18s ease, transform 0.12s ease;
 }
 
-.consultation-starter-strip > span {
-  color: var(--muted);
-  font-size: 0.78rem;
+.cv-send:hover { filter: brightness(1.06); }
+.cv-send:active { transform: scale(0.94); }
+
+.cv-send svg { width: 20px; height: 20px; }
+
+.cv-send:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  filter: grayscale(0.3);
 }
 
-.consultation-starter-strip .consultation-starters button {
-  min-height: 34px;
-  padding: 0 10px;
-  font-size: 0.86rem;
+/* =========================================================================
+   7. LIMIT REACHED — 責めない文面＋導線
+   ========================================================================= */
+.cv-limit {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--cv-gold-line);
+  border-radius: var(--cv-radius);
+  background:
+    radial-gradient(120% 100% at 50% 0%, rgba(226, 190, 103, 0.12), transparent 60%),
+    var(--cv-panel-2);
 }
 
-.consultation-view :focus-visible {
-  outline: 2px solid rgba(125, 199, 197, 0.8);
-  outline-offset: 3px;
+.cv-limit-head {
+  display: grid;
+  gap: 4px;
 }
 
-@keyframes consultation-shimmer {
-  from {
-    transform: translateX(-120%);
-  }
-  to {
-    transform: translateX(320%);
-  }
+.cv-limit-head span {
+  font-size: 0.66rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--cv-gold);
 }
 
+.cv-limit-head strong {
+  font-weight: 500;
+  font-size: 1.04rem;
+  line-height: 1.5;
+}
+
+.cv-limit p {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.7;
+  color: var(--cv-muted);
+}
+
+.cv-limit-actions {
+  display: grid;
+  gap: 8px;
+}
+
+/* =========================================================================
+   8. BUTTONS (scoped) — globals .button に準拠
+   ========================================================================= */
+.cv-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: var(--cv-tap);
+  padding: 0 18px;
+  border: 1px solid var(--cv-gold-line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--cv-text);
+  font-family: inherit;
+  font-size: 0.92rem;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: border-color 0.18s ease, filter 0.18s ease, transform 0.12s ease;
+}
+
+.cv-btn:hover { border-color: rgba(226, 190, 103, 0.5); }
+.cv-btn:active { transform: scale(0.99); }
+
+.cv-btn.is-primary {
+  border-color: transparent;
+  background: linear-gradient(135deg, #f0cf7c, #b9862d);
+  color: #1a1206;
+  font-weight: 600;
+}
+
+.cv-btn.is-primary:hover { filter: brightness(1.06); }
+
+.cv-btn-block { width: 100%; }
+
+/* =========================================================================
+   9. RESPONSIVE — desktop widens conversation, two-up readers
+   ========================================================================= */
+@media (min-width: 720px) {
+  .cv-thread { padding: 28px 28px 10px; }
+  .cv-msg-user { max-width: 60%; }
+  .cv-msg-reader { width: min(100%, 760px); align-self: flex-start; }
+  .cv-thinking { width: min(100%, 760px); align-self: flex-start; }
+  .cv-reader-options { grid-template-columns: 1fr 1fr; }
+  .cv-reader-letter { font-size: 1.04rem; padding: 22px 26px 24px; }
+  .cv-quota { padding: 16px 28px; }
+  .cv-composer { padding: 14px 28px calc(16px + env(safe-area-inset-bottom)); }
+  .cv-themes { margin: 0 -28px; padding: 0 28px; }
+  .cv-love { margin: 0 28px; }
+}
+
+/* reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  .consultation-scroll {
-    scroll-behavior: auto;
-  }
-
-  .consultation-shimmer::before {
-    animation: none;
-  }
-}
-
-@media (max-width: 760px) {
-  .consultation-page-shell {
-    width: 100%;
-    padding: calc(env(safe-area-inset-top) + 56px) 10px 0;
-  }
-
-  .consultation-page-body {
-    width: 100%;
-  }
-
-  .consultation-view {
-    max-height: calc(100dvh - env(safe-area-inset-top) - 64px);
-    border-radius: 8px;
-  }
-
-  .consultation-view-header {
-    gap: 10px;
-    padding: 8px 12px;
-  }
-
-  .consultation-view-actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .consultation-plan-chip,
-  .consultation-reader-chip {
-    min-width: 0;
-  }
-
-  .consultation-reader-chip strong,
-  .consultation-plan-chip strong {
-    font-size: 0.84rem;
-  }
-
-  .consultation-line-banner,
-  .consultation-notice,
-  .consultation-limit-banner,
-  .consultation-reader-sheet {
-    margin-right: 14px;
-    margin-left: 14px;
-  }
-
-  .consultation-line-banner,
-  .consultation-limit-banner {
-    grid-template-columns: 1fr;
-  }
-
-  .consultation-limit-banner .button {
-    grid-row: auto;
-    width: 100%;
-  }
-
-  .consultation-scroll {
-    padding: 14px 12px;
-  }
-
-  .consultation-message {
-    max-width: 94%;
-  }
-
-  .consultation-compose-area {
-    padding: 10px 12px 12px;
-  }
-
-  .consultation-input-row {
-    grid-template-columns: minmax(0, 1fr) 84px;
-  }
-
-  .consultation-input-row .button {
-    width: 100%;
-  }
-
-  .consultation-input-row textarea {
-    min-height: 54px;
-  }
-
-  .consultation-empty-state {
-    margin: 10px 0 auto;
-    padding: 16px;
-  }
-
-  .consultation-empty-starters {
-    grid-template-columns: 1fr;
-  }
+  .cv-reader-sheet { animation: none; }
+  .cv-thinking-bar::after { animation: none; opacity: 0.5; }
+  .cv-thread { scroll-behavior: auto; }
 }
