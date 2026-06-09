@@ -233,6 +233,9 @@ function buildNonBillableLineReply(billing: QuestionBilling, usage: UsageSnapsho
   if (kind === "legal") {
     return `利用規約、プライバシーポリシー、特定商取引法に基づく表記はこちらから確認できます。\n${appUrl("/terms")}\n${appUrl("/privacy")}\n${appUrl("/legal/commercial-disclosure")}${noCount}`;
   }
+  if (kind === "menu_starter") {
+    return `テーマを選びました。\n\nこのまま占うには、今の状況や知りたいことを一言添えて送ってください。\n\n例:\n「今日の運勢を、仕事中心で見て」\n「恋愛について、今の相手との流れを見て」\n「仕事や人生の流れを、転職の迷いに合わせて見て」${usageText}${noCount}`;
+  }
   if (kind === "small_talk") {
     return `ありがとうございます。占いたいことがあれば、そのまま短く送ってください。\n\n例: 今日の運勢は？ / 復縁をどう見ればいい？ / 転職するなら何を重視すべき？${usageText}${noCount}`;
   }

@@ -280,6 +280,9 @@ function buildNonBillableChatAnswer(billing: QuestionBilling, usage: Awaited<Ret
   if (kind === "legal") {
     return `利用規約、プライバシーポリシー、特定商取引法に基づく表記は各ページで確認できます。\n\n/terms\n/privacy\n/legal/commercial-disclosure${noCount}`;
   }
+  if (kind === "menu_starter") {
+    return `テーマを選びました。\n\nこのまま占うには、今の状況や知りたいことを一言添えて送ってください。\n\n例:\n「今日の運勢を、仕事中心で見て」\n「恋愛について、今の相手との流れを見て」\n「仕事や人生の流れを、転職の迷いに合わせて見て」${usageText}${noCount}`;
+  }
   if (kind === "small_talk") {
     return `ありがとうございます。占いたいことがあれば、そのまま短く送ってください。恋愛、仕事、今日の運勢、今月の流れなど、気になるテーマから読めます。${usageText}${noCount}`;
   }

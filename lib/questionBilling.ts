@@ -1,4 +1,4 @@
-export type NonBillableQuestionKind = "account" | "legal" | "line" | "off_topic" | "pricing" | "reader" | "small_talk" | "support" | "usage";
+export type NonBillableQuestionKind = "account" | "legal" | "line" | "menu_starter" | "off_topic" | "pricing" | "reader" | "small_talk" | "support" | "usage";
 
 export type QuestionBilling = {
   countable: boolean;
@@ -17,6 +17,10 @@ export function classifyQuestionBilling(question: string): QuestionBilling {
   const text = normalizeQuestionForBilling(question);
   const lower = text.toLowerCase();
   if (!text) return billable("astrology", "占い相談");
+
+  if (isRichMenuStarter(text)) {
+    return nonBillable("menu_starter", "リッチメニューの入口");
+  }
 
   if (/^(ありがとう|ありがと|助かった|ok|ｏｋ|了解|わかった|分かった|こんにちは|こんばんは|おはよう|テスト|test)$/i.test(text)) {
     return nonBillable("small_talk", "挨拶・短い返答");
@@ -66,6 +70,11 @@ export function classifyQuestionBilling(question: string): QuestionBilling {
 
 export function normalizeQuestionForBilling(question: string) {
   return String(question || "").trim().replace(readerPrefixPattern, "").trim();
+}
+
+export function isRichMenuStarter(text: string) {
+  const normalized = String(text || "").trim().replace(/[。.!！?？\s]+$/g, "");
+  return new Set(["今日の運勢を占って", "相談したいです", "恋愛について占って", "仕事や人生の流れを占って"]).has(normalized);
 }
 
 function isClearlyOffTopic(text: string, lower: string) {
