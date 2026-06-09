@@ -25,12 +25,19 @@ export function GlobalNav({ active, brandLabel = "HOSHIYOMI" }: GlobalNavProps) 
 
   useEffect(() => {
     let frame = 0;
+    let retryTimer = 0;
 
     const readScroll = () => {
       frame = 0;
       const pageScroll = window.scrollY || document.documentElement.scrollTop || 0;
-      const innerScroll = Array.from(document.querySelectorAll<HTMLElement>(".consultation-scroll")).some((element) => element.scrollTop > 24);
-      setVisible(pageScroll > 24 || innerScroll);
+      const scrollTargets = Array.from(document.querySelectorAll<HTMLElement>(".consultation-scroll, .cv-thread"));
+      const innerScroll = scrollTargets.some((element) => element.scrollTop > 24);
+      const hasScrollableContent =
+        document.documentElement.scrollHeight > document.documentElement.clientHeight + 24 ||
+        scrollTargets.some((element) => element.scrollHeight > element.clientHeight + 24);
+      const shouldExposeConsultationMenu =
+        Boolean(document.querySelector(".consultation-view.is-reading")) && !hasScrollableContent;
+      setVisible(pageScroll > 24 || innerScroll || shouldExposeConsultationMenu);
     };
 
     const scheduleRead = () => {
@@ -39,10 +46,15 @@ export function GlobalNav({ active, brandLabel = "HOSHIYOMI" }: GlobalNavProps) 
     };
 
     readScroll();
+    retryTimer = window.setTimeout(scheduleRead, 180);
+    const observer = new MutationObserver(scheduleRead);
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] });
     window.addEventListener("scroll", scheduleRead, { passive: true });
     document.addEventListener("scroll", scheduleRead, { capture: true, passive: true });
     return () => {
       if (frame) window.cancelAnimationFrame(frame);
+      if (retryTimer) window.clearTimeout(retryTimer);
+      observer.disconnect();
       window.removeEventListener("scroll", scheduleRead);
       document.removeEventListener("scroll", scheduleRead, { capture: true });
     };

@@ -407,7 +407,15 @@ export function ConsultationView(props: ConsultationViewProps) {
 
   useEffect(() => {
     const el = threadRef.current;
-    if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    if (!el) return;
+    window.requestAnimationFrame(() => {
+      if (el.scrollHeight > el.clientHeight + 4) {
+        el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+        return;
+      }
+      const latest = el.lastElementChild instanceof HTMLElement ? el.lastElementChild : el;
+      latest.scrollIntoView({ block: "end", behavior: "smooth" });
+    });
   }, [messages, loading, streamingAnswer, pendingLoveQuestion]);
 
   /* ---- empty state: チャート未作成 ---- */
