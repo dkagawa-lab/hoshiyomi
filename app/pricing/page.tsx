@@ -5,7 +5,7 @@ export default function PricingPage() {
   return (
     <main className="shell pricing-page">
       <section className="panel pricing-hero">
-        <div className="eyebrow">Reading Plans</div>
+        <div className="eyebrow">料金プラン</div>
         <h1>相談を重ねるほど、あなたの運命に寄り添える</h1>
         <p>
           恋愛、仕事、相性、将来の迷いを、同じ星の文脈のまま深く見ていけます。今のあなたに合う相談回数、回答の深さ、占い師タイプをお選びください。
