@@ -74,7 +74,7 @@ a {
 .shell {
   width: min(1160px, calc(100% - 32px));
   margin: 0 auto;
-  padding: 28px 0 56px;
+  padding: 84px 0 56px;
 }
 
 .topbar {
@@ -93,8 +93,25 @@ a {
 }
 
 .global-topbar {
+  display: block;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  padding: 10px 0;
+  background: rgba(8, 13, 25, 0.9);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(226, 190, 103, 0.16);
+}
+
+.global-topbar-inner {
+  width: min(1160px, calc(100% - 32px));
+  margin: 0 auto;
+  display: flex;
   align-items: center;
-  position: relative;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 .global-menu {
@@ -3834,7 +3851,7 @@ textarea:focus {
 
   .shell {
     width: min(100% - 24px, 720px);
-    padding: 18px 0 44px;
+    padding: 80px 0 44px;
   }
 
   .topbar {
@@ -4053,7 +4070,7 @@ textarea:focus {
 
   .shell {
     width: min(100% - 18px, 520px);
-    padding-top: 12px;
+    padding-top: 80px;
   }
 
   .brand {

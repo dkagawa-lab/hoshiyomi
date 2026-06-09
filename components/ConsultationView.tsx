@@ -225,19 +225,6 @@ export function ConsultationView({
 
       {hasChart ? (
         <div className="consultation-compose-area">
-          {!loading && followUpQuestions.length ? (
-            <div className="consultation-follow-ups">
-              <span>続けて掘り下げるなら</span>
-              <div>
-                {followUpQuestions.map((followUp) => (
-                  <button className={question === followUp ? "active" : ""} key={followUp} onClick={() => onFollowUp(followUp)} type="button">
-                    {followUp}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : null}
-
           <div className="consultation-starters" aria-label="相談テーマを選ぶ">
             {starterQuestions.map((sample) => (
               <button

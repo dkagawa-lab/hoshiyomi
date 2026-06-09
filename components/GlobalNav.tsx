@@ -18,31 +18,33 @@ const navItems = [
 export function GlobalNav({ active, brandLabel = "HOSHIYOMI" }: GlobalNavProps) {
   return (
     <nav className="topbar global-topbar">
-      <Link className="brand" href="/">
-        <BrandLogo label={brandLabel} />
-      </Link>
-      <details className="global-menu">
-        <summary className="global-menu-button" aria-label="メニューを開く">
-          <span className="hamburger-lines" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-          </span>
-          <span>Menu</span>
-        </summary>
-        <div className="global-nav-links" aria-label="主要ナビゲーション">
-          {navItems.map((item) => (
-            <Link
-              aria-current={active === item.key ? "page" : undefined}
-              className={`global-nav-link ${active === item.key ? "active" : ""}`}
-              href={item.href}
-              key={item.key}
-            >
-              {item.label}
-            </Link>
-          ))}
-        </div>
-      </details>
+      <div className="global-topbar-inner">
+        <Link className="brand" href="/">
+          <BrandLogo label={brandLabel} />
+        </Link>
+        <details className="global-menu">
+          <summary className="global-menu-button" aria-label="メニューを開く">
+            <span className="hamburger-lines" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </span>
+            <span>Menu</span>
+          </summary>
+          <div className="global-nav-links" aria-label="主要ナビゲーション">
+            {navItems.map((item) => (
+              <Link
+                aria-current={active === item.key ? "page" : undefined}
+                className={`global-nav-link ${active === item.key ? "active" : ""}`}
+                href={item.href}
+                key={item.key}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </div>
+        </details>
+      </div>
     </nav>
   );
 }
