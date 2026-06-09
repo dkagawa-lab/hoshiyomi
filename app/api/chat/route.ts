@@ -280,8 +280,14 @@ function buildNonBillableChatAnswer(billing: QuestionBilling, usage: Awaited<Ret
   if (kind === "legal") {
     return `利用規約、プライバシーポリシー、特定商取引法に基づく表記は各ページで確認できます。\n\n/terms\n/privacy\n/legal/commercial-disclosure${noCount}`;
   }
-  if (kind === "menu_starter") {
-    return `テーマを選びました。\n\nこのまま占うには、今の状況や知りたいことを一言添えて送ってください。\n\n例:\n「今日の運勢を、仕事中心で見て」\n「恋愛について、今の相手との流れを見て」\n「仕事や人生の流れを、転職の迷いに合わせて見て」${usageText}${noCount}`;
+  if (kind === "menu_consult") {
+    return `相談したいことを、そのまま一言で送ってください。\n\n例:\n「今の迷いをどう見ればいい？」\n「この選択をして大丈夫？」\n「最近同じことで悩んでいる」\n\n内容が具体的なほど、あなたの星と今の流れに合わせて読みやすくなります。${usageText}${noCount}`;
+  }
+  if (kind === "menu_love") {
+    return `恋愛について見ていきます。\n\nまず、どの相手・状況に近いですか？\n\n「好きな人がいる」\n「付き合っている人がいる」\n「復縁したい」\n「出会いを見たい」\n「相手の気持ちを知りたい」\n\n相手との関係や、今いちばん知りたいことを添えて送ってください。${usageText}${noCount}`;
+  }
+  if (kind === "menu_work") {
+    return `仕事・人生の流れを見ていきます。\n\n今知りたいことは、どれに近いですか？\n\n「転職するか迷っている」\n「今の仕事を続けるべき？」\n「向いている働き方を知りたい」\n「人間関係を見たい」\n「人生全体の転機を見たい」\n\n近いものをそのまま送るか、今の状況を一言添えてください。${usageText}${noCount}`;
   }
   if (kind === "small_talk") {
     return `ありがとうございます。占いたいことがあれば、そのまま短く送ってください。恋愛、仕事、今日の運勢、今月の流れなど、気になるテーマから読めます。${usageText}${noCount}`;
