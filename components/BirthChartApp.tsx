@@ -1062,7 +1062,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
 
           {!hideConsultation || consultationOnly ? consultationView : null}
 
-          {!hideConsultation || consultationOnly ? (
+          {!hideConsultation && !consultationOnly ? (
           <section className="panel memory-card">
             <div className="eyebrow">Member Memory</div>
             <h2>あなたの星と鑑定履歴</h2>

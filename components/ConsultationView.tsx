@@ -108,9 +108,7 @@ export function ConsultationView({
   const showIntro = messages.length === 0;
   const trimmedQuestion = question.trim();
   const canSend = hasChart && Boolean(trimmedQuestion) && !loading && !quotaReached;
-  const quotaText = usage.unlimited
-    ? "無制限"
-    : `${usage.periodLabel} 残り${Math.max(0, usage.remaining)}回`;
+  const quotaText = usage.unlimited ? "無制限" : `残り${Math.max(0, usage.remaining)}回`;
 
   useEffect(() => {
     window.requestAnimationFrame(() => {
@@ -128,31 +126,26 @@ export function ConsultationView({
   return (
     <section className="consultation-view panel" aria-label="相談画面">
       <div className="consultation-view-header">
-        <div className="consultation-view-title">
-          <div className="eyebrow">Private Reading</div>
-          <h2 className="consultation-title-compact">星読み相談</h2>
-        </div>
-        <div className="consultation-view-actions">
-          <Link className="consultation-plan-chip" href={pricingHref}>
-            <span>{usage.planLabel}</span>
-            <strong>{quotaText}</strong>
-          </Link>
-          {hasChart ? (
-            <button
-              aria-controls="consultation-reader-sheet"
-              aria-expanded={readerStyleExpanded}
-              className="consultation-reader-chip"
-              onClick={onToggleReaderStyleExpanded}
-              type="button"
-            >
-              <img alt="" src={activeReader.imageSrc} />
-              <span>
-                <small>占い師</small>
-                <strong>{activeReader.readerName}</strong>
-              </span>
-            </button>
-          ) : null}
-        </div>
+        {hasChart ? (
+          <button
+            aria-controls="consultation-reader-sheet"
+            aria-expanded={readerStyleExpanded}
+            className="consultation-reader-chip"
+            onClick={onToggleReaderStyleExpanded}
+            type="button"
+          >
+            <img alt="" src={activeReader.imageSrc} />
+            <span>
+              <small>占い師</small>
+              <strong>{activeReader.readerName}</strong>
+            </span>
+          </button>
+        ) : (
+          <span className="consultation-header-brand">星読み相談</span>
+        )}
+        <Link className="consultation-quota-chip" href={pricingHref} aria-label="相談の残り回数とプラン">
+          {quotaText}
+        </Link>
       </div>
 
       {showIntro && hasChart && lineEntry && usage.isMember ? <ConsultationLineBanner lineEntry={lineEntry} /> : null}
