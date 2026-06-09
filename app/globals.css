@@ -103,6 +103,22 @@ a {
   background: rgba(8, 13, 25, 0.9);
   backdrop-filter: blur(14px);
   border-bottom: 1px solid rgba(226, 190, 103, 0.16);
+  transition: transform 0.22s ease, opacity 0.22s ease, visibility 0.22s ease;
+  will-change: transform, opacity;
+}
+
+.topbar.global-topbar.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(calc(-100% - 8px));
+  visibility: hidden;
+}
+
+.topbar.global-topbar.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+  visibility: visible;
 }
 
 .global-topbar-inner {

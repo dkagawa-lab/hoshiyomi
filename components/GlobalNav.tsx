@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { BrandLogo } from "@/components/BrandLogo";
 
 type GlobalNavProps = {
@@ -18,8 +21,35 @@ const navItems = [
 ] as const;
 
 export function GlobalNav({ active, brandLabel = "HOSHIYOMI" }: GlobalNavProps) {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    let frame = 0;
+
+    const readScroll = () => {
+      frame = 0;
+      const pageScroll = window.scrollY || document.documentElement.scrollTop || 0;
+      const innerScroll = Array.from(document.querySelectorAll<HTMLElement>(".consultation-scroll")).some((element) => element.scrollTop > 24);
+      setVisible(pageScroll > 24 || innerScroll);
+    };
+
+    const scheduleRead = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(readScroll);
+    };
+
+    readScroll();
+    window.addEventListener("scroll", scheduleRead, { passive: true });
+    document.addEventListener("scroll", scheduleRead, { capture: true, passive: true });
+    return () => {
+      if (frame) window.cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", scheduleRead);
+      document.removeEventListener("scroll", scheduleRead, { capture: true });
+    };
+  }, []);
+
   return (
-    <nav className="topbar global-topbar">
+    <nav className={`topbar global-topbar ${visible ? "is-visible" : "is-hidden"}`}>
       <div className="global-topbar-inner">
         <Link className="brand" href="/">
           <BrandLogo label={brandLabel} />
