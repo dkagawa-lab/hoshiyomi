@@ -658,7 +658,7 @@ a.cv-quota-plan:hover {
 .cv-thread-hint {
   align-self: center;
   max-width: 30ch;
-  margin: auto 0;
+  margin: clamp(26px, 7dvh, 54px) auto 0;
   text-align: center;
   color: var(--cv-muted);
   font-size: 0.9rem;
@@ -821,8 +821,8 @@ a.cv-quota-plan:hover {
   bottom: 0;
   z-index: 5;
   display: grid;
-  gap: 12px;
-  padding: 12px 16px calc(14px + env(safe-area-inset-bottom));
+  gap: 13px;
+  padding: 13px 16px calc(18px + env(safe-area-inset-bottom));
   background: linear-gradient(180deg, rgba(9, 14, 26, 0.4), rgba(9, 14, 26, 0.96) 32%);
   border-top: 1px solid var(--cv-gold-line);
   backdrop-filter: blur(10px);
@@ -945,22 +945,22 @@ a.cv-quota-plan:hover {
 .cv-input-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
+  align-items: center;
   gap: 10px;
 }
 
 .cv-input-row textarea {
   width: 100%;
-  min-height: var(--cv-tap);
+  min-height: 64px;
   max-height: 132px;
   resize: none;
-  padding: 11px 14px;
+  padding: 15px 15px;
   border: 1px solid rgba(226, 190, 103, 0.26);
-  border-radius: 14px;
+  border-radius: 18px;
   background: rgba(5, 8, 18, 0.6);
   color: var(--cv-text);
   font-family: inherit;
-  font-size: 0.95rem;
+  font-size: 1rem;
   line-height: 1.55;
 }
 
@@ -976,8 +976,8 @@ a.cv-quota-plan:hover {
 
 .cv-send {
   flex-shrink: 0;
-  width: var(--cv-tap);
-  height: var(--cv-tap);
+  width: 54px;
+  height: 54px;
   display: grid;
   place-items: center;
   border: 1px solid transparent;
