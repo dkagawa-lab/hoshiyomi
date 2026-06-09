@@ -6,7 +6,7 @@ import { PlanKey, resolvePlan, usageLimitsDisabled } from "@/lib/plans";
 import { classifyQuestionBilling, NonBillableQuestionKind, QuestionBilling } from "@/lib/questionBilling";
 import { QuestionIntentKey, resolveQuestionIntent } from "@/lib/questionIntents";
 import { buildConversationContext, generateAstrologyAnswer, isAnthropicApiError, isAnthropicRateLimitError, isProductionAiConfigured, mergeConversationMessages, normalizeChatMessages } from "@/lib/aiRuntime";
-import { getAuthenticatedRequestUser } from "@/lib/serverAuth";
+import { anonymousSessionCookieName, getAuthenticatedRequestUser, getOrCreateAnonymousRequestUser } from "@/lib/serverAuth";
 import { birthInputFromStoredUser, checkNonBillableRateLimit, consumeQuota, countLifetimeUserMessages, getQuotaState, getUsageSnapshot, insertChatTurn, isServerStoreConfigured, listChatMessages, normalizeClientUserId, NonBillableRateLimitResult, StoredUser, upsertUserForChart, upsertUserForLineChart } from "@/lib/serverStore";
 
 type ChatRequest = {
@@ -22,20 +22,35 @@ type ChatRequest = {
 
 export async function POST(req: Request) {
   const body = (await req.json()) as ChatRequest;
+  const authUser = await getAuthenticatedRequestUser(req);
+  const anonymousUser = authUser ? null : getOrCreateAnonymousRequestUser(req);
+  const respond = (payload: unknown, init?: ResponseInit) => {
+    const response = NextResponse.json(payload, init);
+    if (anonymousUser?.cookieValue) {
+      response.cookies.set(anonymousSessionCookieName, anonymousUser.cookieValue, {
+        httpOnly: true,
+        maxAge: 60 * 60 * 24 * 30,
+        path: "/",
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production"
+      });
+    }
+    return response;
+  };
+
   if (!body.chart || !body.question) {
-    return NextResponse.json({ error: "chart and question are required" }, { status: 400 });
+    return respond({ error: "chart and question are required" }, { status: 400 });
   }
 
   const billing = classifyQuestionBilling(body.question);
-  const authUser = await getAuthenticatedRequestUser(req);
   const requestClientUserId = normalizeClientUserId(body.clientUserId);
-  const clientUserId = authUser?.clientUserId ?? (process.env.NODE_ENV === "production" && isServerStoreConfigured() ? null : requestClientUserId);
+  const clientUserId = authUser?.clientUserId ?? anonymousUser?.clientUserId ?? (process.env.NODE_ENV === "production" && isServerStoreConfigured() ? null : requestClientUserId);
   const requiresServerBackedAi = billing.countable && isProductionAiConfigured() && process.env.NODE_ENV === "production";
   if (requiresServerBackedAi && !isServerStoreConfigured()) {
-    return NextResponse.json({ error: "相談回数の確認ができないため、鑑定を開始できません。少し時間をおいてもう一度お試しください。" }, { status: 503 });
+    return respond({ error: "相談回数の確認ができないため、鑑定を開始できません。少し時間をおいてもう一度お試しください。" }, { status: 503 });
   }
-  if (requiresServerBackedAi && !authUser) {
-    return NextResponse.json({ error: "この相談を続けるには、ログインまたは会員登録が必要です。" }, { status: 401 });
+  if (requiresServerBackedAi && !clientUserId) {
+    return respond({ error: "お試し相談枠を確認できませんでした。少し時間をおいてもう一度お試しください。" }, { status: 503 });
   }
 
   const storedUser =
@@ -50,7 +65,7 @@ export async function POST(req: Request) {
       : await safeServerStore("read quota for chat", () => getQuotaState(storedUser))
     : null;
   if (requiresServerBackedAi && (!storedUser || !quota)) {
-    return NextResponse.json({ error: "相談回数の確認ができないため、鑑定を開始できません。少し時間をおいてもう一度お試しください。" }, { status: 503 });
+    return respond({ error: "相談回数の確認ができないため、鑑定を開始できません。少し時間をおいてもう一度お試しください。" }, { status: 503 });
   }
   const plan = resolvePlan(quota?.plan ?? body.plan);
   const quotaDisabled = usageLimitsDisabled();
@@ -62,7 +77,7 @@ export async function POST(req: Request) {
       scope: storedUser ? "web-user" : clientUserId ? "web-client" : "web-anonymous"
     });
     if (!rateLimit.allowed) {
-      return NextResponse.json(
+      return respond(
         {
           counted: false,
           error: buildNonBillableLimitMessage(rateLimit),
@@ -74,7 +89,7 @@ export async function POST(req: Request) {
         { status: 429 }
       );
     }
-    return NextResponse.json({
+    return respond({
       answer: buildNonBillableChatAnswer(billing, usage),
       counted: false,
       nonBillableKind: billing.kind,
@@ -98,7 +113,7 @@ export async function POST(req: Request) {
       : countPreviousClientUserQuestions(body.messages);
 
   if (!quotaDisabled && storedUser && quota && quota.remaining <= 0) {
-    return NextResponse.json(
+    return respond(
       {
         error: "相談回数を使い切りました。追加100回パック、または上位プランで続けて相談できます。",
         usage: await getUsageSnapshot(storedUser)
@@ -111,9 +126,9 @@ export async function POST(req: Request) {
     const answer = demoAnswer(body.question, effectiveChart, transits, readerStyle, plan.key, questionIntent);
     if (storedUser && quota) {
       const usage = await persistChatTurnAndQuota({ answer, question: body.question, quota, quotaDisabled, storedUser });
-      return NextResponse.json({ answer, mode: "demo", ...(usage ? { usage } : {}) });
+      return respond({ answer, mode: "demo", ...(usage ? { usage } : {}) });
     }
-    return NextResponse.json({ answer, mode: "demo" });
+    return respond({ answer, mode: "demo" });
   }
 
   let answer = "";
@@ -147,7 +162,7 @@ export async function POST(req: Request) {
         retryAfterSeconds: error.retryAfterSeconds,
         tokensRemaining: error.rateLimit.tokensRemaining
       });
-      return NextResponse.json(
+      return respond(
         {
           code: error.code,
           error: buildRateLimitMessage(error.retryAfterSeconds),
@@ -165,7 +180,7 @@ export async function POST(req: Request) {
         status: error.status,
         tokensRemaining: error.rateLimit.tokensRemaining
       });
-      return NextResponse.json(
+      return respond(
         {
           code: error.status === 529 ? "ANTHROPIC_OVERLOADED" : error.code,
           error: error.status === 529 ? "今、鑑定が集中していて少しつながりにくくなっています。相談回数は消費していません。少し時間をおいて、もう一度送ってください。" : "鑑定文の生成で一時的な問題が起きました。相談回数は消費していません。少し時間をおいて、もう一度送ってください。"
@@ -175,20 +190,20 @@ export async function POST(req: Request) {
     }
 
     console.warn("AI response failed", { message: error instanceof Error ? error.message : "Unknown error" });
-    return NextResponse.json({ error: "鑑定文の生成で一時的な問題が起きました。相談回数は消費していません。少し時間をおいて、もう一度送ってください。" }, { status: 502 });
+    return respond({ error: "鑑定文の生成で一時的な問題が起きました。相談回数は消費していません。少し時間をおいて、もう一度送ってください。" }, { status: 502 });
   }
 
   if (storedUser && quota) {
     const usage = await persistChatTurnAndQuota({ answer, question: body.question, quota, quotaDisabled, storedUser });
     if (requiresServerBackedAi && !usage) {
-      return NextResponse.json({ error: "相談履歴を保存できなかったため、鑑定を完了できませんでした。相談回数は消費していません。" }, { status: 503 });
+      return respond({ error: "相談履歴を保存できなかったため、鑑定を完了できませんでした。相談回数は消費していません。" }, { status: 503 });
     }
-    return NextResponse.json({ answer, mode: aiMode, model: aiModel, ...(usage ? { usage } : {}) });
+    return respond({ answer, mode: aiMode, model: aiModel, ...(usage ? { usage } : {}) });
   }
   if (requiresServerBackedAi) {
-    return NextResponse.json({ error: "相談履歴を保存できなかったため、鑑定を完了できませんでした。相談回数は消費していません。" }, { status: 503 });
+    return respond({ error: "相談履歴を保存できなかったため、鑑定を完了できませんでした。相談回数は消費していません。" }, { status: 503 });
   }
-  return NextResponse.json({ answer, mode: aiMode, model: aiModel });
+  return respond({ answer, mode: aiMode, model: aiModel });
 }
 
 function upsertChatUser(input: { authUser: Awaited<ReturnType<typeof getAuthenticatedRequestUser>>; chart: Chart; clientUserId: string; isMember: boolean }) {

@@ -1,8 +1,9 @@
-import { createHmac, timingSafeEqual } from "crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { normalizeClientUserId, normalizeLineUserId } from "@/lib/serverStore";
 
 export const lineAuthSessionCookieName = "hoshiyomi_line_auth_client_user_id";
+export const anonymousSessionCookieName = "hoshiyomi_anon_session";
 
 export type AuthenticatedRequestUser = {
   clientUserId: string;
@@ -10,6 +11,11 @@ export type AuthenticatedRequestUser = {
   lineUserId?: string;
   provider: "line" | "supabase";
   userId?: string;
+};
+
+export type AnonymousRequestUser = {
+  clientUserId: string;
+  cookieValue?: string;
 };
 
 let supabaseAuthServerClient: SupabaseClient | null = null;
@@ -44,6 +50,23 @@ export function signLineSessionValue(clientUserId: string): string | null {
   return signature ? `${identity}.${signature}` : null;
 }
 
+export function getOrCreateAnonymousRequestUser(req: Request): AnonymousRequestUser | null {
+  const cookies = parseCookieHeader(req.headers.get("cookie"));
+  const existing = verifyAnonymousSessionValue(cookies[anonymousSessionCookieName]);
+  if (existing) return { clientUserId: existing.clientUserId };
+
+  const clientUserId = createAnonymousClientUserId();
+  const cookieValue = signAnonymousSessionValue(clientUserId);
+  return cookieValue ? { clientUserId, cookieValue } : null;
+}
+
+export function signAnonymousSessionValue(clientUserId: string): string | null {
+  const identity = normalizeClientUserId(clientUserId);
+  if (!identity?.startsWith("anon:")) return null;
+  const signature = signAnonymousIdentity(identity);
+  return signature ? `${identity}.${signature}` : null;
+}
+
 function verifyLineSessionValue(value: string | undefined) {
   if (!value) return null;
   const separatorIndex = value.lastIndexOf(".");
@@ -57,6 +80,23 @@ function verifyLineSessionValue(value: string | undefined) {
   const expectedSignature = signLineIdentity(clientUserId);
   if (!expectedSignature || !safeEqual(signature, expectedSignature)) return null;
   return { clientUserId, lineUserId };
+}
+
+function verifyAnonymousSessionValue(value: string | undefined) {
+  if (!value) return null;
+  const separatorIndex = value.lastIndexOf(".");
+  if (separatorIndex <= 0 || separatorIndex >= value.length - 1) return null;
+  const identity = value.slice(0, separatorIndex);
+  const signature = value.slice(separatorIndex + 1);
+  const clientUserId = normalizeClientUserId(identity);
+  if (!clientUserId || clientUserId !== identity || !clientUserId.startsWith("anon:")) return null;
+  const expectedSignature = signAnonymousIdentity(clientUserId);
+  if (!expectedSignature || !safeEqual(signature, expectedSignature)) return null;
+  return { clientUserId };
+}
+
+function createAnonymousClientUserId() {
+  return `anon:${randomBytes(18).toString("base64url")}`;
 }
 
 async function getSupabaseAuthenticatedUser(req: Request): Promise<AuthenticatedRequestUser | null> {
@@ -104,8 +144,18 @@ function signLineIdentity(identity: string) {
   return createHmac("sha256", secret).update(identity).digest("base64url");
 }
 
+function signAnonymousIdentity(identity: string) {
+  const secret = readAnonymousSessionSecret();
+  if (!secret) return null;
+  return createHmac("sha256", secret).update(identity).digest("base64url");
+}
+
 function readLineSessionSecret() {
   return (process.env.LINE_SESSION_SECRET || "").trim();
+}
+
+function readAnonymousSessionSecret() {
+  return (process.env.ANONYMOUS_SESSION_SECRET || process.env.LINE_SESSION_SECRET || "").trim();
 }
 
 function safeEqual(a: string, b: string) {
