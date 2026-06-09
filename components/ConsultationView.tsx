@@ -17,7 +17,7 @@
  * スタイルは素のCSS（consultation-view.css）。Tailwind 不使用。
  */
 
-import { FormEvent, useEffect, useRef } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { ReaderStyle, ReaderStyleKey, readerStyles } from "@/lib/readerStyles";
 import { PlanKey } from "@/lib/plans";
 import { QuestionIntentKey } from "@/lib/questionIntents";
@@ -401,9 +401,11 @@ export function ConsultationView(props: ConsultationViewProps) {
   } = props;
 
   const threadRef = useRef<HTMLDivElement | null>(null);
+  const composerRef = useRef<HTMLFormElement | null>(null);
   const activeReader = resolveReaderStyle(activeReaderStyleKey);
   const limitReached = !usage.unlimited && usage.remaining <= 0;
   const hasReadingContent = messages.length > 0 || loading || Boolean(streamingAnswer) || pendingLoveQuestion;
+  const [keyboardActive, setKeyboardActive] = useState(false);
 
   useEffect(() => {
     const el = threadRef.current;
@@ -417,6 +419,50 @@ export function ConsultationView(props: ConsultationViewProps) {
       latest.scrollIntoView({ block: "end", behavior: "smooth" });
     });
   }, [messages, loading, streamingAnswer, pendingLoveQuestion]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    let focusTimer: number | undefined;
+
+    const updateKeyboardInset = () => {
+      const viewport = window.visualViewport;
+      const activeElement = document.activeElement;
+      const editing =
+        activeElement instanceof HTMLTextAreaElement ||
+        activeElement instanceof HTMLInputElement ||
+        activeElement instanceof HTMLSelectElement;
+      const rawInset = viewport ? window.innerHeight - viewport.height - viewport.offsetTop : 0;
+      const inset = editing ? Math.max(0, Math.round(rawInset)) : 0;
+      const active = editing && inset > 80;
+      root.style.setProperty("--cv-keyboard-inset", `${active ? inset : 0}px`);
+      if (active) root.dataset.cvKeyboard = "open";
+      else delete root.dataset.cvKeyboard;
+      setKeyboardActive(active);
+    };
+
+    const scheduleUpdate = () => {
+      if (focusTimer) window.clearTimeout(focusTimer);
+      focusTimer = window.setTimeout(updateKeyboardInset, 60);
+    };
+
+    updateKeyboardInset();
+    window.visualViewport?.addEventListener("resize", updateKeyboardInset);
+    window.visualViewport?.addEventListener("scroll", updateKeyboardInset);
+    window.addEventListener("orientationchange", scheduleUpdate);
+    window.addEventListener("focusin", scheduleUpdate);
+    window.addEventListener("focusout", scheduleUpdate);
+
+    return () => {
+      if (focusTimer) window.clearTimeout(focusTimer);
+      window.visualViewport?.removeEventListener("resize", updateKeyboardInset);
+      window.visualViewport?.removeEventListener("scroll", updateKeyboardInset);
+      window.removeEventListener("orientationchange", scheduleUpdate);
+      window.removeEventListener("focusin", scheduleUpdate);
+      window.removeEventListener("focusout", scheduleUpdate);
+      root.style.removeProperty("--cv-keyboard-inset");
+      delete root.dataset.cvKeyboard;
+    };
+  }, []);
 
   /* ---- empty state: チャート未作成 ---- */
   if (!hasChart) {
@@ -451,7 +497,7 @@ export function ConsultationView(props: ConsultationViewProps) {
   const showHint = !messages.length && !loading;
 
   return (
-    <section className={`consultation-view ${hasReadingContent ? "is-reading" : ""}`} data-screen-label="相談">
+    <section className={`consultation-view ${hasReadingContent ? "is-reading" : ""} ${keyboardActive ? "is-keyboard-active" : ""}`} data-screen-label="相談">
       <QuotaHeader usage={usage} activeReader={activeReader} onToggleReader={props.onToggleReaderStyleExpanded} pricingHref={pricingHref} />
       {usage.isMember && lineEntry ? <LineEntry entry={lineEntry} /> : null}
 
@@ -490,7 +536,7 @@ export function ConsultationView(props: ConsultationViewProps) {
 
       {pendingLoveQuestion ? <LovePreferencePanel onChoose={props.onChooseRomanticInterest} /> : null}
 
-      <form className="cv-composer" onSubmit={submit}>
+      <form className="cv-composer" ref={composerRef} onSubmit={submit}>
         {limitReached ? (
           <div className="cv-limit">
             <div className="cv-limit-head">
@@ -546,6 +592,9 @@ export function ConsultationView(props: ConsultationViewProps) {
           <textarea
             value={question}
             onChange={(e) => props.onQuestionChange(e.target.value)}
+            onFocus={() => {
+              window.setTimeout(() => composerRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }), 120);
+            }}
             placeholder="聞きたいことを自由に入力"
             aria-label="相談内容を入力"
             rows={1}
