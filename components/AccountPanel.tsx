@@ -491,7 +491,7 @@ export function AccountPanel() {
         </div>
       </div>
 
-      <div className="panel account-detail-card referral-card">
+      <div className="panel account-detail-card referral-card" id="referral">
         <div className="eyebrow">Invite Gift</div>
         <h2>紹介コード</h2>
         <div className="referral-layout">

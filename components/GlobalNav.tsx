@@ -12,6 +12,8 @@ const navItems = [
   { key: "consultation", label: "相談", href: "/consultation" },
   { key: "glossary", label: "完全ガイド・用語集", href: "/glossary" },
   { key: "account", label: "登録情報", href: "/account" },
+  { key: "review", label: "評価特典", href: "/account#review" },
+  { key: "referral", label: "紹介コード", href: "/account#referral" },
   { key: "support", label: "問い合わせ", href: "/contact" }
 ] as const;
 
