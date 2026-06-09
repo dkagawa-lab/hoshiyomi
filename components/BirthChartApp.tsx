@@ -457,7 +457,25 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: await buildAuthHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ chart: requestChart, question: trimmedQuestion, messages: requestMessages, readerStyle: activeReaderStyle.key, plan: currentPlan.key, questionIntent: resolvedIntent, clientUserId: activeClientUserId, isMember: member })
+        body: JSON.stringify({
+          chart: requestChart,
+          clientUsage: {
+            addOnCredits,
+            freeBonusRemaining,
+            isMember: member,
+            plan: currentPlan.key,
+            remaining: remainingQuota,
+            unlimited: quotaDisabled,
+            used
+          },
+          clientUserId: activeClientUserId,
+          isMember: member,
+          messages: requestMessages,
+          plan: currentPlan.key,
+          question: trimmedQuestion,
+          questionIntent: resolvedIntent,
+          readerStyle: activeReaderStyle.key
+        })
       });
       const data = await res.json().catch(() => ({}));
       if (data.usage) applyServerUsage(data.usage);

@@ -17,7 +17,28 @@ type ChatRequest = {
   plan?: PlanKey;
   questionIntent?: QuestionIntentKey;
   clientUserId?: string;
+  clientUsage?: ClientUsageSnapshot;
   isMember?: boolean;
+};
+
+type ClientUsageSnapshot = {
+  addOnCredits?: number;
+  freeBonusRemaining?: number;
+  isMember?: boolean;
+  plan?: PlanKey;
+  remaining?: number;
+  unlimited?: boolean;
+  used?: number;
+};
+
+type DisplayUsageSnapshot = {
+  addOnCredits: number;
+  freeBonusRemaining: number;
+  isMember: boolean;
+  plan: PlanKey;
+  remaining: number;
+  unlimited?: boolean;
+  used: number;
 };
 
 export async function POST(req: Request) {
@@ -70,7 +91,8 @@ export async function POST(req: Request) {
   const plan = resolvePlan(quota?.plan ?? body.plan);
   const quotaDisabled = usageLimitsDisabled();
   if (!billing.countable) {
-    const usage = storedUser ? await safeServerStore("read usage for non-billable chat", () => getUsageSnapshot(storedUser)) : null;
+    const serverUsage = storedUser ? await safeServerStore("read usage for non-billable chat", () => getUsageSnapshot(storedUser)) : null;
+    const usage = serverUsage ?? normalizeClientUsageSnapshot(body.clientUsage, body.plan, body.isMember);
     const rateLimit = await checkNonBillableRateLimit({
       identifier: buildWebNonBillableIdentifier(req, storedUser?.id ?? clientUserId),
       kind: billing.kind,
@@ -270,14 +292,14 @@ function resolveQuotaMode(quota: Awaited<ReturnType<typeof getQuotaState>> | nul
   return "base";
 }
 
-function buildNonBillableChatAnswer(billing: QuestionBilling, usage: Awaited<ReturnType<typeof getUsageSnapshot>> | null) {
-  const usageText = usage ? `\n\n現在の利用状況\nプラン: ${resolvePlan(usage.plan).label}\n残り回数: ${usage.remaining}回` : "";
+function buildNonBillableChatAnswer(billing: QuestionBilling, usage: DisplayUsageSnapshot | null) {
+  const usageText = usage ? `\n\n現在の利用状況\nプラン: ${formatUsagePlanLabel(usage)}\n${formatUsageRemaining(usage)}` : "";
   const noCount = "\n\nこの確認では相談回数は消費していません。";
   const kind = billing.kind as NonBillableQuestionKind;
 
   if (kind === "usage") {
     return usage
-      ? `現在の利用状況です。\n\nプラン: ${resolvePlan(usage.plan).label}\n残り回数: ${usage.remaining}回${usage.freeBonusRemaining > 0 && usage.plan === "free" ? `\n登録特典: 残り${usage.freeBonusRemaining}回` : ""}${usage.addOnCredits > 0 ? `\n追加分: 残り${usage.addOnCredits}回` : ""}${noCount}`
+      ? `現在の利用状況です。\n\nプラン: ${formatUsagePlanLabel(usage)}\n${formatUsageRemaining(usage)}${usage.freeBonusRemaining > 0 && usage.plan === "free" ? `\n登録特典: 残り${usage.freeBonusRemaining}回` : ""}${usage.addOnCredits > 0 ? `\n追加分: 残り${usage.addOnCredits}回` : ""}\n\n残り回数や料金、登録方法の確認では相談回数は減りません。占い相談として星を読む時だけ、相談枠を使います。`
       : `利用状況を確認するには、登録情報との連携が必要です。登録情報ページから確認できます。\n/account${noCount}`;
   }
   if (kind === "pricing") {
@@ -311,6 +333,39 @@ function buildNonBillableChatAnswer(billing: QuestionBilling, usage: Awaited<Ret
     return `ここでは、星読み・登録情報・使い方に関する内容を扱っています。\n\n医療、法律、投資など専門判断が必要なことは専門家へ相談してください。占いたいテーマがあれば、恋愛・仕事・人生の流れのように聞いてください。${usageText}${noCount}`;
   }
   return `使い方や不具合については、登録情報ページや問い合わせページから確認できます。\n/account\n/contact${usageText}${noCount}`;
+}
+
+function normalizeClientUsageSnapshot(input: ClientUsageSnapshot | undefined, fallbackPlan: PlanKey | undefined, fallbackIsMember: boolean | undefined): DisplayUsageSnapshot | null {
+  if (!input) return null;
+  const plan = resolvePlan(input.plan ?? fallbackPlan).key;
+  const remaining = coerceNonNegativeInteger(input.remaining);
+  if (remaining === null && !input.unlimited) return null;
+  return {
+    addOnCredits: coerceNonNegativeInteger(input.addOnCredits) ?? 0,
+    freeBonusRemaining: coerceNonNegativeInteger(input.freeBonusRemaining) ?? 0,
+    isMember: Boolean(input.isMember ?? fallbackIsMember),
+    plan,
+    remaining: remaining ?? 0,
+    unlimited: Boolean(input.unlimited),
+    used: coerceNonNegativeInteger(input.used) ?? 0
+  };
+}
+
+function coerceNonNegativeInteger(value: unknown) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return null;
+  return Math.max(0, Math.floor(number));
+}
+
+function formatUsagePlanLabel(usage: DisplayUsageSnapshot) {
+  const plan = resolvePlan(usage.plan);
+  if (plan.key === "free" && !usage.isMember) return `未登録（${plan.questionLimit}回まで）`;
+  return plan.label;
+}
+
+function formatUsageRemaining(usage: DisplayUsageSnapshot) {
+  if (usage.unlimited) return "開発環境: 相談回数の制限なし";
+  return `残り回数: ${usage.remaining}回`;
 }
 
 function buildNonBillableLimitMessage(rateLimit: NonBillableRateLimitResult) {

@@ -30,7 +30,7 @@ export function classifyQuestionBilling(question: string): QuestionBilling {
     return nonBillable("small_talk", "挨拶・短い返答");
   }
 
-  if (/(残り|あと何回|何回使|回数|相談枠|無料枠|利用状況|上限|トークン|クレジット)/.test(text)) {
+  if (/(残り|残数|あと何回|あと何問|あと何件|何回使|何回.*(聞|相談|質問|占|使|残|でき|出来)|何問.*(聞|相談|質問|占|使|残|でき|出来)|回数|利用回数|相談回数|質問枠|相談枠|鑑定枠|無料枠|利用状況|上限|トークン|クレジット)/.test(text)) {
     return nonBillable("usage", "利用状況の確認");
   }
 

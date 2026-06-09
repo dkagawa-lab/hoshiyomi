@@ -497,7 +497,7 @@ export function ConsultationView(props: ConsultationViewProps) {
               <span>Continue Reading</span>
               <strong>今日の相談枠を、いまぶんは読み切りました</strong>
             </div>
-            <p>焦らなくて大丈夫です。明日になればまた相談できます。今すぐ続きを読みたいときだけ、追加枠か上位プランを選べます。</p>
+            <p>残り回数、料金、登録、LINE連携などの確認は、このまま送っても相談回数を消費しません。占い相談を続けたいときだけ、追加枠か上位プランを選べます。</p>
             <div className="cv-limit-actions">
               <button className="cv-btn is-primary cv-btn-block" type="button" onClick={props.onOpenPaywall}>
                 追加枠・プランを見る
@@ -549,9 +549,9 @@ export function ConsultationView(props: ConsultationViewProps) {
             placeholder="聞きたいことを自由に入力"
             aria-label="相談内容を入力"
             rows={1}
-            disabled={limitReached}
+            disabled={loading}
           />
-          <button className="cv-send" type="submit" disabled={loading || limitReached || !question.trim()} aria-label="相談を送信">
+          <button className="cv-send" type="submit" disabled={loading || !question.trim()} aria-label="相談を送信">
             <IconSend />
           </button>
         </div>
