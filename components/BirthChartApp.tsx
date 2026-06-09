@@ -1,9 +1,10 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { BirthInput, calculateChart, Chart } from "@/lib/astrology";
 import { ChartWheel } from "@/components/ChartWheel";
+import { ConsultationView } from "@/components/ConsultationView";
 import { notifyBirthUpdated } from "@/components/MobileStickyCta";
 import { PricingPanel } from "@/components/PricingPanel";
 import { buildAuthHeaders } from "@/lib/authRegistrationClient";
@@ -30,8 +31,8 @@ import {
   canUseReaderStyle,
   ensureFreeBonusRemaining,
   isPlanKey,
-  planQuotaLabel,
   planQuotaRemaining,
+  planPeriodLabel,
   planStatusLabel,
   PlanKey,
   readAddOnCredits,
@@ -171,15 +172,11 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
   const [birthError, setBirthError] = useState("");
   const [showPaywallModal, setShowPaywallModal] = useState(false);
   const [checkoutNotice, setCheckoutNotice] = useState("");
-  const messagesRef = useRef<HTMLDivElement | null>(null);
-  const messageEndRef = useRef<HTMLDivElement | null>(null);
 
   const currentPlan = resolvePlan(plan);
   const remainingQuota = planQuotaRemaining(currentPlan, used, member, freeBonusRemaining, addOnCredits);
   const quotaDisabled = usageLimitsDisabled();
   const readerStyleLocksDisabled = quotaDisabled;
-  const quotaLabel = quotaDisabled ? "開発環境: 相談回数の制限なし" : planQuotaLabel(currentPlan, used, member, freeBonusRemaining, addOnCredits);
-  const visibleQuotaLabel = !quotaDisabled && remainingQuota <= 0 ? "聞きたいことを入力して、内容を確認してから相談できます。" : quotaLabel;
   const currentPlanLabel = planStatusLabel(currentPlan, member);
   const birthDateParts = parseBirthDateParts(input.date);
   const birthDayOptions = useMemo(() => buildBirthDayOptions(birthDateParts.year, birthDateParts.month), [birthDateParts.year, birthDateParts.month]);
@@ -262,13 +259,12 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
 
   function scrollToLatestMessage(behavior: ScrollBehavior = "smooth") {
     window.requestAnimationFrame(() => {
-      if (messagesRef.current) {
-        messagesRef.current.scrollTo({
-          top: messagesRef.current.scrollHeight,
-          behavior
-        });
-      }
-      messageEndRef.current?.scrollIntoView({ behavior, block: "end" });
+      const scrollContainer = document.querySelector<HTMLDivElement>(".consultation-scroll");
+      if (!scrollContainer) return;
+      scrollContainer.scrollTo({
+        top: scrollContainer.scrollHeight,
+        behavior
+      });
     });
   }
 
@@ -732,6 +728,56 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
 
   const containerClass = compact ? "panel form-panel" : consultationOnly ? "consultation-grid" : "app-grid";
   const showBirthForm = !consultationOnly && (!chart || birthFormExpanded);
+  const consultationView = (
+    <ConsultationView
+      activeReaderStyleKey={activeReaderStyle.key}
+      checkoutNotice={checkoutNotice}
+      followUpQuestions={followUpQuestions}
+      hasChart={Boolean(chart)}
+      isReaderStyleLocked={(key) => !readerStyleLocksDisabled && !canUseReaderStyle(key, plan)}
+      lineEntry={member ? { lineLinked, connectHref: lineConnectHref, friendUrl: lineFriendUrl } : undefined}
+      loading={loading}
+      loadingText={streamingAnswer ? streamingLoadingText : loadingSequence[loadingStep] ?? loadingSequence[loadingSequence.length - 1] ?? loadingStepPool[0]}
+      messages={messages}
+      onChooseRomanticInterest={(key) => chooseRomanticInterest(key)}
+      onClearQuestion={() => {
+        setQuestion("");
+        setSelectedQuestionIntent(undefined);
+      }}
+      onFollowUp={(text) => prepareQuestion(text)}
+      onOpenPaywall={() => setShowPaywallModal(true)}
+      onQuestionChange={(text) => {
+        setQuestion(text);
+        setSelectedQuestionIntent(undefined);
+      }}
+      onSelectReaderStyle={(key) => updateReaderStyle(key)}
+      onSelectStarter={(text, intent) => prepareQuestion(text, intent)}
+      onSend={(text, intent) => ask(text, intent)}
+      onToggleReaderStyleExpanded={() => setReaderStyleExpanded((expanded) => !expanded)}
+      pendingLoveQuestion={Boolean(pendingLoveQuestion)}
+      pricingHref="/pricing"
+      question={question}
+      readerStyleExpanded={readerStyleExpanded}
+      readerStyleGroups={readerStyleGroups}
+      readerStyleNotice={readerStyleNotice}
+      readerStyleUpgradePlan={readerStyleUpgradePlan}
+      requiredPlanLabelFor={(key) => `${requiredPlanForReaderStyle(key).label}で選択可能`}
+      startReadingHref="/m"
+      starterQuestions={starterQuestions}
+      streamingAnswer={streamingAnswer}
+      usage={{
+        plan: currentPlan.key,
+        planLabel: currentPlanLabel,
+        remaining: remainingQuota,
+        used,
+        freeBonusRemaining,
+        addOnCredits,
+        isMember: member,
+        unlimited: quotaDisabled,
+        periodLabel: planPeriodLabel(currentPlan)
+      }}
+    />
+  );
 
   return (
     <div className={containerClass}>
@@ -1014,227 +1060,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
             </section>
           ) : null}
 
-          {!hideConsultation || consultationOnly ? (
-          <section className="panel chat-card">
-            <div className="eyebrow">Private Reading</div>
-            <h2>ここから先は、星の文脈を記憶し、あなた専用の占い師として未来を占います</h2>
-            <p className="small">
-              あなたの出生図とこれまでの鑑定をもとに、恋愛、仕事、相性、将来の迷いまで、同じ星の文脈を引き継いで見ていきます。
-            </p>
-            <div className="plan-entry-card">
-              <div>
-                <span>Current Plan</span>
-                <strong>{currentPlanLabel}</strong>
-                <p>{quotaLabel}</p>
-              </div>
-              <Link className="button" href="/pricing">
-                プランを見る
-              </Link>
-            </div>
-            {checkoutNotice ? <p className="form-status success">{checkoutNotice}</p> : null}
-            {member ? <LineConsultationGuide lineConnectHref={lineConnectHref} lineFriendUrl={lineFriendUrl} lineLinked={lineLinked} /> : null}
-            <div className="consultation-profile-card">
-              <div className="consultation-profile-heading">
-                <span>プロフィール</span>
-                <p>恋愛相談では、相手や恋愛対象の性別を決めつけずに読むために使います。</p>
-              </div>
-              <div className="profile-select-grid">
-                <label>
-                  <span>あなたの性別（任意）</span>
-                  <select
-                    value={input.gender ?? "unspecified"}
-                    onChange={(e) => {
-                      const nextGender = isGenderKey(e.target.value) ? e.target.value : "unspecified";
-                      updateBirthProfile({ gender: nextGender });
-                    }}
-                  >
-                    {genderOptions.map((option) => (
-                      <option key={option.key} value={option.key}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  <span>恋愛対象</span>
-                  <select
-                    value={input.romanticInterest ?? "unspecified"}
-                    onChange={(e) => {
-                      const nextRomanticInterest = isRomanticInterestKey(e.target.value) ? e.target.value : "unspecified";
-                      updateBirthProfile({ romanticInterest: nextRomanticInterest });
-                    }}
-                  >
-                    {romanticInterestOptions.map((option) => (
-                      <option key={option.key} value={option.key}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-            </div>
-            <div className="reader-style-panel">
-              <div className="reader-style-panel-header">
-                <div className="reader-style-panel-title">
-                  <span>占い師タイプ</span>
-                  <strong>{activeReaderStyle.label} / {activeReaderStyle.readerName}</strong>
-                </div>
-                <button
-                  aria-controls="reader-style-options"
-                  aria-expanded={readerStyleExpanded}
-                  className="reader-style-toggle"
-                  onClick={() => setReaderStyleExpanded((expanded) => !expanded)}
-                  type="button"
-                >
-                  {readerStyleExpanded ? "折り畳む" : "選択肢を開く"}
-                </button>
-              </div>
-              {readerStyleExpanded ? (
-                <div className="reader-style-groups" id="reader-style-options">
-                  {readerStyleGroups.map((group) => (
-                    <div className={`reader-style-group ${group.key}`} key={group.key}>
-                      <span className="reader-style-group-label">{group.label}</span>
-                      <div className="reader-style-grid">
-                        {group.items.map((style) => (
-                          <button
-                            aria-pressed={activeReaderStyle.key === style.key}
-                            className={`reader-style-button reader-style-${style.requiredPlan} ${activeReaderStyle.key === style.key ? "active" : ""} ${
-                              !readerStyleLocksDisabled && !canUseReaderStyle(style.key, plan) ? "locked" : ""
-                            } ${readerStyleLocksDisabled && style.requiredPlan !== "free" ? "dev-unlocked" : ""}`}
-                            key={style.key}
-                            onClick={() => updateReaderStyle(style.key)}
-                            type="button"
-                          >
-                            <img src={style.imageSrc} alt="" />
-                            <span className="reader-style-copy">
-                              <strong>{style.label}</strong>
-                              <em>{style.readerName}</em>
-                              <small>{style.persona}</small>
-                            </span>
-                            <b>{readerStyleLocksDisabled && style.requiredPlan !== "free" ? "開発環境で選択可" : `${requiredPlanForReaderStyle(style.key).label}で選択可能`}</b>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="reader-style-current">
-                  <img src={activeReaderStyle.imageSrc} alt="" />
-                  <div>
-                    <span>現在の占い師タイプ</span>
-                    <strong>{activeReaderStyle.label} / {activeReaderStyle.readerName}</strong>
-                    <p>{activeReaderStyle.persona}</p>
-                  </div>
-                </div>
-              )}
-              {readerStyleNotice ? (
-                <div className="reader-style-unlock">
-                  <p>{readerStyleNotice}</p>
-                  {readerStyleUpgradePlan ? (
-                    <button className="button primary" onClick={() => setShowPaywallModal(true)} type="button">
-                      プランを見る
-                    </button>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-            <p className="small plan-limit-line">
-              {visibleQuotaLabel}
-            </p>
-            <div className="question-guide">
-              <span>相談テーマを選ぶ</span>
-              <p>下の候補から選んでも、そのまま自由に書いても大丈夫です。恋愛、仕事、相性、将来の迷い、不安、願いまで、いま知りたいことを占いましょう。</p>
-            </div>
-            {pendingLoveQuestion ? (
-              <div className="love-preference-panel">
-                <span>恋愛相談の前に確認します</span>
-                <strong>あなたが恋愛対象として見ることが多いのはどちらですか？</strong>
-                <p>ここを選ぶと、その前提で鑑定を続けます。まだ決めきれない場合や、恋愛対象がない場合も選べます。</p>
-                <div className="love-preference-options">
-                  {romanticInterestOptions
-                    .filter((option) => option.key !== "unspecified")
-                    .map((option) => (
-                      <button className="love-preference-option" key={option.key} onClick={() => chooseRomanticInterest(option.key)} type="button">
-                        <strong>{option.label}</strong>
-                        <span>{option.description}</span>
-                      </button>
-                    ))}
-                </div>
-              </div>
-            ) : null}
-            <div className="pill-row">
-              {starterQuestions.map((sample) => (
-                <button className={`pill ${question === sample.text ? "active" : ""}`} key={sample.text} onClick={() => prepareQuestion(sample.text, sample.intent)} type="button">
-                  {sample.text}
-                </button>
-              ))}
-            </div>
-            <div className="messages" ref={messagesRef}>
-              {!messages.length && !loading ? (
-                <div className="message assistant hint-message">
-                  候補から選ぶか、下の入力欄にそのまま相談を書いてください。送信すると、ここに最新の鑑定が表示されます。
-                </div>
-              ) : null}
-              {messages.map((message, index) => (
-                <MessageBubble key={index} message={message} onFollowUp={(followUp) => prepareQuestion(followUp)} />
-              ))}
-              {loading ? (
-                <div className="message assistant reader-answer thinking-message">
-                  <ReaderAnswerHeader readerStyle={activeReaderStyle.key} />
-                  <span>{streamingAnswer ? streamingLoadingText : loadingSequence[loadingStep] ?? loadingSequence[loadingSequence.length - 1] ?? loadingStepPool[0]}</span>
-                  <i />
-                  {streamingAnswer ? <p className="reader-answer-body">{streamingAnswer}</p> : null}
-                </div>
-              ) : null}
-              <div aria-hidden="true" className="message-end" ref={messageEndRef} />
-            </div>
-            {!loading && followUpQuestions.length ? (
-              <div className="follow-up-panel">
-                <span>この続きを深掘りする</span>
-                <div className="pill-row">
-                  {followUpQuestions.map((followUp) => (
-                    <button className={`pill ${question === followUp ? "active" : ""}`} key={followUp} onClick={() => prepareQuestion(followUp)} type="button">
-                      {followUp}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-            <form
-              className="chat-form"
-              onSubmit={(event) => {
-                event.preventDefault();
-                ask(question, selectedQuestionIntent);
-              }}
-            >
-              <div className="chat-form-heading">
-                <span>{question ? "この質問について相談しますか？" : "自由に相談を書く"}</span>
-                <small>{question ? "内容を確認してから開始できます" : "候補にない悩みも、そのまま送れます"}</small>
-              </div>
-              {question ? (
-                <div className="selected-question-card">
-                  <span>選択中の相談</span>
-                  <p>{question}</p>
-                  <button className="text-button" onClick={() => { setQuestion(""); setSelectedQuestionIntent(undefined); }} type="button">
-                    内容を変更する
-                  </button>
-                </div>
-              ) : null}
-              <textarea
-                value={question}
-                onChange={(e) => {
-                  setQuestion(e.target.value);
-                  setSelectedQuestionIntent(undefined);
-                }}
-                placeholder="候補にないことでも大丈夫です。例: あの人との今後は？今の仕事を続けるべき？今年動くなら何を意識すればいい？"
-              />
-              <button className="button primary" type="submit" disabled={loading}>
-                {question ? "この内容で相談する" : "相談する"}
-              </button>
-            </form>
-          </section>
-          ) : null}
+          {!hideConsultation || consultationOnly ? consultationView : null}
 
           {!hideConsultation || consultationOnly ? (
           <section className="panel memory-card">
@@ -1319,18 +1145,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
           ) : null}
         </div>
       ) : compact ? null : consultationOnly ? (
-        <div className="panel reading-card">
-          <h2 className="consultation-empty-title">
-            <span>先にホロスコープを</span>
-            <span>作成してください</span>
-          </h2>
-          <p>相談を始めるには、生年月日と出生地からあなたの星を読み取る必要があります。</p>
-          <div className="actions">
-            <Link className="button primary" href="/m">
-              出生情報を入力する
-            </Link>
-          </div>
-        </div>
+        consultationView
       ) : (
         <div className="panel reading-card">
           <h2>まず出生情報を入力してください</h2>

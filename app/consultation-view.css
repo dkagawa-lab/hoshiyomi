@@ -1,0 +1,675 @@
+.consultation-page-shell {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.consultation-page-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.consultation-page-body > .consultation-grid {
+  flex: 1;
+  min-height: 0;
+}
+
+.consultation-view {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-height: 0;
+  height: 100%;
+  max-height: calc(100dvh - 120px);
+  padding: 0;
+  overflow: hidden;
+  border-color: rgba(226, 190, 103, 0.24);
+  background:
+    linear-gradient(180deg, rgba(12, 21, 37, 0.94), rgba(8, 13, 25, 0.98)),
+    radial-gradient(circle at 18% 0%, rgba(226, 190, 103, 0.13), transparent 30%);
+}
+
+.consultation-view-header {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  padding: 22px;
+  border-bottom: 1px solid rgba(226, 190, 103, 0.18);
+  background:
+    linear-gradient(180deg, rgba(9, 17, 31, 0.98), rgba(9, 17, 31, 0.9)),
+    linear-gradient(90deg, rgba(226, 190, 103, 0.08), transparent);
+  backdrop-filter: blur(18px);
+}
+
+.consultation-view-title {
+  min-width: 0;
+}
+
+.consultation-view-title h2 {
+  max-width: 760px;
+  margin: 6px 0 8px;
+  font-size: clamp(1.18rem, 2.2vw, 1.7rem);
+  line-height: 1.45;
+}
+
+.consultation-view-title p {
+  max-width: 760px;
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.8;
+}
+
+.consultation-view-actions {
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.consultation-plan-chip,
+.consultation-reader-chip {
+  min-height: 54px;
+  border: 1px solid rgba(226, 190, 103, 0.24);
+  border-radius: 8px;
+  background: rgba(5, 8, 18, 0.58);
+  color: var(--text);
+}
+
+.consultation-plan-chip {
+  display: grid;
+  align-content: center;
+  min-width: 144px;
+  padding: 9px 12px;
+  text-decoration: none;
+}
+
+.consultation-plan-chip span,
+.consultation-reader-chip small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.consultation-plan-chip strong {
+  margin-top: 4px;
+  color: var(--gold);
+  font-size: 0.92rem;
+}
+
+.consultation-reader-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 178px;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.consultation-reader-chip img {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(226, 190, 103, 0.28);
+  border-radius: 50%;
+  background: rgba(226, 190, 103, 0.08);
+}
+
+.consultation-reader-chip span {
+  display: grid;
+  min-width: 0;
+}
+
+.consultation-reader-chip strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.consultation-plan-chip:hover,
+.consultation-reader-chip:hover {
+  border-color: rgba(226, 190, 103, 0.45);
+  background: rgba(226, 190, 103, 0.1);
+}
+
+.consultation-line-banner,
+.consultation-notice,
+.consultation-limit-banner,
+.consultation-reader-sheet {
+  margin: 14px 22px 0;
+}
+
+.consultation-line-banner {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(125, 199, 197, 0.22);
+  border-radius: 8px;
+  background: rgba(125, 199, 197, 0.08);
+}
+
+.consultation-line-banner span {
+  color: var(--aqua);
+  font-weight: 700;
+}
+
+.consultation-line-banner p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.consultation-line-banner a {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  border: 1px solid rgba(125, 199, 197, 0.32);
+  border-radius: 999px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.consultation-notice,
+.consultation-limit-banner {
+  border-radius: 8px;
+  padding: 12px 14px;
+  line-height: 1.7;
+}
+
+.consultation-notice.success {
+  border: 1px solid rgba(125, 199, 197, 0.28);
+  background: rgba(125, 199, 197, 0.08);
+  color: var(--text);
+}
+
+.consultation-notice.error {
+  border: 1px solid rgba(211, 138, 138, 0.38);
+  background: rgba(211, 138, 138, 0.1);
+  color: #ffdede;
+}
+
+.consultation-limit-banner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 14px;
+  align-items: center;
+  border: 1px solid rgba(226, 190, 103, 0.28);
+  background: rgba(226, 190, 103, 0.08);
+}
+
+.consultation-limit-banner span {
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.consultation-limit-banner p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.consultation-limit-banner .button {
+  grid-row: span 2;
+}
+
+.consultation-reader-sheet {
+  max-height: min(44dvh, 420px);
+  overflow: auto;
+  padding: 14px;
+  border: 1px solid rgba(226, 190, 103, 0.2);
+  border-radius: 8px;
+  background: rgba(5, 8, 18, 0.42);
+}
+
+.consultation-reader-group + .consultation-reader-group {
+  margin-top: 18px;
+}
+
+.consultation-reader-group > span {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--gold);
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.consultation-reader-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px;
+}
+
+.consultation-reader-card {
+  position: relative;
+  min-height: 128px;
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid rgba(226, 190, 103, 0.18);
+  border-radius: 8px;
+  background: rgba(17, 27, 45, 0.76);
+  color: var(--text);
+  text-align: left;
+}
+
+.consultation-reader-card.private {
+  border-color: rgba(226, 190, 103, 0.36);
+  background:
+    linear-gradient(135deg, rgba(226, 190, 103, 0.14), transparent 42%),
+    rgba(17, 27, 45, 0.84);
+  box-shadow: inset 0 0 0 1px rgba(247, 241, 223, 0.04);
+}
+
+.consultation-reader-card.active {
+  border-color: rgba(226, 190, 103, 0.82);
+  box-shadow: 0 0 0 2px rgba(226, 190, 103, 0.16), 0 18px 42px rgba(0, 0, 0, 0.28);
+}
+
+.consultation-reader-card.locked {
+  opacity: 0.74;
+}
+
+.consultation-reader-card img {
+  width: 54px;
+  height: 54px;
+  border: 1px solid rgba(226, 190, 103, 0.26);
+  border-radius: 50%;
+  background: rgba(5, 8, 18, 0.52);
+}
+
+.consultation-reader-card span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.consultation-reader-card strong {
+  color: var(--text);
+}
+
+.consultation-reader-card em {
+  color: var(--gold);
+  font-style: normal;
+  font-size: 0.88rem;
+}
+
+.consultation-reader-card small {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.consultation-reader-card b {
+  grid-column: 1 / -1;
+  min-height: 26px;
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: rgba(226, 190, 103, 0.1);
+  color: var(--gold);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.consultation-reader-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid rgba(226, 190, 103, 0.22);
+  border-radius: 8px;
+  background: rgba(226, 190, 103, 0.08);
+}
+
+.consultation-reader-notice p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.consultation-scroll {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+  padding: 22px;
+  scroll-behavior: smooth;
+}
+
+.consultation-empty-state {
+  width: min(520px, 100%);
+  margin: auto;
+  padding: 28px;
+  border: 1px solid rgba(226, 190, 103, 0.2);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(247, 241, 223, 0.05), rgba(247, 241, 223, 0.02)),
+    rgba(5, 8, 18, 0.38);
+  text-align: center;
+}
+
+.consultation-empty-state span {
+  color: var(--gold);
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.consultation-empty-state h3 {
+  margin: 8px 0 10px;
+  font-size: 1.35rem;
+}
+
+.consultation-empty-state p {
+  margin: 0 auto 16px;
+  color: var(--muted);
+  line-height: 1.8;
+}
+
+.consultation-message {
+  max-width: min(720px, 88%);
+}
+
+.consultation-message.user {
+  align-self: flex-end;
+  width: fit-content;
+  min-height: 44px;
+  padding: 12px 14px;
+  border: 1px solid rgba(125, 199, 197, 0.22);
+  border-radius: 8px 8px 2px 8px;
+  background: rgba(125, 199, 197, 0.14);
+  color: var(--text);
+  line-height: 1.7;
+}
+
+.consultation-message.assistant {
+  align-self: flex-start;
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(226, 190, 103, 0.22);
+  border-radius: 8px 8px 8px 2px;
+  background:
+    linear-gradient(180deg, rgba(247, 241, 223, 0.08), rgba(247, 241, 223, 0.035)),
+    rgba(17, 27, 45, 0.86);
+  box-shadow: 0 18px 52px rgba(0, 0, 0, 0.28);
+}
+
+.consultation-reader-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(226, 190, 103, 0.14);
+}
+
+.consultation-reader-identity.private {
+  border-bottom-color: rgba(226, 190, 103, 0.28);
+}
+
+.consultation-reader-identity img {
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(226, 190, 103, 0.28);
+  border-radius: 50%;
+  background: rgba(5, 8, 18, 0.42);
+}
+
+.consultation-reader-identity span {
+  display: grid;
+}
+
+.consultation-reader-identity small {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.consultation-reader-identity strong {
+  color: var(--gold);
+}
+
+.consultation-answer-body {
+  color: #fbf6e8;
+  line-height: 1.92;
+  white-space: pre-line;
+}
+
+.consultation-answer-follow-ups {
+  display: grid;
+  gap: 9px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(226, 190, 103, 0.14);
+}
+
+.consultation-answer-follow-ups span,
+.consultation-follow-ups > span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.consultation-answer-follow-ups div,
+.consultation-follow-ups div,
+.consultation-starters {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.consultation-answer-follow-ups button,
+.consultation-follow-ups button,
+.consultation-starters button {
+  flex: 0 0 auto;
+  min-height: 40px;
+  border: 1px solid rgba(226, 190, 103, 0.2);
+  border-radius: 999px;
+  padding: 0 12px;
+  background: rgba(5, 8, 18, 0.38);
+  color: var(--text);
+}
+
+.consultation-answer-follow-ups button:hover,
+.consultation-follow-ups button:hover,
+.consultation-starters button:hover,
+.consultation-starters button.active {
+  border-color: rgba(226, 190, 103, 0.46);
+  background: rgba(226, 190, 103, 0.11);
+}
+
+.consultation-thinking p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.8;
+}
+
+.consultation-shimmer {
+  width: min(360px, 100%);
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(226, 190, 103, 0.1);
+}
+
+.consultation-shimmer::before {
+  display: block;
+  width: 35%;
+  height: 100%;
+  content: "";
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, rgba(226, 190, 103, 0.52), transparent);
+  animation: consultation-shimmer 1.4s ease-in-out infinite;
+}
+
+.consultation-love-panel {
+  max-width: 760px;
+  margin: 0;
+}
+
+.consultation-compose-area {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: grid;
+  gap: 10px;
+  padding: 14px 22px 18px;
+  border-top: 1px solid rgba(226, 190, 103, 0.18);
+  background:
+    linear-gradient(180deg, rgba(9, 17, 31, 0.86), rgba(5, 8, 18, 0.98)),
+    rgba(5, 8, 18, 0.96);
+  backdrop-filter: blur(18px);
+}
+
+.consultation-follow-ups {
+  display: grid;
+  gap: 7px;
+}
+
+.consultation-form {
+  display: grid;
+  gap: 10px;
+}
+
+.consultation-input-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.consultation-input-row textarea {
+  width: 100%;
+  min-height: 74px;
+  max-height: 150px;
+  resize: vertical;
+  border: 1px solid rgba(226, 190, 103, 0.24);
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: rgba(5, 8, 18, 0.58);
+  color: var(--text);
+  line-height: 1.7;
+}
+
+.consultation-input-row textarea:disabled {
+  opacity: 0.62;
+}
+
+.consultation-input-row .button {
+  min-width: 160px;
+  min-height: 52px;
+}
+
+.consultation-view :focus-visible {
+  outline: 2px solid rgba(125, 199, 197, 0.8);
+  outline-offset: 3px;
+}
+
+@keyframes consultation-shimmer {
+  from {
+    transform: translateX(-120%);
+  }
+  to {
+    transform: translateX(320%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .consultation-scroll {
+    scroll-behavior: auto;
+  }
+
+  .consultation-shimmer::before {
+    animation: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .consultation-page-shell {
+    width: 100%;
+    padding: 12px 10px 0;
+  }
+
+  .consultation-page-body {
+    width: 100%;
+  }
+
+  .consultation-view {
+    max-height: calc(100dvh - 92px);
+    border-radius: 8px;
+  }
+
+  .consultation-view-header {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .consultation-view-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .consultation-plan-chip,
+  .consultation-reader-chip {
+    min-width: 0;
+  }
+
+  .consultation-reader-chip strong,
+  .consultation-plan-chip strong {
+    font-size: 0.84rem;
+  }
+
+  .consultation-line-banner,
+  .consultation-notice,
+  .consultation-limit-banner,
+  .consultation-reader-sheet {
+    margin-right: 14px;
+    margin-left: 14px;
+  }
+
+  .consultation-line-banner,
+  .consultation-limit-banner {
+    grid-template-columns: 1fr;
+  }
+
+  .consultation-limit-banner .button {
+    grid-row: auto;
+    width: 100%;
+  }
+
+  .consultation-scroll {
+    padding: 16px 14px;
+  }
+
+  .consultation-message {
+    max-width: 94%;
+  }
+
+  .consultation-compose-area {
+    padding: 12px 14px 14px;
+  }
+
+  .consultation-input-row {
+    grid-template-columns: 1fr;
+  }
+
+  .consultation-input-row .button {
+    width: 100%;
+  }
+}

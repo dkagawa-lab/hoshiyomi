@@ -3,9 +3,11 @@ import { GlobalNav } from "@/components/GlobalNav";
 
 export default function ConsultationPage() {
   return (
-    <main className="shell">
+    <main className="shell consultation-page-shell">
       <GlobalNav active="consultation" />
-      <BirthChartApp consultationOnly />
+      <div className="consultation-page-body">
+        <BirthChartApp consultationOnly />
+      </div>
     </main>
   );
 }
