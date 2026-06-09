@@ -42,6 +42,7 @@ export function RegisterActions({ mode = "register" }: RegisterActionsProps) {
   const isLoginMode = mode === "login";
   const authFlow = isLoginMode ? "login" : "signup";
   const canStartAuth = isLoginMode || legalConsent;
+  const lineLiffId = process.env.NEXT_PUBLIC_LINE_LIFF_ID?.trim() || "";
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -85,8 +86,8 @@ export function RegisterActions({ mode = "register" }: RegisterActionsProps) {
     const params = new URLSearchParams({ returnTo, mode: authFlow });
     if (currentClientUserId) params.set("clientUserId", currentClientUserId);
     if (referralCode.trim()) params.set("ref", referralCode.trim());
-    return `/api/auth/line/login?${params.toString()}`;
-  }, [authFlow, currentClientUserId, isLoginMode, referralCode, returnTo]);
+    return lineLiffId ? `https://liff.line.me/${encodeURIComponent(lineLiffId)}?${params.toString()}` : `/api/auth/line/login?${params.toString()}`;
+  }, [authFlow, currentClientUserId, lineLiffId, referralCode, returnTo]);
 
   async function handleEmailSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -269,7 +270,7 @@ export function RegisterActions({ mode = "register" }: RegisterActionsProps) {
             rememberPendingReferralCode(referralCode);
           }}
         >
-          {isLoginMode ? "LINEでログイン" : "LINEで登録・友だち追加"}
+          {lineLiffId ? (isLoginMode ? "LINEアプリでログイン" : "LINEアプリで登録・友だち追加") : isLoginMode ? "LINEでログイン" : "LINEで登録・友だち追加"}
         </a>
       </div>
 
