@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { GlobalNav } from "@/components/GlobalNav";
 import { addOnPack, servicePlans } from "@/lib/plans";
 
 export default function CommercialDisclosurePage() {
@@ -8,7 +7,6 @@ export default function CommercialDisclosurePage() {
 
   return (
     <main className="shell detail-shell">
-      <GlobalNav active="support" mark="☉" />
 
       <section className="detail-hero">
         <div className="eyebrow">Commercial Disclosure</div>

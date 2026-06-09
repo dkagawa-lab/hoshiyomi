@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { GlobalNav } from "@/components/GlobalNav";
 
 const mechanismItems = [
   {
@@ -23,7 +22,6 @@ const mechanismItems = [
 export default function MechanismPage() {
   return (
     <main className="shell detail-shell">
-      <GlobalNav mark="☉" />
 
       <section className="detail-hero">
         <div className="eyebrow">Mechanism</div>

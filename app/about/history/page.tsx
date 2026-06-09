@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { GlobalNav } from "@/components/GlobalNav";
 
 const historyItems = [
   {
@@ -23,7 +22,6 @@ const historyItems = [
 export default function HistoryPage() {
   return (
     <main className="shell detail-shell">
-      <GlobalNav />
 
       <section className="detail-hero">
         <div className="eyebrow">History</div>

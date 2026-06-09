@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { BackButton } from "@/components/BackButton";
 import { GlossaryGuide } from "@/components/GlossaryGuide";
-import { GlobalNav } from "@/components/GlobalNav";
 
 const glossaryGroups = [
   {
@@ -501,7 +500,6 @@ const enrichedHoroscopeGuideSections = horoscopeGuideSections.map((section) => (
 export default function GlossaryPage() {
   return (
     <main className="shell detail-shell">
-      <GlobalNav active="glossary" mark="✦" />
 
       <section className="detail-hero">
         <div className="eyebrow">Complete Guide / Glossary</div>

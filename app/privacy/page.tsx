@@ -1,10 +1,8 @@
 import Link from "next/link";
-import { GlobalNav } from "@/components/GlobalNav";
 
 export default function PrivacyPage() {
   return (
     <main className="shell detail-shell">
-      <GlobalNav active="support" mark="☽" />
 
       <section className="detail-hero">
         <div className="eyebrow">Privacy Policy</div>

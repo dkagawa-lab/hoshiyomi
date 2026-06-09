@@ -1,11 +1,9 @@
-import { GlobalNav } from "@/components/GlobalNav";
 import { PricingPanel } from "@/components/PricingPanel";
 import Link from "next/link";
 
 export default function PricingPage() {
   return (
     <main className="shell pricing-page">
-      <GlobalNav active="consultation" />
       <section className="panel pricing-hero">
         <div className="eyebrow">Reading Plans</div>
         <h1>相談を重ねるほど、あなたの運命に寄り添える</h1>

@@ -1,11 +1,9 @@
 import { Suspense } from "react";
-import { GlobalNav } from "@/components/GlobalNav";
 import { LineAuthCompleteClient } from "@/components/LineAuthCompleteClient";
 
 export default function LineAuthCompletePage() {
   return (
     <main className="shell">
-      <GlobalNav active="account" mark="✦" />
       <section className="panel form-panel auth-entry-page">
         <div className="eyebrow">LINE Membership</div>
         <h1>LINE認証を完了しています</h1>

@@ -1,11 +1,9 @@
 import Link from "next/link";
 import { ContactForm } from "@/components/ContactForm";
-import { GlobalNav } from "@/components/GlobalNav";
 
 export default function ContactPage() {
   return (
     <main className="shell detail-shell">
-      <GlobalNav active="support" mark="✦" />
 
       <section className="detail-hero contact-hero">
         <div className="eyebrow">Contact</div>

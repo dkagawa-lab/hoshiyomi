@@ -1,10 +1,8 @@
 import Link from "next/link";
-import { GlobalNav } from "@/components/GlobalNav";
 
 export default function WhyItResonatesPage() {
   return (
     <main className="shell detail-shell">
-      <GlobalNav mark="✦" />
 
       <section className="detail-hero">
         <div className="eyebrow">Why It Resonates</div>

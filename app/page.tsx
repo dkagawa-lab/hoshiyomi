@@ -1,13 +1,11 @@
 import Link from "next/link";
 import { BirthChartApp } from "@/components/BirthChartApp";
-import { GlobalNav } from "@/components/GlobalNav";
 import { PublicReviewList } from "@/components/PublicReviewList";
 import { reviewFixtures } from "@/lib/reviewFixtures";
 
 export default function Home() {
   return (
     <main className="shell">
-      <GlobalNav mark="☉" />
 
       <section className="hero">
         <div className="copy">

@@ -1,11 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { BrandLogo } from "@/components/BrandLogo";
 
+type GlobalNavActive = "chart" | "consultation" | "glossary" | "account" | "support";
+
 type GlobalNavProps = {
-  active?: "chart" | "consultation" | "glossary" | "account" | "support";
+  active?: GlobalNavActive;
   brandLabel?: string;
   mark?: string;
 };
@@ -21,7 +24,9 @@ const navItems = [
 ] as const;
 
 export function GlobalNav({ active, brandLabel = "HOSHIYOMI" }: GlobalNavProps) {
+  const pathname = usePathname();
   const [visible, setVisible] = useState(false);
+  const resolvedActive = active ?? resolveActiveNav(pathname);
 
   useEffect(() => {
     let frame = 0;
@@ -37,7 +42,8 @@ export function GlobalNav({ active, brandLabel = "HOSHIYOMI" }: GlobalNavProps) 
         scrollTargets.some((element) => element.scrollHeight > element.clientHeight + 24);
       const shouldExposeConsultationMenu =
         Boolean(document.querySelector(".consultation-view.is-reading")) && !hasScrollableContent;
-      setVisible(pageScroll > 24 || innerScroll || shouldExposeConsultationMenu);
+      const shouldExposeStaticMenu = !hasScrollableContent;
+      setVisible(pageScroll > 24 || innerScroll || shouldExposeConsultationMenu || shouldExposeStaticMenu);
     };
 
     const scheduleRead = () => {
@@ -58,7 +64,7 @@ export function GlobalNav({ active, brandLabel = "HOSHIYOMI" }: GlobalNavProps) 
       window.removeEventListener("scroll", scheduleRead);
       document.removeEventListener("scroll", scheduleRead, { capture: true });
     };
-  }, []);
+  }, [pathname]);
 
   return (
     <nav className={`topbar global-topbar ${visible ? "is-visible" : "is-hidden"}`}>
@@ -78,8 +84,8 @@ export function GlobalNav({ active, brandLabel = "HOSHIYOMI" }: GlobalNavProps) 
           <div className="global-nav-links" aria-label="主要ナビゲーション">
             {navItems.map((item) => (
               <Link
-                aria-current={active === item.key ? "page" : undefined}
-                className={`global-nav-link ${active === item.key ? "active" : ""}`}
+                aria-current={resolvedActive === item.key ? "page" : undefined}
+                className={`global-nav-link ${resolvedActive === item.key ? "active" : ""}`}
                 href={item.href}
                 key={item.key}
               >
@@ -91,4 +97,23 @@ export function GlobalNav({ active, brandLabel = "HOSHIYOMI" }: GlobalNavProps) 
       </div>
     </nav>
   );
+}
+
+function resolveActiveNav(pathname: string | null): GlobalNavActive | undefined {
+  if (!pathname) return undefined;
+  if (pathname === "/m" || pathname === "/dashboard" || pathname.startsWith("/reading")) return "chart";
+  if (pathname === "/consultation" || pathname.startsWith("/pricing")) return "consultation";
+  if (pathname.startsWith("/glossary") || pathname.startsWith("/about")) return "glossary";
+  if (
+    pathname.startsWith("/account") ||
+    pathname.startsWith("/auth") ||
+    pathname.startsWith("/forgot-password") ||
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/register") ||
+    pathname.startsWith("/registration-complete")
+  ) {
+    return "account";
+  }
+  if (pathname.startsWith("/contact") || pathname.startsWith("/legal") || pathname.startsWith("/privacy") || pathname.startsWith("/terms")) return "support";
+  return undefined;
 }

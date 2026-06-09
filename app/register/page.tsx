@@ -1,11 +1,9 @@
 import Link from "next/link";
-import { GlobalNav } from "@/components/GlobalNav";
 import { RegisterActions } from "@/components/RegisterActions";
 
 export default function RegisterPage() {
   return (
     <main className="shell">
-      <GlobalNav active="account" mark="✦" />
       <section className="panel form-panel auth-entry-page">
         <div className="eyebrow">Membership</div>
         <h1>新規登録</h1>

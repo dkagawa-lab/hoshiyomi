@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { GlobalNav } from "@/components/GlobalNav";
 import { addOnPack, servicePlans } from "@/lib/plans";
 
 const paidPlans = servicePlans.filter((plan) => plan.key !== "free");
@@ -7,7 +6,6 @@ const paidPlans = servicePlans.filter((plan) => plan.key !== "free");
 export default function PaymentTermsPage() {
   return (
     <main className="shell detail-shell">
-      <GlobalNav active="support" mark="☉" />
 
       <section className="detail-hero">
         <div className="eyebrow">Payment Terms</div>
