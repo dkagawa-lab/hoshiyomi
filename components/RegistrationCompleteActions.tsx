@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { resolveReturnTo } from "@/lib/authRegistrationClient";
+import { readPendingCheckoutIntent } from "@/lib/checkoutIntent";
 import { ensureClientUserId } from "@/lib/clientIdentity";
 import { getLineFriendUrl } from "@/lib/lineLinks";
 
@@ -22,11 +23,12 @@ const loginMethodLabels: Record<string, string> = {
 export function RegistrationCompleteActions() {
   const searchParams = useSearchParams();
   const [lineConnectHref, setLineConnectHref] = useState("");
+  const [hasPendingCheckout, setHasPendingCheckout] = useState(false);
   const returnTo = resolveReturnTo(searchParams.get("returnTo"));
   const method = searchParams.get("method") || "mail";
   const flow = searchParams.get("flow") === "login" ? "login" : "signup";
   const methodLabel = flow === "login" ? loginMethodLabels[method] || "ログイン" : signupMethodLabels[method] || "会員登録";
-  const primary = resolvePrimaryAction(returnTo);
+  const primary = resolvePrimaryAction(returnTo, hasPendingCheckout);
   const lineFriendUrl = getLineFriendUrl();
   const isLineMethod = method === "line";
   const showConsultationAction = returnTo !== "/consultation";
@@ -38,6 +40,7 @@ export function RegistrationCompleteActions() {
       returnTo: "/account"
     });
     setLineConnectHref(`/api/auth/line/login?${params.toString()}`);
+    setHasPendingCheckout(Boolean(readPendingCheckoutIntent()));
   }, []);
 
   return (
@@ -90,10 +93,10 @@ export function RegistrationCompleteActions() {
   );
 }
 
-function resolvePrimaryAction(returnTo: string) {
+function resolvePrimaryAction(returnTo: string, hasPendingCheckout: boolean) {
   if (returnTo === "/reading") return { href: "/reading", label: "続きを見る" };
   if (returnTo === "/consultation") return { href: "/consultation", label: "相談へ戻る" };
   if (returnTo === "/dashboard") return { href: "/dashboard", label: "星の確認へ" };
-  if (returnTo === "/pricing") return { href: "/pricing", label: "プランを見る" };
+  if (returnTo === "/pricing") return { href: "/pricing", label: hasPendingCheckout ? "決済へ進む" : "プランを見る" };
   return { href: "/account", label: "登録情報へ進む" };
 }

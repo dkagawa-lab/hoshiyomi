@@ -8,6 +8,7 @@ import { ConsultationView } from "@/components/ConsultationView";
 import { notifyBirthUpdated } from "@/components/MobileStickyCta";
 import { PricingPanel } from "@/components/PricingPanel";
 import { buildAuthHeaders } from "@/lib/authRegistrationClient";
+import { checkoutLoginHref, writePendingCheckoutIntent } from "@/lib/checkoutIntent";
 import { ensureClientUserId } from "@/lib/clientIdentity";
 import { getLineFriendUrl } from "@/lib/lineLinks";
 import { findPrefecture, japanLocations, Municipality } from "@/lib/japanLocations";
@@ -565,6 +566,11 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
     const activeClientUserId = clientUserId || ensureClientUserId();
     if (!clientUserId) setClientUserId(activeClientUserId);
     const { data, res } = await postCheckout({ plan: nextPlan, clientUserId: activeClientUserId });
+    if (res.status === 401) {
+      writePendingCheckoutIntent({ kind: "plan", plan: nextPlan });
+      window.location.assign(checkoutLoginHref());
+      return;
+    }
     if (!res.ok || data.error) throw new Error(data.error || "決済画面を開けませんでした。");
     if (data.url) {
       window.location.href = data.url;
@@ -584,6 +590,11 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
     const activeClientUserId = clientUserId || ensureClientUserId();
     if (!clientUserId) setClientUserId(activeClientUserId);
     const { data, res } = await postCheckout({ product: addOnPack.key, clientUserId: activeClientUserId });
+    if (res.status === 401) {
+      writePendingCheckoutIntent({ kind: "addOn", product: addOnPack.key });
+      window.location.assign(checkoutLoginHref());
+      return;
+    }
     if (!res.ok || data.error) throw new Error(data.error || "追加相談枠の決済画面を開けませんでした。");
     if (data.url) {
       window.location.href = data.url;

@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { buildAuthHeaders } from "@/lib/authRegistrationClient";
+import { checkoutLoginHref, clearPendingCheckoutIntent, readPendingCheckoutIntent, writePendingCheckoutIntent } from "@/lib/checkoutIntent";
 import { ensureClientUserId } from "@/lib/clientIdentity";
 import { addOnPack, PlanKey, planStatusLabel, readAddOnCredits, readPlanFromStorage, resolvePlan, servicePlans, writeAddOnCredits } from "@/lib/plans";
 
@@ -19,6 +20,7 @@ export function PricingPanel({ addOnCredits, currentPlanKey, isMember, onBuyAddO
   const [activeAddOnCredits, setActiveAddOnCredits] = useState(addOnCredits ?? 0);
   const [checkoutLoading, setCheckoutLoading] = useState<string>("");
   const [checkoutMessage, setCheckoutMessage] = useState("");
+  const pendingCheckoutStarted = useRef(false);
 
   useEffect(() => {
     if (currentPlanKey) {
@@ -32,6 +34,21 @@ export function PricingPanel({ addOnCredits, currentPlanKey, isMember, onBuyAddO
     if (typeof isMember === "boolean") setActiveMember(isMember);
     setActiveAddOnCredits(addOnCredits ?? readAddOnCredits());
   }, [addOnCredits, currentPlanKey, isMember]);
+
+  useEffect(() => {
+    if (onCheckout || pendingCheckoutStarted.current) return;
+    const pending = readPendingCheckoutIntent();
+    if (!pending) return;
+    pendingCheckoutStarted.current = true;
+    clearPendingCheckoutIntent();
+    window.setTimeout(() => {
+      if (pending.kind === "plan") {
+        void checkout(pending.plan);
+      } else {
+        void buyAddOnPack();
+      }
+    }, 250);
+  }, [onCheckout]);
 
   async function checkout(nextPlan: Exclude<PlanKey, "free">) {
     setCheckoutLoading(nextPlan);
@@ -49,6 +66,10 @@ export function PricingPanel({ addOnCredits, currentPlanKey, isMember, onBuyAddO
     const clientUserId = ensureClientUserId();
     try {
       const { data, res } = await postCheckout({ plan: nextPlan, clientUserId });
+      if (res.status === 401) {
+        redirectToLoginForCheckout({ kind: "plan", plan: nextPlan });
+        return;
+      }
       if (!res.ok || data.error) throw new Error(data.error || "決済画面を開けませんでした。");
       if (data.url) {
         window.location.href = data.url;
@@ -83,6 +104,10 @@ export function PricingPanel({ addOnCredits, currentPlanKey, isMember, onBuyAddO
     const clientUserId = ensureClientUserId();
     try {
       const { data, res } = await postCheckout({ product: addOnPack.key, clientUserId });
+      if (res.status === 401) {
+        redirectToLoginForCheckout({ kind: "addOn", product: addOnPack.key });
+        return;
+      }
       if (!res.ok || data.error) throw new Error(data.error || "追加相談枠の決済画面を開けませんでした。");
       if (data.url) {
         window.location.href = data.url;
@@ -142,6 +167,12 @@ export function PricingPanel({ addOnCredits, currentPlanKey, isMember, onBuyAddO
     } finally {
       window.clearTimeout(timer);
     }
+  }
+
+  function redirectToLoginForCheckout(intent: { kind: "plan"; plan: Exclude<PlanKey, "free"> } | { kind: "addOn"; product: typeof addOnPack.key }) {
+    writePendingCheckoutIntent(intent);
+    setCheckoutMessage("決済に進むにはログインが必要です。ログイン後に、同じプランの決済画面を開きます。");
+    window.location.assign(checkoutLoginHref());
   }
 
   return (
