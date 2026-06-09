@@ -22,7 +22,7 @@ html {
 body {
   position: relative;
   margin: 0;
-  min-height: 100vh;
+  min-height: 100dvh;
   overflow-x: hidden;
   background:
     linear-gradient(145deg, rgba(5, 8, 18, 0.98), rgba(9, 17, 31, 0.94) 50%, rgba(12, 21, 37, 0.98)),
@@ -74,7 +74,7 @@ a {
 .shell {
   width: min(1160px, calc(100% - 32px));
   margin: 0 auto;
-  padding: calc(env(safe-area-inset-top) + 84px) 0 56px;
+  padding: calc(env(safe-area-inset-top) + 62px) 0 56px;
 }
 
 .topbar {
@@ -92,14 +92,14 @@ a {
   gap: 10px;
 }
 
-.global-topbar {
+.topbar.global-topbar {
   display: block;
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   z-index: 50;
-  padding: max(10px, env(safe-area-inset-top)) 0 10px;
+  padding: max(6px, env(safe-area-inset-top)) 0 6px;
   background: rgba(8, 13, 25, 0.9);
   backdrop-filter: blur(14px);
   border-bottom: 1px solid rgba(226, 190, 103, 0.16);
@@ -133,8 +133,8 @@ a {
   gap: 10px;
   border: 1px solid rgba(226, 190, 103, 0.18);
   border-radius: 999px;
-  min-height: 42px;
-  padding: 0 14px;
+  min-height: 34px;
+  padding: 0 12px;
   background: rgba(5, 8, 18, 0.42);
   color: var(--text);
   cursor: pointer;
@@ -3851,7 +3851,7 @@ textarea:focus {
 
   .shell {
     width: min(100% - 24px, 720px);
-    padding: calc(env(safe-area-inset-top) + 80px) 0 44px;
+    padding: calc(env(safe-area-inset-top) + 58px) 0 44px;
   }
 
   .topbar {
@@ -4070,7 +4070,7 @@ textarea:focus {
 
   .shell {
     width: min(100% - 18px, 520px);
-    padding-top: calc(env(safe-area-inset-top) + 80px);
+    padding-top: calc(env(safe-area-inset-top) + 58px);
   }
 
   .brand {
@@ -4084,8 +4084,8 @@ textarea:focus {
   }
 
   .brand-logo-mark {
-    width: 38px;
-    height: 38px;
+    width: 30px;
+    height: 30px;
   }
 
   .brand-wordmark {

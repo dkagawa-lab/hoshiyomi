@@ -498,8 +498,10 @@
 .consultation-follow-ups div,
 .consultation-starters {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  overflow-x: auto;
+  max-height: 92px;
+  overflow-y: auto;
   padding-bottom: 2px;
 }
 
@@ -585,8 +587,8 @@
 
 .consultation-input-row textarea {
   width: 100%;
-  min-height: 74px;
-  max-height: 150px;
+  min-height: 112px;
+  max-height: 180px;
   resize: vertical;
   border: 1px solid rgba(226, 190, 103, 0.24);
   border-radius: 8px;
@@ -632,7 +634,7 @@
 @media (max-width: 760px) {
   .consultation-page-shell {
     width: 100%;
-    padding: calc(env(safe-area-inset-top) + 76px) 10px 0;
+    padding: calc(env(safe-area-inset-top) + 56px) 10px 0;
   }
 
   .consultation-page-body {
@@ -640,7 +642,7 @@
   }
 
   .consultation-view {
-    max-height: calc(100dvh - env(safe-area-inset-top) - 84px);
+    max-height: calc(100dvh - env(safe-area-inset-top) - 64px);
     border-radius: 8px;
   }
 

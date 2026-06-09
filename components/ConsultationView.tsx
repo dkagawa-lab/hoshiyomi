@@ -362,9 +362,8 @@ function NoChartState({ startReadingHref }: { startReadingHref: string }) {
 function EmptyConsultationState() {
   return (
     <div className="consultation-empty-state">
-      <span>Ask The Stars</span>
       <h3>いま知りたいことを占いましょう</h3>
-      <p>出生図とこれまでの鑑定を引き継ぎながら、恋愛、仕事、相性、将来の迷いまで同じ星の文脈で見ていきます。候補から選んでも、そのまま自由に書いても大丈夫です。</p>
+      <p>下の候補から選んでも、そのまま自由に書いても大丈夫です。</p>
     </div>
   );
 }
