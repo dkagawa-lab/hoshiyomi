@@ -1205,9 +1205,9 @@ a.cv-quota-plan:hover {
    ========================================================================= */
 @media (min-width: 720px) {
   .cv-thread { padding: 28px 28px 10px; }
-  .cv-msg-user { max-width: 60%; }
-  .cv-msg-reader { width: min(100%, 760px); align-self: flex-start; }
-  .cv-thinking { width: min(100%, 760px); align-self: flex-start; }
+  .cv-msg-user { max-width: min(72%, 680px); }
+  .cv-msg-reader { width: 100%; align-self: stretch; }
+  .cv-thinking { width: 100%; align-self: stretch; }
   .cv-reader-options { grid-template-columns: 1fr 1fr; }
   .cv-reader-letter { font-size: 1.04rem; padding: 22px 26px 24px; }
   .cv-quota { padding: 16px 28px; }
