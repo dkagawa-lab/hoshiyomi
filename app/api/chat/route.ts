@@ -299,7 +299,7 @@ function buildNonBillableChatAnswer(billing: QuestionBilling, usage: DisplayUsag
 
   if (kind === "usage") {
     return usage
-      ? `現在の利用状況です。\n\nプラン: ${formatUsagePlanLabel(usage)}\n${formatUsageRemaining(usage)}${usage.freeBonusRemaining > 0 && usage.plan === "free" ? `\n登録特典: 残り${usage.freeBonusRemaining}回` : ""}${usage.addOnCredits > 0 ? `\n追加分: 残り${usage.addOnCredits}回` : ""}\n\n残り回数や料金、登録方法の確認では相談回数は減りません。占い相談として星を読む時だけ、相談枠を使います。`
+      ? `現在の利用状況です。\n\nプラン: ${formatUsagePlanLabel(usage)}\n${formatUsageRemaining(usage)}${usage.freeBonusRemaining > 0 && usage.plan === "free" ? `\n登録特典: 残り${usage.freeBonusRemaining}回` : ""}${usage.addOnCredits > 0 ? `\n追加分: 残り${usage.addOnCredits}回` : ""}\n\n残り回数や料金、登録方法の確認では相談回数は減りません。星を読んで鑑定する内容だけ、相談枠を使います。`
       : `利用状況を確認するには、登録情報との連携が必要です。登録情報ページから確認できます。\n/account${noCount}`;
   }
   if (kind === "pricing") {
@@ -309,7 +309,7 @@ function buildNonBillableChatAnswer(billing: QuestionBilling, usage: DisplayUsag
     return `占い師タイプは、通常・マイルド・はっきり厳しめ・寄り添い系・辛辣から選べます。\n\n無料プランでは通常、通常プランではマイルドとはっきり厳しめ、プライベートプランでは寄り添い系と辛辣を含む全タイプが使えます。${usageText}${noCount}`;
   }
   if (kind === "line") {
-    return `LINEで相談するには、登録情報とLINEをつなぎます。LINE登録の流れで公式アカウントの友だち追加も行えます。\n\n登録情報ページから「LINEで登録・友だち追加」を選んでください。\n/account${usageText}${noCount}`;
+    return `LINEで相談するには、登録情報とLINEをつなぎます。LINE登録を進めると、公式アカウントの友だち追加までできます。\n\n登録情報ページから「LINEで登録・友だち追加」を選んでください。\n/account${usageText}${noCount}`;
   }
   if (kind === "account") {
     return `登録情報、ログイン状態、出生情報、鑑定履歴は登録情報ページで確認できます。\n/account${usageText}${noCount}`;
@@ -318,19 +318,19 @@ function buildNonBillableChatAnswer(billing: QuestionBilling, usage: DisplayUsag
     return `利用規約、プライバシーポリシー、特定商取引法に基づく表記は各ページで確認できます。\n\n/terms\n/privacy\n/legal/commercial-disclosure${noCount}`;
   }
   if (kind === "menu_consult") {
-    return `相談したいことを、そのまま一言で送ってください。\n\n例:\n「今の迷いをどう見ればいい？」\n「この選択をして大丈夫？」\n「最近同じことで悩んでいる」\n\n内容が具体的なほど、あなたの星と今の流れに合わせて読みやすくなります。${usageText}${noCount}`;
+    return `相談したいことを、そのまま一言で送ってください。\n\n例:\n「今の迷いをどう見ればいい？」\n「この選択をして大丈夫？」\n「最近同じことで悩んでいる」\n\n内容が具体的なほど、あなたの星と今の流れに合わせて深く読めます。${usageText}${noCount}`;
   }
   if (kind === "menu_love") {
     return `恋愛について見ていきます。\n\nまず、どの相手・状況に近いですか？\n\n「好きな人がいる」\n「付き合っている人がいる」\n「復縁したい」\n「出会いを見たい」\n「相手の気持ちを知りたい」\n\n相手との関係や、今いちばん知りたいことを添えて送ってください。${usageText}${noCount}`;
   }
   if (kind === "menu_work") {
-    return `仕事・人生の流れを見ていきます。\n\n今知りたいことは、どれに近いですか？\n\n「転職するか迷っている」\n「今の仕事を続けるべき？」\n「向いている働き方を知りたい」\n「人間関係を見たい」\n「人生全体の転機を見たい」\n\n近いものをそのまま送るか、今の状況を一言添えてください。${usageText}${noCount}`;
+    return `仕事や人生の流れを見ていきます。\n\n今知りたいことは、どれに近いですか？\n\n「転職するか迷っている」\n「今の仕事を続けるべき？」\n「向いている働き方を知りたい」\n「人間関係を見たい」\n「人生全体の転機を見たい」\n\n近いものをそのまま送るか、今の状況を一言添えてください。${usageText}${noCount}`;
   }
   if (kind === "small_talk") {
     return `ありがとうございます。占いたいことがあれば、そのまま短く送ってください。恋愛、仕事、今日の運勢、今月の流れなど、気になるテーマから読めます。${usageText}${noCount}`;
   }
   if (kind === "off_topic") {
-    return `ここでは、星読み・登録情報・使い方に関する内容を扱っています。\n\n医療、法律、投資など専門判断が必要なことは専門家へ相談してください。占いたいテーマがあれば、恋愛・仕事・人生の流れのように聞いてください。${usageText}${noCount}`;
+    return `ここでは、星読み・登録情報・使い方に関する内容を扱っています。\n\n医療、法律、投資など専門判断が必要なことは専門家へ相談してください。占いたいテーマがあれば、恋愛や仕事、人生の流れのように聞いてください。${usageText}${noCount}`;
   }
   return `使い方や不具合については、登録情報ページや問い合わせページから確認できます。\n/account\n/contact${usageText}${noCount}`;
 }
@@ -370,7 +370,7 @@ function formatUsageRemaining(usage: DisplayUsageSnapshot) {
 
 function buildNonBillableLimitMessage(rateLimit: NonBillableRateLimitResult) {
   const wait = formatRetryAfter(rateLimit.retryAfterSeconds);
-  return `確認系のメッセージが短時間に続いているため、一時的に受付を止めています。占い相談の回数は消費していません。${wait ? `${wait}ほど時間をおいて、` : "少し時間をおいて、"}もう一度送ってください。`;
+  return `確認メッセージが短時間に続いているため、一時的に受付を止めています。占い相談の回数は消費していません。${wait ? `${wait}ほど時間をおいて、` : "少し時間をおいて、"}もう一度送ってください。`;
 }
 
 function buildWebNonBillableIdentifier(req: Request, userKey?: string | null) {
@@ -383,7 +383,7 @@ function buildWebNonBillableIdentifier(req: Request, userKey?: string | null) {
 
 function buildRateLimitMessage(retryAfterSeconds?: number) {
   const wait = formatRetryAfter(retryAfterSeconds);
-  return `今、鑑定への相談が集中しています。相談回数は消費していません。${wait ? `${wait}ほど時間をおいて、` : "少し時間をおいて、"}もう一度送ってください。`;
+  return `今、鑑定の依頼が集中しています。相談回数は消費していません。${wait ? `${wait}ほど時間をおいて、` : "少し時間をおいて、"}もう一度送ってください。`;
 }
 
 function formatRetryAfter(seconds?: number) {

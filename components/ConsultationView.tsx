@@ -473,7 +473,7 @@ export function ConsultationView(props: ConsultationViewProps) {
           <h2>
             まず、あなたの星を読みます
           </h2>
-          <p>相談を始めるには、生年月日と出生地からホロスコープを作成します。星の配置を読み取ってから、専任の占い師として未来を見ていきます。</p>
+          <p>相談を始めるには、生年月日と出生地からホロスコープを作成します。星の配置を読み取ったうえで、あなたの相談に合わせてこれからの流れを見ていきます。</p>
           {props.onStartReading ? (
             <button className="cv-btn is-primary" type="button" onClick={props.onStartReading}>
               出生情報を入力する
@@ -509,7 +509,7 @@ export function ConsultationView(props: ConsultationViewProps) {
         {showHint ? (
           <p className="cv-thread-hint">
             <span className="cv-star" aria-hidden="true">✦</span>
-            下のテーマから選んでも、そのまま自由に書いても大丈夫です。送信すると、ここに鑑定が届きます。
+            下のテーマから選んでも、そのまま自由に書いても大丈夫です。送信すると、ここに鑑定結果が届きます。
           </p>
         ) : null}
 
@@ -541,9 +541,9 @@ export function ConsultationView(props: ConsultationViewProps) {
           <div className="cv-limit">
             <div className="cv-limit-head">
               <span>Continue Reading</span>
-              <strong>今日の相談枠を、いまぶんは読み切りました</strong>
+              <strong>今日の相談枠を使い切りました</strong>
             </div>
-            <p>残り回数、料金、登録、LINE連携などの確認は、このまま送っても相談回数を消費しません。占い相談を続けたいときだけ、追加枠か上位プランを選べます。</p>
+            <p>残り回数、料金、登録、LINE連携などの確認は、このまま送っても相談回数を消費しません。鑑定を続けたい場合は、追加枠または上位プランを選べます。</p>
             <div className="cv-limit-actions">
               <button className="cv-btn is-primary cv-btn-block" type="button" onClick={props.onOpenPaywall}>
                 追加枠・プランを見る
@@ -584,7 +584,7 @@ export function ConsultationView(props: ConsultationViewProps) {
 
         {!question ? (
           <p className="cv-input-help">
-            候補にないことでも大丈夫です。今気になっている相手、仕事、迷い、今日の流れなど、そのまま書いてください。
+            候補にないことでも大丈夫です。今気になっている相手、仕事のこと、迷っていること、今日の流れなど、そのまま書いてください。
           </p>
         ) : null}
 

@@ -234,26 +234,26 @@ function buildNonBillableLineReply(billing: QuestionBilling, usage: UsageSnapsho
     return `利用規約、プライバシーポリシー、特定商取引法に基づく表記はこちらから確認できます。\n${appUrl("/terms")}\n${appUrl("/privacy")}\n${appUrl("/legal/commercial-disclosure")}${noCount}`;
   }
   if (kind === "menu_consult") {
-    return `相談したいことを、そのまま一言で送ってください。\n\n例:\n「今の迷いをどう見ればいい？」\n「この選択をして大丈夫？」\n「最近同じことで悩んでいる」\n\n内容が具体的なほど、あなたの星と今の流れに合わせて読みやすくなります。${usageText}${noCount}`;
+    return `相談したいことを、そのまま一言で送ってください。\n\n例:\n「今の迷いをどう見ればいい？」\n「この選択をして大丈夫？」\n「最近同じことで悩んでいる」\n\n内容が具体的なほど、あなたの星と今の流れに合わせて深く読めます。${usageText}${noCount}`;
   }
   if (kind === "menu_love") {
     return `恋愛について見ていきます。\n\nまず、どの相手・状況に近いですか？\n\n「好きな人がいる」\n「付き合っている人がいる」\n「復縁したい」\n「出会いを見たい」\n「相手の気持ちを知りたい」\n\n相手との関係や、今いちばん知りたいことを添えて送ってください。${usageText}${noCount}`;
   }
   if (kind === "menu_work") {
-    return `仕事・人生の流れを見ていきます。\n\n今知りたいことは、どれに近いですか？\n\n「転職するか迷っている」\n「今の仕事を続けるべき？」\n「向いている働き方を知りたい」\n「人間関係を見たい」\n「人生全体の転機を見たい」\n\n近いものをそのまま送るか、今の状況を一言添えてください。${usageText}${noCount}`;
+    return `仕事や人生の流れを見ていきます。\n\n今知りたいことは、どれに近いですか？\n\n「転職するか迷っている」\n「今の仕事を続けるべき？」\n「向いている働き方を知りたい」\n「人間関係を見たい」\n「人生全体の転機を見たい」\n\n近いものをそのまま送るか、今の状況を一言添えてください。${usageText}${noCount}`;
   }
   if (kind === "small_talk") {
     return `ありがとうございます。占いたいことがあれば、そのまま短く送ってください。\n\n例: 今日の運勢は？ / 復縁をどう見ればいい？ / 転職するなら何を重視すべき？${usageText}${noCount}`;
   }
   if (kind === "off_topic") {
-    return `ここでは、星読み・登録情報・使い方に関する内容を扱っています。\n\n医療、法律、投資など専門判断が必要なことは専門家へ相談してください。占いたいテーマがあれば、恋愛・仕事・人生の流れのように送ってください。${usageText}${noCount}`;
+    return `ここでは、星読み・登録情報・使い方に関する内容を扱っています。\n\n医療、法律、投資など専門判断が必要なことは専門家へ相談してください。占いたいテーマがあれば、恋愛や仕事、人生の流れのように送ってください。${usageText}${noCount}`;
   }
   return `使い方や不具合については、Webの登録情報ページや問い合わせページから確認できます。\n${appUrl("/account")}\n${appUrl("/contact")}${usageText}${noCount}`;
 }
 
 function buildNonBillableLineLimitReply(rateLimit: NonBillableRateLimitResult) {
   const wait = formatRetryAfter(rateLimit.retryAfterSeconds);
-  return `確認系のメッセージが短時間に続いているため、一時的に受付を止めています。\n\n占い相談の回数は消費していません。${wait ? `${wait}ほど時間をおいて、` : "少し時間をおいて、"}もう一度送ってください。`;
+  return `確認メッセージが短時間に続いているため、一時的に受付を止めています。\n\n占い相談の回数は消費していません。${wait ? `${wait}ほど時間をおいて、` : "少し時間をおいて、"}もう一度送ってください。`;
 }
 
 function buildLineStatusFooter(input: { persistence?: LinePersistenceResult; readerStyle: ReaderStyleKey; usage: UsageSnapshot; verbose?: boolean }) {
@@ -320,7 +320,7 @@ function buildLimitReply(user: StoredUser, quota: Awaited<ReturnType<typeof getQ
 function buildLineAiErrorReply(error: unknown) {
   if (isAnthropicRateLimitError(error)) {
     const retry = error.retryAfterSeconds ? `\n\n${formatRetryAfter(error.retryAfterSeconds)}ほど時間をおいて、もう一度送ってください。` : "";
-    return `今、鑑定への相談が集中しています。相談回数は消費していません。${retry}`;
+    return `今、鑑定の依頼が集中しています。相談回数は消費していません。${retry}`;
   }
   if (isAnthropicApiError(error) && error.status === 529) {
     return "今、鑑定が集中していて少しつながりにくくなっています。相談回数は消費していません。少し時間をおいて、もう一度送ってください。";
