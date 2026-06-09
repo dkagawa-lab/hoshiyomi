@@ -377,16 +377,16 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
   overflow-y: auto;
-  padding: 22px;
+  padding: 18px;
   scroll-behavior: smooth;
 }
 
 .consultation-empty-state {
-  width: min(520px, 100%);
+  width: min(680px, 100%);
   margin: auto;
-  padding: 28px;
+  padding: 22px;
   border: 1px solid rgba(226, 190, 103, 0.2);
   border-radius: 8px;
   background:
@@ -403,14 +403,37 @@
 }
 
 .consultation-empty-state h3 {
-  margin: 8px 0 10px;
-  font-size: 1.35rem;
+  margin: 6px 0 8px;
+  font-size: 1.24rem;
 }
 
 .consultation-empty-state p {
   margin: 0 auto 16px;
   color: var(--muted);
   line-height: 1.8;
+}
+
+.consultation-empty-starters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  text-align: left;
+}
+
+.consultation-empty-starters button {
+  min-height: 46px;
+  border: 1px solid rgba(226, 190, 103, 0.22);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: rgba(5, 8, 18, 0.42);
+  color: var(--text);
+  text-align: left;
+  line-height: 1.45;
+}
+
+.consultation-empty-starters button:hover {
+  border-color: rgba(226, 190, 103, 0.48);
+  background: rgba(226, 190, 103, 0.1);
 }
 
 .consultation-message {
@@ -498,11 +521,11 @@
 .consultation-follow-ups div,
 .consultation-starters {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 8px;
-  max-height: 92px;
-  overflow-y: auto;
+  overflow-x: auto;
   padding-bottom: 2px;
+  -webkit-overflow-scrolling: touch;
 }
 
 .consultation-answer-follow-ups button,
@@ -559,8 +582,8 @@
   bottom: 0;
   z-index: 5;
   display: grid;
-  gap: 10px;
-  padding: 14px 22px 18px;
+  gap: 8px;
+  padding: 10px 16px 12px;
   border-top: 1px solid rgba(226, 190, 103, 0.18);
   background:
     linear-gradient(180deg, rgba(9, 17, 31, 0.86), rgba(5, 8, 18, 0.98)),
@@ -575,20 +598,20 @@
 
 .consultation-form {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .consultation-input-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) 108px;
+  gap: 8px;
   align-items: end;
 }
 
 .consultation-input-row textarea {
   width: 100%;
-  min-height: 112px;
-  max-height: 180px;
+  min-height: 58px;
+  max-height: 130px;
   resize: vertical;
   border: 1px solid rgba(226, 190, 103, 0.24);
   border-radius: 8px;
@@ -603,8 +626,24 @@
 }
 
 .consultation-input-row .button {
-  min-width: 160px;
-  min-height: 52px;
+  min-width: 0;
+  min-height: 50px;
+}
+
+.consultation-starter-strip {
+  display: grid;
+  gap: 6px;
+}
+
+.consultation-starter-strip > span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.consultation-starter-strip .consultation-starters button {
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 0.86rem;
 }
 
 .consultation-view :focus-visible {
@@ -685,7 +724,7 @@
   }
 
   .consultation-scroll {
-    padding: 16px 14px;
+    padding: 14px 12px;
   }
 
   .consultation-message {
@@ -693,14 +732,27 @@
   }
 
   .consultation-compose-area {
-    padding: 12px 14px 14px;
+    padding: 10px 12px 12px;
   }
 
   .consultation-input-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) 84px;
   }
 
   .consultation-input-row .button {
     width: 100%;
+  }
+
+  .consultation-input-row textarea {
+    min-height: 54px;
+  }
+
+  .consultation-empty-state {
+    margin: 10px 0 auto;
+    padding: 16px;
+  }
+
+  .consultation-empty-starters {
+    grid-template-columns: 1fr;
   }
 }

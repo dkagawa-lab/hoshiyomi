@@ -104,6 +104,7 @@ export function ConsultationView({
 }: ConsultationViewProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const activeReader = useMemo(() => resolveReader(activeReaderStyleKey), [activeReaderStyleKey]);
+  const featuredStarters = useMemo(() => starterQuestions.slice(0, 6), [starterQuestions]);
   const quotaReached = hasChart && !usage.unlimited && usage.remaining <= 0;
   const showIntro = messages.length === 0;
   const trimmedQuestion = question.trim();
@@ -182,7 +183,7 @@ export function ConsultationView({
 
       <div className="consultation-scroll" ref={scrollRef}>
         {!hasChart ? <NoChartState startReadingHref={startReadingHref} /> : null}
-        {hasChart && !messages.length && !loading ? <EmptyConsultationState /> : null}
+        {hasChart && !messages.length && !loading ? <EmptyConsultationState onSelectStarter={onSelectStarter} starters={featuredStarters} /> : null}
 
         {messages.map((message, index) => (
           <ConsultationMessageBubble activeReaderStyleKey={activeReaderStyleKey} key={`${message.role}-${index}`} message={message} onFollowUp={onFollowUp} />
@@ -218,24 +219,10 @@ export function ConsultationView({
 
       {hasChart ? (
         <div className="consultation-compose-area">
-          <div className="consultation-starters" aria-label="相談テーマを選ぶ">
-            {starterQuestions.map((sample) => (
-              <button
-                aria-pressed={question === sample.text}
-                className={question === sample.text ? "active" : ""}
-                key={sample.text}
-                onClick={() => onSelectStarter(sample.text, sample.intent)}
-                type="button"
-              >
-                {sample.text}
-              </button>
-            ))}
-          </div>
-
           <form className="consultation-form" onSubmit={submit}>
             <div className="chat-form-heading">
-              <span>{question ? "この質問について相談しますか？" : "自由に相談を書く"}</span>
-              <small>{question ? "内容を確認してから開始できます" : "候補にない悩みも、そのまま送れます"}</small>
+              <span>{question ? "この内容で占います" : "何を占いますか？"}</span>
+              <small>{question ? "送る前に内容を確認できます" : "一言でも大丈夫です。候補から選んでも、自由に書いても使えます。"}</small>
             </div>
             {question ? (
               <div className="selected-question-card">
@@ -251,14 +238,30 @@ export function ConsultationView({
                 aria-label="相談内容"
                 disabled={!hasChart || loading || quotaReached}
                 onChange={(event) => onQuestionChange(event.target.value)}
-                placeholder="候補にないことでも大丈夫です。例: あの人との今後は？今の仕事を続けるべき？今年動くなら何を意識すればいい？"
+                placeholder="例: あの人の気持ちは？ 今日の運勢は？ 転職するなら今？"
                 value={question}
               />
               <button className="button primary" disabled={!canSend} type="submit">
-                {question ? "この内容で相談する" : "相談する"}
+                {question ? "この内容で占う" : "占う"}
               </button>
             </div>
           </form>
+          <div className="consultation-starter-strip">
+            <span>よくある相談</span>
+            <div className="consultation-starters" aria-label="相談テーマを選ぶ">
+              {starterQuestions.map((sample) => (
+                <button
+                  aria-pressed={question === sample.text}
+                  className={question === sample.text ? "active" : ""}
+                  key={sample.text}
+                  onClick={() => onSelectStarter(sample.text, sample.intent)}
+                  type="button"
+                >
+                  {sample.text}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       ) : null}
     </section>
@@ -359,11 +362,24 @@ function NoChartState({ startReadingHref }: { startReadingHref: string }) {
   );
 }
 
-function EmptyConsultationState() {
+function EmptyConsultationState({
+  onSelectStarter,
+  starters
+}: {
+  onSelectStarter: (text: string, intent: QuestionIntentKey) => void;
+  starters: { intent: QuestionIntentKey; text: string }[];
+}) {
   return (
     <div className="consultation-empty-state">
       <h3>いま知りたいことを占いましょう</h3>
-      <p>下の候補から選んでも、そのまま自由に書いても大丈夫です。</p>
+      <p>まずは近いものを選ぶだけでも大丈夫です。あとから詳しい状況を書き足せます。</p>
+      <div className="consultation-empty-starters" aria-label="すぐに選べる相談">
+        {starters.map((sample) => (
+          <button key={sample.text} onClick={() => onSelectStarter(sample.text, sample.intent)} type="button">
+            {sample.text}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
