@@ -24,7 +24,7 @@ export function MobileStickyCta() {
     };
   }, [pathname]);
 
-  if (!pathname || pathname === "/consultation" || pathname.startsWith("/consultation/")) return null;
+  if (!pathname || pathname === "/consultation" || pathname.startsWith("/consultation/") || pathname.startsWith("/lp")) return null;
 
   const href = hasBirth ? "/consultation" : "/m";
   const label = hasBirth ? "相談する" : "星を読む";

@@ -66,6 +66,8 @@ export function GlobalNav({ active, brandLabel = "HOSHIYOMI" }: GlobalNavProps) 
     };
   }, [pathname]);
 
+  if (pathname?.startsWith("/lp")) return null;
+
   return (
     <nav className={`topbar global-topbar ${visible ? "is-visible" : "is-hidden"}`}>
       <div className="global-topbar-inner">
