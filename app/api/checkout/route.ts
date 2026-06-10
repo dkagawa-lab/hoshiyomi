@@ -71,8 +71,8 @@ export async function POST(req: Request) {
         mode: selectedProduct ? "payment" : "subscription",
         line_items: [{ price, quantity: 1 }],
         success_url: selectedProduct
-          ? `${appUrl}/consultation?checkout=success&product=${selectedProduct}`
-          : `${appUrl}/consultation?checkout=success&plan=${selectedPlan}`,
+          ? `${appUrl}/checkout/complete?product=${selectedProduct}`
+          : `${appUrl}/checkout/complete?plan=${selectedPlan}`,
         cancel_url: `${appUrl}/consultation?checkout=cancel`,
         ...(billingClientUserId ? { client_reference_id: billingClientUserId } : {}),
         metadata,

@@ -102,7 +102,7 @@ export function GlobalNav({ active, brandLabel = "HOSHIYOMI" }: GlobalNavProps) 
 function resolveActiveNav(pathname: string | null): GlobalNavActive | undefined {
   if (!pathname) return undefined;
   if (pathname === "/m" || pathname === "/dashboard" || pathname.startsWith("/reading")) return "chart";
-  if (pathname === "/consultation" || pathname.startsWith("/pricing")) return "consultation";
+  if (pathname === "/consultation" || pathname.startsWith("/pricing") || pathname.startsWith("/checkout")) return "consultation";
   if (pathname.startsWith("/glossary") || pathname.startsWith("/about")) return "glossary";
   if (
     pathname.startsWith("/account") ||

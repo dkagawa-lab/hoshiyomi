@@ -3490,6 +3490,27 @@ textarea:focus {
   margin: 0;
 }
 
+.completion-summary {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  max-width: 620px;
+  border: 1px solid rgba(226, 190, 103, 0.2);
+  border-radius: 8px;
+  padding: 16px;
+  background: rgba(226, 190, 103, 0.08);
+}
+
+.completion-summary strong {
+  color: var(--gold);
+  font-size: 1.2rem;
+}
+
+.completion-note {
+  color: var(--muted);
+  font-size: 0.94rem;
+}
+
 .completion-actions {
   display: flex;
   flex-wrap: wrap;
