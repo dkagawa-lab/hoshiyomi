@@ -5,7 +5,7 @@ import { reviewFixtures } from "@/lib/reviewFixtures";
 import "../lp.css";
 
 export const metadata: Metadata = {
-  title: "彼の気持ち、星に聞いてみませんか｜HOSHIYOMI",
+  title: "あの人の気持ち、星に聞いてみませんか｜HOSHIYOMI",
   description:
     "生まれた日時と場所から作る、あなただけのホロスコープ。恋愛・相性・これからの流れを、続けて相談できます。まずは無料で星を読む。",
   robots: { index: false, follow: false }
@@ -19,7 +19,7 @@ export default function LoveLandingPage() {
       <section className="lp-hero">
         <div className="eyebrow">Your Private Star Reading</div>
         <h1 className="lp-title">
-          彼の気持ち、<em>星に聞いて</em>みませんか
+          あの人の気持ち、<em>星に聞いて</em>みませんか
         </h1>
         <p className="lp-sub">
           「このまま進んでいいの？」その答えは、12星座占いでは出ません。
@@ -100,7 +100,7 @@ export default function LoveLandingPage() {
           <div>
             <span>03</span>
             <strong>続けて相談する</strong>
-            <p>「彼との今後は？」など、知りたいことを言葉のまま続けて聞けます。</p>
+            <p>「あの人との今後は？」など、知りたいことを言葉のまま続けて聞けます。</p>
           </div>
         </div>
         <div className="lp-cta-row" style={{ marginTop: 22 }}>
@@ -163,6 +163,12 @@ export default function LoveLandingPage() {
           <details>
             <summary>本当に無料で試せますか？</summary>
             <p>はい。登録なしで出生図と最初の鑑定を読めます。登録すると初回10回まで無料で相談できます。</p>
+          </details>
+          <details>
+            <summary>相手の性別を決めずに相談できますか？</summary>
+            <p>
+              できます。HOSHIYOMIは恋愛対象を決めつけません。同性のパートナーのこと、性別を決めたくない関係、自分の気持ちが揺れている段階でも、そのままの言葉でフラットに読みます。
+            </p>
           </details>
           <details>
             <summary>出生時刻がわからなくても占えますか？</summary>
