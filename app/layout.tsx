@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { Viewport } from "next";
 import { GlobalNav } from "@/components/GlobalNav";
+import { MarketingTags } from "@/components/MarketingTags";
 import { MobileStickyCta } from "@/components/MobileStickyCta";
 import "./globals.css";
 
@@ -24,6 +25,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="ja">
       <body>
+        <MarketingTags />
         <GlobalNav />
         {children}
         <MobileStickyCta />
