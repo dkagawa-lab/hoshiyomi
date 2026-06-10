@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { getLineFriendUrl } from "@/lib/lineLinks";
 import { addOnPack, isPlanKey, resolvePlan } from "@/lib/plans";
 
 export function CheckoutCompleteActions() {
@@ -9,6 +10,7 @@ export function CheckoutCompleteActions() {
   const planKey = searchParams.get("plan");
   const productKey = searchParams.get("product");
   const isAddOn = productKey === addOnPack.key;
+  const lineFriendUrl = getLineFriendUrl();
   const plan = isPlanKey(planKey) && planKey !== "free" ? resolvePlan(planKey) : null;
   const title = isAddOn ? "追加相談枠が付与されました" : plan ? `${plan.label}になりました` : "決済が完了しました";
   const detail = isAddOn
@@ -38,6 +40,15 @@ export function CheckoutCompleteActions() {
         <Link className="button" href="/account">
           登録情報を見る
         </Link>
+        {lineFriendUrl ? (
+          <a className="button auth-provider-button line" href={lineFriendUrl} rel="noreferrer" target="_blank">
+            LINEでも相談する
+          </a>
+        ) : (
+          <Link className="button auth-provider-button line" href="/account">
+            LINE連携する
+          </Link>
+        )}
         <Link className="text-link" href="/pricing">
           料金プランへ戻る
         </Link>

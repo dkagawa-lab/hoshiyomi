@@ -6,7 +6,7 @@ import { MobileStickyCta } from "@/components/MobileStickyCta";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "HOSHIYOMI",
+  title: "HOSHIYOMI | 出生図から読むAI星読み・ホロスコープ鑑定",
   description: "出生図から読む、パーソナル星読み",
   icons: {
     icon: [{ url: "/brand/hoshiyomi-mark.svg", type: "image/svg+xml" }],

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BirthChartApp } from "@/components/BirthChartApp";
+import { LineCtaCard } from "@/components/LineCtaCard";
 import { PublicReviewList } from "@/components/PublicReviewList";
 import { reviewFixtures } from "@/lib/reviewFixtures";
 
@@ -33,6 +34,9 @@ export default function Home() {
           <div className="actions hero-actions">
             <Link className="button primary" href="/m">
               まず無料で星を読む
+            </Link>
+            <Link className="button auth-provider-button line" href="/register?returnTo=/consultation">
+              LINEで相談する
             </Link>
             <a className="button" href="#reading-flow">
               相談までの流れを見る
@@ -183,6 +187,8 @@ export default function Home() {
             </div>
           </div>
         </div>
+
+        <LineCtaCard />
       </section>
 
       <section className="testimonial-section" aria-labelledby="testimonial-title">

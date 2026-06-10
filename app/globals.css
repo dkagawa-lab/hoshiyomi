@@ -1984,6 +1984,7 @@ textarea:focus {
 }
 
 .line-consultation-guide,
+.line-cta-card,
 .line-friend-card,
 .registration-line-guide {
   display: grid;
@@ -1997,8 +1998,19 @@ textarea:focus {
 }
 
 .line-consultation-guide,
+.line-cta-card,
 .line-friend-card {
   margin: 14px 0 6px;
+}
+
+.line-cta-card {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  margin-top: 22px;
+}
+
+.line-cta-card.compact {
+  margin-top: 18px;
 }
 
 .line-friend-card {
@@ -2012,15 +2024,23 @@ textarea:focus {
 }
 
 .line-consultation-guide span,
+.line-cta-card .eyebrow,
 .line-friend-card .eyebrow {
   color: #85e7a9;
 }
 
 .line-consultation-guide strong,
+.line-cta-card h2,
 .line-friend-card h2,
 .registration-line-guide strong {
   color: var(--text);
   font-weight: 500;
+}
+
+.line-cta-card h2 {
+  margin: 4px 0 0;
+  font-size: clamp(1.55rem, 2.8vw, 2.35rem);
+  line-height: 1.12;
 }
 
 .line-friend-card h2 {
@@ -2030,6 +2050,7 @@ textarea:focus {
 }
 
 .line-consultation-guide p,
+.line-cta-card p,
 .line-friend-card p,
 .registration-line-guide p {
   margin: 0;
@@ -2039,6 +2060,7 @@ textarea:focus {
 }
 
 .line-consultation-actions,
+.line-cta-actions,
 .line-friend-actions,
 .registration-line-actions {
   display: flex;
@@ -4288,6 +4310,7 @@ textarea:focus {
   .contact-form-grid,
   .legal-link-panel,
   .plan-entry-card,
+  .line-cta-card,
   .line-friend-card,
   .pricing-grid,
   .referral-layout,

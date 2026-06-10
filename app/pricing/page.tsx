@@ -1,4 +1,5 @@
 import { PricingPanel } from "@/components/PricingPanel";
+import { LineCtaCard } from "@/components/LineCtaCard";
 import Link from "next/link";
 
 export default function PricingPage() {
@@ -17,6 +18,7 @@ export default function PricingPage() {
         </div>
       </section>
       <PricingPanel />
+      <LineCtaCard compact />
       <section className="pricing-legal-links" aria-label="決済前に確認する情報">
         <Link className="text-link" href="/legal/payment-terms">
           決済・サブスクリプション条件
