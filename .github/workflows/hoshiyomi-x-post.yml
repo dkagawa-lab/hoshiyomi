@@ -1,11 +1,6 @@
 name: HOSHIYOMI X auto post
 
 on:
-  schedule:
-    # UTC指定。JSTで 07:30 / 12:30 / 21:00 の3回
-    - cron: "30 22 * * *"   # 07:30 JST (morning)
-    - cron: "30 3 * * *"    # 12:30 JST (noon)
-    - cron: "0 12 * * *"    # 21:00 JST (night)
   workflow_dispatch:        # 手動実行も可能(テスト用)
     inputs:
       dry_run:
