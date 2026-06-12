@@ -49,7 +49,18 @@ export function authClientUserId(userId: string) {
 }
 
 export function resolveReturnTo(value: string | null) {
-  const allowed = new Set(["/account", "/reading", "/consultation", "/dashboard", "/pricing"]);
+  const allowed = new Set([
+    "/account",
+    "/reading",
+    "/consultation",
+    "/dashboard",
+    "/pricing",
+    "/en/account",
+    "/en/reading",
+    "/en/consultation",
+    "/en/dashboard",
+    "/en/pricing"
+  ]);
   return value && allowed.has(value) ? value : "/account";
 }
 

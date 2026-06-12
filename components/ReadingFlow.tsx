@@ -8,6 +8,7 @@ import { notifyBirthUpdated } from "@/components/MobileStickyCta";
 import { buildAuthHeaders } from "@/lib/authRegistrationClient";
 import { ensureClientUserId } from "@/lib/clientIdentity";
 import { ensureFreeBonusRemaining, planQuotaLabel, PlanKey, readFreeBonusRemaining, readPlanFromStorage, readPlanUsage, resolvePlan, usageLimitsDisabled } from "@/lib/plans";
+import { Locale, localizedPath } from "@/lib/i18n";
 
 type Topic = {
   key: string;
@@ -58,7 +59,8 @@ type ReadingServerStateSetters = {
   setUsedChats: (used: number) => void;
 };
 
-export function ReadingFlow() {
+export function ReadingFlow({ language = "ja" }: { language?: Locale }) {
+  const english = language === "en";
   const [birth, setBirth] = useState<BirthInput | null>(null);
   const [unlocked, setUnlocked] = useState(false);
   const [usedChats, setUsedChats] = useState(0);
@@ -86,10 +88,10 @@ export function ReadingFlow() {
   if (!birth || !chart) {
     return (
       <section className="panel reading-empty">
-        <h1>出生情報がまだありません</h1>
-        <p>まずトップページで生年月日、出生時刻、出生地を入力してホロスコープを作成してください。</p>
-        <Link className="button primary" href="/m">
-          入力に戻る
+        <h1>{english ? "No birth data yet" : "出生情報がまだありません"}</h1>
+        <p>{english ? "Enter your birth date, time, and birthplace first to create your horoscope." : "まずトップページで生年月日、出生時刻、出生地を入力してホロスコープを作成してください。"}</p>
+        <Link className="button primary" href={localizedPath("/m", language)}>
+          {english ? "Back to input" : "入力に戻る"}
         </Link>
       </section>
     );
@@ -223,18 +225,18 @@ export function ReadingFlow() {
                   あなたの星を記録しておくことで、次回からも同じ文脈で続けて相談できます。
                 </p>
                 <div className="member-gate-actions">
-                  <Link className="button primary" href="/register?returnTo=/reading">
-                    この星を記録して続きを見る
+                  <Link className="button primary" href={`${localizedPath("/register", language)}?returnTo=${encodeURIComponent(localizedPath("/reading", language))}`}>
+                    {english ? "Save this chart and continue" : "この星を記録して続きを見る"}
                   </Link>
-                  <Link className="button" href="/consultation">
-                    登録せずに相談へ進む
+                  <Link className="button" href={localizedPath("/consultation", language)}>
+                    {english ? "Consult without registration" : "登録せずに相談へ進む"}
                   </Link>
-                  <Link className="button subtle" href="/login?returnTo=/reading">
-                    登録済みの方はログイン
+                  <Link className="button subtle" href={`${localizedPath("/login", language)}?returnTo=${encodeURIComponent(localizedPath("/reading", language))}`}>
+                    {english ? "Log in if registered" : "登録済みの方はログイン"}
                   </Link>
                 </div>
-                <Link className="text-link" href="/terms">
-                  利用規約・鑑定前のご注意を確認する
+                <Link className="text-link" href={localizedPath("/terms", language)}>
+                  {english ? "Read terms before continuing" : "利用規約・鑑定前のご注意を確認する"}
                 </Link>
               </div>
             ) : (
@@ -247,8 +249,8 @@ export function ReadingFlow() {
                   <h3>次に取るべき行動</h3>
                   <p>{analysis.action}</p>
                 </div>
-                <Link className="button primary" href="/consultation">
-                  この星のあなたについて詳しく相談する（{remainingChats}）
+                <Link className="button primary" href={localizedPath("/consultation", language)}>
+                  {english ? `Consult more about this chart (${remainingChats})` : `この星のあなたについて詳しく相談する（${remainingChats}）`}
                 </Link>
               </>
             )}
@@ -274,8 +276,8 @@ export function ReadingFlow() {
               ここから先は、星の文脈を記憶し、あなた専用の占い師として未来を占います。
             </p>
             <div className="actions compact-actions">
-              <Link className="button primary" href="/consultation">
-                この星のあなたについて詳しく相談する
+              <Link className="button primary" href={localizedPath("/consultation", language)}>
+                {english ? "Consult more about this chart" : "この星のあなたについて詳しく相談する"}
               </Link>
             </div>
           </section>

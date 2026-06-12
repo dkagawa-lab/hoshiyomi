@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { isEnglishPath, localizedPath, stripLocalePrefix } from "@/lib/i18n";
 
 const birthStorageKey = "hoshiyomi:birth";
 const birthUpdatedEvent = "hoshiyomi:birth-updated";
@@ -24,14 +25,16 @@ export function MobileStickyCta() {
     };
   }, [pathname]);
 
-  if (!pathname || pathname === "/consultation" || pathname.startsWith("/consultation/") || pathname.startsWith("/lp")) return null;
+  const cleanPath = stripLocalePrefix(pathname);
+  const english = isEnglishPath(pathname);
+  if (!pathname || cleanPath === "/consultation" || cleanPath.startsWith("/consultation/") || cleanPath.startsWith("/lp")) return null;
 
-  const href = hasBirth ? "/consultation" : "/m";
-  const label = hasBirth ? "相談する" : "星を読む";
-  const subLabel = hasBirth ? "保存した星の文脈で続ける" : "まず出生図を作成する";
+  const href = localizedPath(hasBirth ? "/consultation" : "/m", english ? "en" : "ja");
+  const label = english ? (hasBirth ? "Ask the stars" : "Read my chart") : hasBirth ? "相談する" : "星を読む";
+  const subLabel = english ? (hasBirth ? "Continue with your saved chart" : "Create your birth chart first") : hasBirth ? "保存した星の文脈で続ける" : "まず出生図を作成する";
 
   return (
-    <div className="mobile-sticky-cta" aria-label="次の行動">
+    <div className="mobile-sticky-cta" aria-label={english ? "Next action" : "次の行動"}>
       <Link className="mobile-sticky-cta-button" href={href}>
         <span className="mobile-sticky-cta-copy">
           <strong>{label}</strong>

@@ -4,7 +4,10 @@ import { PlanKey, resolvePlan } from "@/lib/plans";
 import { QuestionIntentKey, resolveQuestionIntent } from "@/lib/questionIntents";
 import { genderLabel, romanticInterestLabel } from "@/lib/profileOptions";
 
-export function buildChartContext(chart: Chart) {
+type PromptLanguage = "ja" | "en";
+
+export function buildChartContext(chart: Chart, language: PromptLanguage = "ja") {
+  if (language === "en") return buildEnglishChartContext(chart);
   const planets = chart.planets.map(formatPosition).join("\n");
   const angles = [chart.ascendant, chart.midheaven].filter(Boolean).map((p) => formatPosition(p!)).join("\n");
   const aspects = chart.aspects.map((a) => `${a.from} - ${a.to}: ${a.type} orb ${a.orb.toFixed(1)}度`).join("\n");
@@ -21,7 +24,8 @@ export function buildChartContext(chart: Chart) {
   ].join("\n");
 }
 
-export function buildTransitContext(transits: TransitSnapshot) {
+export function buildTransitContext(transits: TransitSnapshot, language: PromptLanguage = "ja") {
+  if (language === "en") return buildEnglishTransitContext(transits);
   const planets = transits.chart.planets.map(formatPosition).join("\n");
   const aspects = transits.aspects
     .map((a) => `現在の${a.transit.name} - 出生図の${a.natal.name}: ${a.type} orb ${a.orb.toFixed(1)}度`)
@@ -29,7 +33,8 @@ export function buildTransitContext(transits: TransitSnapshot) {
   return [`日時: ${transits.dateLabel}`, "", "現在の天体:", planets, aspects ? `\n出生図との主要アスペクト:\n${aspects}` : ""].join("\n");
 }
 
-export function buildAnswerQualityContext(planKey?: PlanKey, questionIntentKey?: QuestionIntentKey) {
+export function buildAnswerQualityContext(planKey?: PlanKey, questionIntentKey?: QuestionIntentKey, language: PromptLanguage = "ja") {
+  if (language === "en") return buildEnglishAnswerQualityContext(planKey, questionIntentKey);
   const plan = resolvePlan(planKey);
   const intent = resolveQuestionIntent("", questionIntentKey);
   return `回答品質の最低条件:
@@ -50,7 +55,92 @@ export function buildAnswerQualityContext(planKey?: PlanKey, questionIntentKey?:
 - 見出しを使う場合は、記号なしの短い日本語だけを1行で置く。例: 仕事を続ける前に見ること`;
 }
 
-export function systemPrompt(readerStyle?: ReaderStyleKey, planKey?: PlanKey, questionIntentKey?: QuestionIntentKey, question = "") {
+function buildEnglishChartContext(chart: Chart) {
+  const planets = chart.planets.map(formatPositionEn).join("\n");
+  const angles = [chart.ascendant, chart.midheaven].filter(Boolean).map((p) => formatPositionEn(p!)).join("\n");
+  const aspects = chart.aspects.map((a) => `${bodyNameEn(a.from)} - ${bodyNameEn(a.to)}: ${aspectNameEn(a.type)} orb ${a.orb.toFixed(1)} degrees`).join("\n");
+  return [
+    `Client: ${chart.input.name || "Guest"}`,
+    `Profile: gender ${genderLabelEn(chart.input.gender)} / romantic interest ${romanticInterestLabelEn(chart.input.romanticInterest)}`,
+    `Birthplace: ${chart.input.city} (${chart.input.latitude}, ${chart.input.longitude})`,
+    `Birth date and time: ${chart.input.date} ${chart.input.time || "time unknown"}`,
+    "",
+    "Bodies:",
+    planets,
+    angles ? `\nAngles:\n${angles}` : "",
+    aspects ? `\nMajor aspects:\n${aspects}` : ""
+  ].join("\n");
+}
+
+function buildEnglishTransitContext(transits: TransitSnapshot) {
+  const planets = transits.chart.planets.map(formatPositionEn).join("\n");
+  const aspects = transits.aspects
+    .map((a) => `Current ${bodyNameEn(a.transit.name)} - natal ${bodyNameEn(a.natal.name)}: ${aspectNameEn(a.type)} orb ${a.orb.toFixed(1)} degrees`)
+    .join("\n");
+  return [`Date: ${transits.dateLabel}`, "", "Current bodies:", planets, aspects ? `\nMajor natal-transit aspects:\n${aspects}` : ""].join("\n");
+}
+
+function buildEnglishAnswerQualityContext(planKey?: PlanKey, questionIntentKey?: QuestionIntentKey) {
+  const plan = resolvePlan(planKey);
+  const intent = resolveQuestionIntent("", questionIntentKey);
+  return `Minimum answer quality:
+- Answer the selected theme directly: ${intentLabelEn(intent.key)}. Do not turn every answer into vague self-understanding.
+- Open with 2-3 natural sentences that answer what the person is asking. Avoid repetitive headings like "first, the conclusion".
+- Use at least 3 natal placements and explain what each planet symbolizes and how it connects to this question.
+- Use at least 1 current transit and include the current date or month naturally.
+- Include short, middle, and longer-term outlooks, while avoiding fixed prophecy.
+- If the theme is today's luck, include overall luck, love, work, relationships, money, lucky color, lucky number, lucky item, lucky food, what to watch for, and one small action.
+- Do not use mechanical time headings like "within 24 hours" or "within 7 days".
+- End with 2-3 follow-up questions connected to the chart and the user's question.
+- Match the plan depth: ${planAnswerLengthEn(plan.key)}. Do not become too short or pad with repetition.
+- Do not use Markdown symbols such as ##, ###, **, ---, or "- ". Use plain headings and natural paragraphs.`;
+}
+
+function englishSystemPrompt(readerStyle?: ReaderStyleKey, planKey?: PlanKey, questionIntentKey?: QuestionIntentKey, question = "") {
+  const style = resolveReaderStyle(readerStyle);
+  const plan = resolvePlan(planKey);
+  const intent = resolveQuestionIntent(question, questionIntentKey);
+  return `You are a deep, sincere Western astrologer writing in natural English.
+Always answer in English, even if chart labels or previous messages contain Japanese.
+Use the client's birth chart, current transits, and exact question together. The experience should feel like a private astrologer reading for one person, not a generic horoscope.
+
+Current plan:
+- ${planLabelEn(plan.key)}
+- Expected depth: ${planAnswerLengthEn(plan.key)}
+- ${planPolicyEn(plan.key)}
+
+Reader style:
+- ${readerLabelEn(style.key)}
+- ${readerInstructionEn(style.key)}
+
+Tone priority:
+- The selected reader style has priority over previous conversation tone.
+- You may reference past conversation context, but do not copy a different reader's tone.
+
+Question theme:
+- ${intentLabelEn(intent.key)}
+- ${intentInstructionEn(intent.key)}
+
+Reading approach:
+- Pick up concrete words from the user's question and make clear what you are answering.
+- Do not widen the answer into generic advice if the question is specific.
+- For love questions, respect the romantic-interest profile. If unknown or not answered, use "the other person", "the person you like", or "your partner" without assuming gender.
+- Explain why the chart supports the reading. Do not list placements without interpretation.
+- Use Sun, Moon, Mercury, Venus, Mars, Jupiter, Saturn, Uranus, Neptune, or Pluto as relevant, and include at least three chart-based reasons.
+- Include current sky timing: today's date or this month, with at least one transit.
+- Include short, middle, and longer-term outlooks. Speak in terms of tendencies, openings, and areas that can shift, not guaranteed events.
+- Include 2-3 concrete actions that fit the theme. For love, include wording, distance, timing, or what to ask. For work, include conditions to verify, who to talk to, or what must be true before moving. For money, include what number or habit to check.
+- End with "To go deeper" followed by 2-3 bullet-like follow-up questions using the Japanese bullet character "・" so the app can turn them into buttons.
+- Do not pressure the user to pay. You may say what could be explored next in a calm, forward-looking way.
+- Avoid medical, legal, investment, gambling, or guaranteed-future advice.
+- Do not use fear, certainty, or phrases like "this will definitely happen".
+- Do not use Markdown formatting signs such as ##, ###, **, ---, or "- ". Use short plain headings if needed.
+
+${buildEnglishAnswerQualityContext(plan.key, intent.key)}`;
+}
+
+export function systemPrompt(readerStyle?: ReaderStyleKey, planKey?: PlanKey, questionIntentKey?: QuestionIntentKey, question = "", language: PromptLanguage = "ja") {
+  if (language === "en") return englishSystemPrompt(readerStyle, planKey, questionIntentKey, question);
   const style = resolveReaderStyle(readerStyle);
   const plan = resolvePlan(planKey);
   const intent = resolveQuestionIntent(question, questionIntentKey);
@@ -173,7 +263,7 @@ function buildReaderStyleResponseRules(styleKey: ReaderStyleKey) {
 - 星の根拠、相談への答え、現実で見る判断材料を落ち着いて並べる`;
 }
 
-export function demoAnswer(question: string, chart: Chart, transits?: TransitSnapshot, readerStyle?: ReaderStyleKey, planKey?: PlanKey, questionIntentKey?: QuestionIntentKey) {
+export function demoAnswer(question: string, chart: Chart, transits?: TransitSnapshot, readerStyle?: ReaderStyleKey, planKey?: PlanKey, questionIntentKey?: QuestionIntentKey, language: PromptLanguage = "ja") {
   const style = resolveReaderStyle(readerStyle);
   const plan = resolvePlan(planKey);
   const intent = resolveQuestionIntent(question, questionIntentKey);
@@ -188,6 +278,9 @@ export function demoAnswer(question: string, chart: Chart, transits?: TransitSna
   const mainAspect = chart.aspects[0];
   const transitMoon = transits?.chart.planets.find((p) => p.key === "moon");
   const transitAspect = transits?.aspects[0];
+  if (language === "en") {
+    return demoAnswerEn({ chart, intentKey: intent.key, planKey: plan.key, question, readerStyle: style.key, transitAspect, transitMoon, transits });
+  }
   const dateText = formatJapaneseDate(new Date());
   const monthText = formatJapaneseMonth(new Date());
   const opening = buildOpening(question, chart, intent.key);
@@ -547,6 +640,266 @@ function buildOpening(question: string, chart: Chart, intentKey: QuestionIntentK
     return `今月の注意点は、悪いことを避けるためというより、あなたが消耗しやすい場所を先に知るために見ます。月の${moon.sign.name}が揺れやすい反応を、土星の${saturn.sign.name}が現実面で無理をしやすい領域を示しています。`;
   }
   return `この質問では、太陽の${sun.sign.name}が示す意志と、月の${moon.sign.name}が示す安心条件のバランスが鍵になります。答えはひとつに固定されているというより、今どの星の性質を使うかで変わっていきます。`;
+}
+
+function demoAnswerEn(input: {
+  chart: Chart;
+  intentKey: QuestionIntentKey;
+  planKey: PlanKey;
+  question: string;
+  readerStyle: ReaderStyleKey;
+  transitAspect?: TransitSnapshot["aspects"][number];
+  transitMoon?: Chart["planets"][number];
+  transits?: TransitSnapshot;
+}) {
+  const sun = input.chart.planets.find((p) => p.key === "sun")!;
+  const moon = input.chart.planets.find((p) => p.key === "moon")!;
+  const mercury = input.chart.planets.find((p) => p.key === "mercury")!;
+  const venus = input.chart.planets.find((p) => p.key === "venus")!;
+  const mars = input.chart.planets.find((p) => p.key === "mars")!;
+  const saturn = input.chart.planets.find((p) => p.key === "saturn")!;
+  const pluto = input.chart.planets.find((p) => p.key === "pluto");
+  const dateText = formatEnglishDate(new Date());
+  const monthText = formatEnglishMonth(new Date());
+  const intent = intentLabelEn(input.intentKey);
+  const daily = input.intentKey === "daily_luck" ? dailyLuckEn(input.chart) : null;
+  const transitLine = input.transitAspect
+    ? `Right now, current ${bodyNameEn(input.transitAspect.transit.name)} forms a ${aspectNameEn(input.transitAspect.type)} to your natal ${bodyNameEn(input.transitAspect.natal.name)}. That makes this question feel more immediate than it might on an ordinary day.`
+    : input.transitMoon
+      ? `Today, the Moon is in ${signNameEn(input.transitMoon.sign.name)}, so your emotional weather may move through ${elementNameEn(input.transitMoon.sign.element)} themes.`
+      : `The current sky is quieter, which makes this a better moment for sorting your inner response than forcing a dramatic decision.`;
+
+  return `${intent}
+For your question, "${input.question}", the chart points first to the difference between what you show outwardly and what your inner system needs to feel safe. Your Sun in ${signNameEn(sun.sign.name)} wants to move through life with a ${elementNameEn(sun.sign.element)} quality, while your Moon in ${signNameEn(moon.sign.name)} shows the emotional conditions that let you settle.
+
+Why the chart reads this way
+Mercury in ${signNameEn(mercury.sign.name)} describes how you think and speak when something matters. It suggests that your answer becomes clearer when you put the situation into words instead of only holding it in your head.
+
+Venus in ${signNameEn(venus.sign.name)} shows what feels valuable, attractive, or emotionally nourishing. Mars in ${signNameEn(mars.sign.name)} shows how you move toward what you want. Together, they describe the gap between what your heart wants to receive and how easily you act on it.
+
+Saturn in ${signNameEn(saturn.sign.name)} points to the part that needs time, structure, and honesty. ${pluto ? `Pluto in ${signNameEn(pluto.sign.name)} adds a deeper layer: this is not only about the surface answer, but about a pattern you may be ready to change.` : ""}
+
+Current timing
+${dateText}: ${transitLine}
+For ${monthText}, the theme is not to rush the outcome, but to separate emotional urgency from the conditions that would actually make a choice sustainable.
+
+${daily ? `Today's luck
+Overall: ${daily.overall}
+Love: ${daily.love}
+Work: ${daily.work}
+Relationships: ${daily.relationships}
+Money: ${daily.money}
+Lucky color: ${daily.color}
+Lucky number: ${daily.number}
+Lucky item: ${daily.item}
+Lucky food: ${daily.food}
+Watch for: ${daily.caution}
+One small action: ${daily.action}
+` : ""}
+Short, middle, and longer view
+Short term, notice what your body and mood do before your mind starts explaining everything. The Moon placement makes the first emotional reaction useful, but not always final.
+
+Middle term, this question becomes clearer when you test one real condition: what changes if you ask more directly, set one boundary, or name one need?
+
+Longer term, Saturn suggests that the pattern changes when you stop measuring the situation only by immediate relief and start asking what would still feel right after time has passed.
+
+What you can do next
+・Write the situation in three lines: what you feel, what is fact, and what you are hoping someone else will do.
+・Choose one small action that gives you information, not just reassurance.
+・When you hesitate, ask: does this choice make me smaller, or does it help me stand more clearly in my own life?
+
+To go deeper
+・What should I do next in this situation?
+・How does this affect love and work differently?
+・What pattern am I repeating here?`;
+}
+
+function formatPositionEn(position: Chart["planets"][number]) {
+  return `${bodyNameEn(position.name)}: ${signNameEn(position.sign.name)} ${position.degree.toFixed(1)} degrees${position.house ? ` / House ${position.house}` : ""}`;
+}
+
+function bodyNameEn(value: string) {
+  const names: Record<string, string> = {
+    太陽: "Sun",
+    月: "Moon",
+    水星: "Mercury",
+    金星: "Venus",
+    火星: "Mars",
+    木星: "Jupiter",
+    土星: "Saturn",
+    天王星: "Uranus",
+    海王星: "Neptune",
+    冥王星: "Pluto",
+    ASC: "ASC",
+    MC: "MC",
+    sun: "Sun",
+    moon: "Moon",
+    mercury: "Mercury",
+    venus: "Venus",
+    mars: "Mars",
+    jupiter: "Jupiter",
+    saturn: "Saturn",
+    uranus: "Uranus",
+    neptune: "Neptune",
+    pluto: "Pluto"
+  };
+  return names[value] ?? value;
+}
+
+function signNameEn(value: string) {
+  const signs: Record<string, string> = {
+    牡羊座: "Aries",
+    牡牛座: "Taurus",
+    双子座: "Gemini",
+    蟹座: "Cancer",
+    獅子座: "Leo",
+    乙女座: "Virgo",
+    天秤座: "Libra",
+    蠍座: "Scorpio",
+    射手座: "Sagittarius",
+    山羊座: "Capricorn",
+    水瓶座: "Aquarius",
+    魚座: "Pisces"
+  };
+  return signs[value] ?? value;
+}
+
+function elementNameEn(value: string) {
+  const elements: Record<string, string> = {
+    火: "fire",
+    地: "earth",
+    風: "air",
+    水: "water"
+  };
+  return elements[value] ?? value;
+}
+
+function aspectNameEn(value: string) {
+  const aspects: Record<string, string> = {
+    コンジャンクション: "conjunction",
+    オポジション: "opposition",
+    トライン: "trine",
+    スクエア: "square",
+    セクスタイル: "sextile"
+  };
+  return aspects[value] ?? value;
+}
+
+function genderLabelEn(value: Chart["input"]["gender"]) {
+  if (value === "male") return "male";
+  if (value === "female") return "female";
+  if (value === "no_answer") return "prefer not to say";
+  return "not specified";
+}
+
+function romanticInterestLabelEn(value: Chart["input"]["romanticInterest"]) {
+  if (value === "men") return "men";
+  if (value === "women") return "women";
+  if (value === "both") return "both men and women";
+  if (value === "target_unknown") return "target gender unknown";
+  if (value === "none") return "no romantic target";
+  if (value === "not_sure") return "still unsure";
+  if (value === "no_answer") return "prefer not to say";
+  return "not specified";
+}
+
+function planLabelEn(key: PlanKey) {
+  if (key === "standard") return "Standard Plan";
+  if (key === "luxury") return "Private Plan";
+  return "Free Plan";
+}
+
+function planAnswerLengthEn(key: PlanKey) {
+  if (key === "standard") return "about 900-1400 Japanese-character equivalent depth, in a satisfying English length";
+  if (key === "luxury") return "deep, longer reading with room for nuance";
+  return "focused but not thin";
+}
+
+function planPolicyEn(key: PlanKey) {
+  if (key === "standard") return "Use chart evidence, timing, and concrete next actions in detail.";
+  if (key === "luxury") return "Go deeper into contradictions, change potential, and decision criteria without becoming vague.";
+  return "Keep the answer focused, but do not make the astrology feel shallow.";
+}
+
+function readerLabelEn(key: ReaderStyleKey) {
+  if (key === "mild") return "Gentle";
+  if (key === "companion") return "Compassionate";
+  if (key === "direct") return "Direct";
+  if (key === "harsh") return "Sharp";
+  return "Standard";
+}
+
+function readerInstructionEn(key: ReaderStyleKey) {
+  if (key === "harsh") return "Use a strong, old-school sharp astrologer tone. Point out avoidance or wishful thinking clearly, but do not insult, threaten, or create fear.";
+  if (key === "direct") return "Be direct and practical. Name the conditions that need to be checked without becoming harsh or theatrical.";
+  if (key === "companion") return "Be warm, deeply empathetic, and emotionally present. Receive the feeling first, then guide gently.";
+  if (key === "mild") return "Be calm, soft, and easy to receive, while still giving clear chart-based guidance.";
+  return "Be balanced, grounded, and clear about the astrological basis.";
+}
+
+function intentLabelEn(key: QuestionIntentKey) {
+  const labels: Record<QuestionIntentKey, string> = {
+    career_change: "Career change",
+    career_stay: "Current work",
+    continue_love: "Whether to continue this love",
+    custom: "Open question",
+    daily_luck: "Today's luck",
+    general_now: "What is needed now",
+    love_values: "Love values",
+    marriage: "Marriage and long-term compatibility",
+    monthly_caution: "This month's cautions",
+    new_encounter: "New encounters",
+    reconciliation: "Reconciliation",
+    relationship_distance: "Distance with the other person",
+    talent_money: "Talent and money",
+    turning_point: "Life turning point"
+  };
+  return labels[key];
+}
+
+function intentInstructionEn(key: QuestionIntentKey) {
+  if (key === "daily_luck") return "Read today lightly but specifically, including luck by area and lucky elements.";
+  if (["love_values", "new_encounter", "reconciliation", "relationship_distance", "continue_love", "marriage"].includes(key)) return "Keep the answer centered on love, emotional safety, distance, and what to check with the other person.";
+  if (["career_stay", "career_change", "talent_money"].includes(key)) return "Keep the answer centered on work conditions, talent, money flow, and practical verification.";
+  if (key === "monthly_caution") return "Include the current month and divide cautions into practical areas.";
+  if (key === "turning_point") return "Read change as tendencies and preparation, not dramatic certainty.";
+  return "Prioritize the concrete words in the question.";
+}
+
+function dailyLuckEn(chart: Chart) {
+  const moon = chart.planets.find((p) => p.key === "moon")!;
+  const venus = chart.planets.find((p) => p.key === "venus")!;
+  const number = Math.max(1, Math.round((moon.degree + venus.degree) % 9) || 9);
+  return {
+    action: "Clear one small thing before adding a new task.",
+    caution: "Do not answer too quickly when a message stirs your mood.",
+    color: venus.sign.element === "火" ? "warm red" : venus.sign.element === "地" ? "moss green" : venus.sign.element === "風" ? "sky blue" : "pearl white",
+    food: moon.sign.element === "火" ? "something lightly spiced" : moon.sign.element === "地" ? "warm rice or grains" : moon.sign.element === "風" ? "citrus or tea" : "soup",
+    item: "a small notebook",
+    love: "Small, honest wording works better than testing the other person.",
+    money: "Check one recurring expense before buying something new.",
+    number: String(number),
+    overall: `The Moon in ${signNameEn(moon.sign.name)} favors noticing your first emotional response without obeying it immediately.`,
+    relationships: "Choose one calm reply over several anxious explanations.",
+    work: "Finish one visible task before widening the day."
+  };
+}
+
+function formatEnglishDate(date: Date) {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "long",
+    day: "numeric"
+  }).format(date);
+}
+
+function formatEnglishMonth(date: Date) {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "long"
+  }).format(date);
 }
 
 function formatJapaneseDate(date: Date) {

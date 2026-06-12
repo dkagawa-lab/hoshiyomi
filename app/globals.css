@@ -205,6 +205,31 @@ a {
   backdrop-filter: blur(12px);
 }
 
+.language-switcher {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 8px 10px 10px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.language-switcher a {
+  text-decoration: none;
+  color: var(--muted);
+}
+
+.language-switcher a[aria-current="page"] {
+  color: var(--gold);
+}
+
+.account-english-note {
+  margin-bottom: 18px;
+}
+
 .global-menu:not([open]) .global-nav-links {
   display: none;
 }
@@ -1542,6 +1567,12 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   color: var(--text);
   font-size: 0.96rem;
   font-weight: 500;
+  line-height: 1.25;
+}
+
+.location-candidate small {
+  color: rgba(247, 241, 223, 0.62);
+  font-size: 0.72rem;
   line-height: 1.25;
 }
 

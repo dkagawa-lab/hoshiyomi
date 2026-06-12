@@ -13,6 +13,7 @@ import { ensureClientUserId } from "@/lib/clientIdentity";
 import { getLineFriendUrl } from "@/lib/lineLinks";
 import { findPrefecture, japanLocations, Municipality } from "@/lib/japanLocations";
 import { municipalityReadings } from "@/lib/municipalityReadings.generated";
+import { findWorldLocation, worldLocations, WorldCity } from "@/lib/worldLocations";
 import { coerceAnswerText, normalizeAnswerText } from "@/lib/answerText";
 import { isReaderStyleKey, ReaderStyleKey, readerStyles } from "@/lib/readerStyles";
 import {
@@ -26,6 +27,7 @@ import {
   romanticInterestLabel,
   romanticInterestOptions
 } from "@/lib/profileOptions";
+import { Locale, localizedPath } from "@/lib/i18n";
 import {
   addAddOnCredits,
   addOnPack,
@@ -100,7 +102,19 @@ type LocationSearchMatch = {
   label: string;
   municipality: Municipality;
   prefecture: string;
+  subtitle?: string;
   score: number;
+  source?: "local" | "remote";
+};
+
+type RemoteLocationResult = {
+  country?: string;
+  id?: string;
+  label?: string;
+  latitude?: number;
+  longitude?: number;
+  name?: string;
+  subtitle?: string;
 };
 
 const loadingStepPool = [
@@ -120,6 +134,18 @@ const loadingStepPool = [
 ];
 const streamingLoadingText = "言葉になったところから、少しずつお渡ししています";
 
+const englishLoadingStepPool = [
+  "Reading the placements that respond most strongly to your question",
+  "Comparing your Sun, Moon, and Mercury patterns",
+  "Layering today's sky over your birth chart",
+  "Finding the planets most connected to this concern",
+  "Separating emotion, timing, and real-world choices",
+  "Looking at the short, middle, and longer arc",
+  "Checking what can be said clearly and what may still shift",
+  "Turning the chart into words you can actually use"
+];
+const englishStreamingLoadingText = "The reading is coming through piece by piece";
+
 const emptyInput: BirthInput = {
   name: "",
   date: "1995-06-15",
@@ -129,10 +155,20 @@ const emptyInput: BirthInput = {
   longitude: 139.7034
 };
 
+const englishEmptyInput: BirthInput = {
+  name: "",
+  date: "1995-06-15",
+  time: "",
+  city: "New York, United States",
+  latitude: 40.7128,
+  longitude: -74.006
+};
+
 const currentYear = new Date().getFullYear();
 const birthYearOptions = Array.from({ length: currentYear - 1900 + 1 }, (_, index) => 1900 + index);
 const birthMonthOptions = Array.from({ length: 12 }, (_, index) => index + 1);
 const kanaCollator = new Intl.Collator("ja-JP", { usage: "sort", sensitivity: "base", numeric: true });
+const englishCollator = new Intl.Collator("en-US", { usage: "sort", sensitivity: "base", numeric: true });
 const loveIntentKeys = new Set<QuestionIntentKey>(["love_values", "new_encounter", "reconciliation", "relationship_distance", "continue_love", "marriage"]);
 
 type PendingLoveQuestion = {
@@ -140,11 +176,36 @@ type PendingLoveQuestion = {
   text: string;
 };
 
-export function BirthChartApp({ compact = false, consultationOnly = false, hideConsultation = false }: { compact?: boolean; consultationOnly?: boolean; hideConsultation?: boolean }) {
-  const [input, setInput] = useState<BirthInput>(emptyInput);
+const englishStarterQuestions: { intent: QuestionIntentKey; text: string }[] = [
+  { intent: "daily_luck", text: "What is my luck today?" },
+  { intent: "general_now", text: "What do I need to understand right now?" },
+  { intent: "love_values", text: "What matters most for me in love?" },
+  { intent: "new_encounter", text: "What kind of person might I be drawn to next?" },
+  { intent: "reconciliation", text: "How should I look at reconciliation?" },
+  { intent: "relationship_distance", text: "How should I handle the distance with them?" },
+  { intent: "continue_love", text: "Should I keep investing in this love?" },
+  { intent: "marriage", text: "What makes a long-term bond work for me?" },
+  { intent: "career_stay", text: "Should I stay in my current work?" },
+  { intent: "career_change", text: "What should I prioritize if I change jobs?" },
+  { intent: "talent_money", text: "How can I turn my talents into income?" },
+  { intent: "monthly_caution", text: "What should I be careful about this month?" },
+  { intent: "turning_point", text: "Am I near a turning point?" }
+];
+
+type BirthChartAppProps = {
+  compact?: boolean;
+  consultationOnly?: boolean;
+  hideConsultation?: boolean;
+  language?: Locale;
+};
+
+export function BirthChartApp({ compact = false, consultationOnly = false, hideConsultation = false, language = "ja" }: BirthChartAppProps) {
+  const isEnglish = language === "en";
+  const defaultInput = isEnglish ? englishEmptyInput : emptyInput;
+  const [input, setInput] = useState<BirthInput>(defaultInput);
   const [chart, setChart] = useState<Chart | null>(null);
   const [birthFormExpanded, setBirthFormExpanded] = useState(true);
-  const initialLocation = parseSavedLocation(input.city);
+  const initialLocation = parseSavedLocation(input.city, language);
   const [prefecture, setPrefecture] = useState(initialLocation.prefecture);
   const [municipality, setMunicipality] = useState(initialLocation.municipality);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -154,6 +215,9 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
   const [selectedQuestionIntent, setSelectedQuestionIntent] = useState<QuestionIntentKey | undefined>();
   const [locationQuery, setLocationQuery] = useState("");
   const [locationChoicePending, setLocationChoicePending] = useState(false);
+  const [remoteLocationMatches, setRemoteLocationMatches] = useState<LocationSearchMatch[]>([]);
+  const [locationSearchLoading, setLocationSearchLoading] = useState(false);
+  const [locationSearchError, setLocationSearchError] = useState("");
   const [pendingLoveQuestion, setPendingLoveQuestion] = useState<PendingLoveQuestion | null>(null);
   const [clientUserId, setClientUserId] = useState("");
   const [used, setUsed] = useState(0);
@@ -167,7 +231,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
   const [readerStyleUpgradePlan, setReaderStyleUpgradePlan] = useState<Exclude<PlanKey, "free"> | null>(null);
   const [readerStyleExpanded, setReaderStyleExpanded] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [loadingSequence, setLoadingSequence] = useState<string[]>(() => buildLoadingSequence("", "normal"));
+  const [loadingSequence, setLoadingSequence] = useState<string[]>(() => buildLoadingSequence("", "normal", language));
   const [loadingStep, setLoadingStep] = useState(0);
   const [streamingAnswer, setStreamingAnswer] = useState("");
   const [birthError, setBirthError] = useState("");
@@ -184,33 +248,45 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
   const canViewMemory = plan !== "free" || member;
   const mainPlanets = useMemo(() => chart?.planets || [], [chart]);
   const natalProfile = useMemo(() => (chart ? buildNatalProfile(chart) : null), [chart]);
-  const selectedLocation = getSelectedLocation(prefecture, municipality);
-  const selectedBirthCity = `${selectedLocation.location.prefecture} ${selectedLocation.municipality.name}`;
-  const locationSearchMatches = useMemo(() => buildLocationSearchMatches(locationQuery), [locationQuery]);
-  const followUpQuestions = useMemo(() => buildFollowUpQuestions(messages), [messages]);
+  const selectedLocation = getSelectedBirthLocation(prefecture, municipality, language, input);
+  const selectedBirthCity = selectedLocation.displayLabel;
+  const localLocationSearchMatches = useMemo(() => buildLocationSearchMatches(locationQuery, language), [language, locationQuery]);
+  const locationSearchMatches = useMemo(
+    () => mergeLocationMatches(localLocationSearchMatches, isEnglish ? remoteLocationMatches : []),
+    [isEnglish, localLocationSearchMatches, remoteLocationMatches]
+  );
+  const selectableLocationMatches = locationSearchMatches.filter((match) => match.score <= locationMatchSelectThreshold(language));
+  const followUpQuestions = useMemo(() => buildFollowUpQuestions(messages, language), [language, messages]);
   const selectedReaderStyle = readerStyles.find((style) => style.key === readerStyle) ?? readerStyles[0];
   const activeReaderStyle = readerStyleLocksDisabled || canUseReaderStyle(selectedReaderStyle.key, plan) ? selectedReaderStyle : readerStyles[0];
   const lineFriendUrl = getLineFriendUrl();
-  const lineConnectHref = `/api/auth/line/login?returnTo=/consultation&mode=signup&clientUserId=${encodeURIComponent(clientUserId)}`;
+  const consultationPath = localizedPath("/consultation", language);
+  const mobileEntryPath = localizedPath("/m", language);
+  const pricingPath = localizedPath("/pricing", language);
+  const readingPath = localizedPath("/reading", language);
+  const glossaryPath = localizedPath("/glossary", language);
+  const registerPath = `${localizedPath("/register", language)}?returnTo=${encodeURIComponent(consultationPath)}`;
+  const loginPath = `${localizedPath("/login", language)}?returnTo=${encodeURIComponent(consultationPath)}`;
+  const lineConnectHref = `/api/auth/line/login?returnTo=${encodeURIComponent(consultationPath)}&mode=signup&clientUserId=${encodeURIComponent(clientUserId)}`;
   const readerStyleGroups = useMemo(
     () => [
       {
         key: "basic",
-        label: "基本鑑定",
+        label: isEnglish ? "Basic reading" : "基本鑑定",
         items: readerStyles.filter((style) => style.requiredPlan === "free")
       },
       {
         key: "standard",
-        label: "通常プランで選択可能",
+        label: isEnglish ? "Available on Standard" : "通常プランで選択可能",
         items: readerStyles.filter((style) => style.requiredPlan === "standard")
       },
       {
         key: "private",
-        label: "プライベートプラン専用",
+        label: isEnglish ? "Private Plan only" : "プライベートプラン専用",
         items: readerStyles.filter((style) => style.requiredPlan === "luxury")
       }
     ],
-    []
+    [isEnglish]
   );
 
   useEffect(() => {
@@ -220,11 +296,11 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
         setInput(savedBirth);
         setChart(calculateChart(savedBirth));
         setBirthFormExpanded(false);
-        const savedLocation = parseSavedLocation(savedBirth.city);
+        const savedLocation = parseSavedLocation(savedBirth.city, language);
         setPrefecture(savedLocation.prefecture);
         setMunicipality(savedLocation.municipality);
       } catch {
-        setInput(emptyInput);
+        setInput(defaultInput);
         setBirthFormExpanded(true);
       }
     } else {
@@ -270,6 +346,47 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
     }
   }, [plan, readerStyleLocksDisabled, selectedReaderStyle.key]);
 
+  useEffect(() => {
+    if (!isEnglish) {
+      setRemoteLocationMatches([]);
+      setLocationSearchLoading(false);
+      setLocationSearchError("");
+      return;
+    }
+    const query = locationQuery.trim();
+    if (query.length < 2) {
+      setRemoteLocationMatches([]);
+      setLocationSearchLoading(false);
+      setLocationSearchError("");
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setLocationSearchLoading(true);
+      setLocationSearchError("");
+      try {
+        const response = await fetch(`/api/geocode?query=${encodeURIComponent(query)}`, { signal: controller.signal });
+        const data = (await response.json().catch(() => ({}))) as { results?: RemoteLocationResult[]; error?: string };
+        if (!response.ok) throw new Error(data.error || "City search failed.");
+        const remoteMatches = remoteResultsToMatches(data.results ?? []);
+        setRemoteLocationMatches(remoteMatches);
+        setLocationChoicePending((current) => current || remoteMatches.length > 0);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setRemoteLocationMatches([]);
+        setLocationSearchError("City search is temporarily unavailable. You can enter latitude and longitude manually.");
+      } finally {
+        setLocationSearchLoading(false);
+      }
+    }, 350);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [isEnglish, locationQuery]);
+
   function scrollToLatestMessage(behavior: ScrollBehavior = "smooth") {
     window.requestAnimationFrame(() => {
       const scrollContainer = document.querySelector<HTMLDivElement>(".consultation-scroll");
@@ -283,14 +400,21 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
 
   function updateLocationQuery(value: string) {
     setLocationQuery(value);
-    const matches = buildLocationSearchMatches(value);
-    const match = resolveAutoLocationMatch(matches);
+    if (language === "en") {
+      setRemoteLocationMatches([]);
+      setLocationSearchError("");
+      const localMatches = buildLocationSearchMatches(value, language);
+      setLocationChoicePending(localMatches.some((item) => item.score <= locationMatchSelectThreshold(language)) || value.trim().length >= 2);
+      return;
+    }
+    const matches = buildLocationSearchMatches(value, language);
+    const match = resolveAutoLocationMatch(matches, language);
     if (match) {
       setLocationChoicePending(false);
       applyBirthLocation(match.prefecture, match.municipality);
       return;
     }
-    setLocationChoicePending(matches.some((item) => item.score <= 4));
+    setLocationChoicePending(matches.some((item) => item.score <= locationMatchSelectThreshold(language)));
   }
 
   function handleLocationQueryInput(event: FormEvent<HTMLInputElement>) {
@@ -300,7 +424,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
   function chooseLocationMatch(match: LocationSearchMatch) {
     setLocationQuery(match.label);
     setLocationChoicePending(false);
-    applyBirthLocation(match.prefecture, match.municipality);
+    applyBirthLocation(match.prefecture, match.municipality, match.label);
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
     }
@@ -313,12 +437,12 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
     };
   }
 
-  function applyBirthLocation(nextPrefecture: string, nextMunicipality: Municipality) {
+  function applyBirthLocation(nextPrefecture: string, nextMunicipality: Municipality, labelOverride?: string) {
     setPrefecture(nextPrefecture);
     setMunicipality(nextMunicipality.name);
     setInput((current) => ({
       ...current,
-      city: `${nextPrefecture} ${nextMunicipality.name}`,
+      city: labelOverride || formatBirthLocationLabel(nextPrefecture, nextMunicipality, language),
       latitude: nextMunicipality.latitude,
       longitude: nextMunicipality.longitude
     }));
@@ -358,7 +482,11 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
     const style = readerStyles.find((item) => item.key === nextStyle) ?? readerStyles[0];
     if (!readerStyleLocksDisabled && !canUseReaderStyle(style.key, plan)) {
       const requiredPlan = requiredPlanForReaderStyle(style.key);
-      setReaderStyleNotice(`${style.readerName}は${requiredPlan.label}で選択可能です。いまの${currentPlanLabel}では${activeReaderStyle.label}の鑑定が使えます。`);
+      setReaderStyleNotice(
+        isEnglish
+          ? `${readerStyleNameEn(style.key)} is available on the ${planLabelEn(requiredPlan.key)}. Your current plan can use ${readerStyleLabelEn(activeReaderStyle.key)}.`
+          : `${style.readerName}は${requiredPlan.label}で選択可能です。いまの${currentPlanLabel}では${activeReaderStyle.label}の鑑定が使えます。`
+      );
       setReaderStyleUpgradePlan(requiredPlan.key === "free" ? null : requiredPlan.key);
       return;
     }
@@ -374,26 +502,32 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
     setBirthError("");
     const normalizedTime = normalizeBirthTime(input.time || "");
     if (input.time && !normalizedTime) {
-      setBirthError("出生時刻は 14:30 または 1430 のように入力してください。不明な場合は空欄でOKです。");
+      setBirthError(isEnglish ? "Enter the birth time like 14:30 or 1430. If you do not know it, leave it blank." : "出生時刻は 14:30 または 1430 のように入力してください。不明な場合は空欄でOKです。");
       return;
     }
-    if (locationChoicePending) {
-      setBirthError("出生地の候補が複数あります。該当する市区町村を候補から選択してください。");
+    if (locationChoicePending && input.city !== "手入力") {
+      setBirthError(
+        isEnglish
+          ? selectableLocationMatches.length
+            ? "Please choose the correct city from the suggestions."
+            : "No matching city has been applied yet. Search again or enter latitude and longitude manually."
+          : "出生地の候補が複数あります。該当する市区町村を候補から選択してください。"
+      );
       return;
     }
     try {
-      const currentSelectedLocation = getSelectedLocation(prefecture, municipality);
+      const currentSelectedLocation = getSelectedBirthLocation(prefecture, municipality, language);
       const normalizedLocationQuery = normalizeLocationSearchText(locationQuery);
       const normalizedSelectedLocation = normalizeLocationSearchText(
-        `${currentSelectedLocation.location.prefecture}${currentSelectedLocation.municipality.name}`
+        `${currentSelectedLocation.displayLabel}${currentSelectedLocation.location.prefecture}${currentSelectedLocation.municipality.name}`
       );
-      if (normalizedLocationQuery && input.city !== "手入力" && !normalizedSelectedLocation.includes(normalizedLocationQuery)) {
-        setBirthError("出生地の入力内容がまだ反映されていません。候補から該当する市区町村を選択してください。");
+      if (!isEnglish && normalizedLocationQuery && input.city !== "手入力" && !normalizedSelectedLocation.includes(normalizedLocationQuery)) {
+        setBirthError(isEnglish ? "The birthplace you typed has not been applied yet. Please choose a matching city from the suggestions." : "出生地の入力内容がまだ反映されていません。候補から該当する市区町村を選択してください。");
         return;
       }
       const normalizedInput = {
         ...input,
-        city: input.city === "手入力" ? input.city : `${currentSelectedLocation.location.prefecture} ${currentSelectedLocation.municipality.name}`,
+        city: input.city === "手入力" ? input.city : currentSelectedLocation.displayLabel,
         time: normalizedTime,
         latitude: input.city === "手入力" ? Number(input.latitude) : currentSelectedLocation.municipality.latitude,
         longitude: input.city === "手入力" ? Number(input.longitude) : currentSelectedLocation.municipality.longitude
@@ -403,9 +537,9 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
       setBirthFormExpanded(false);
       writeStoredBirth(normalizedInput);
       const birthQuery = `?birth=${encodeURIComponent(JSON.stringify(normalizedInput))}`;
-      window.location.assign(`/reading${birthQuery}`);
+      window.location.assign(`${readingPath}${birthQuery}`);
     } catch {
-      setBirthError("出生情報の計算でエラーが出ました。生年月日、出生地、緯度経度を確認してください。");
+      setBirthError(isEnglish ? "We could not calculate the chart. Please check the date, birthplace, latitude, and longitude." : "出生情報の計算でエラーが出ました。生年月日、出生地、緯度経度を確認してください。");
     }
   }
 
@@ -431,7 +565,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
     const requestChart = chartWithProfile(chart, input, { romanticInterest: effectiveRomanticInterest });
     const currentMessages = normalizeStoredMessages(messages);
     const nextMessages: Message[] = [...currentMessages, { role: "user", content: trimmedQuestion }];
-    const nextLoadingSequence = buildLoadingSequence(trimmedQuestion, activeReaderStyle.key);
+    const nextLoadingSequence = buildLoadingSequence(trimmedQuestion, activeReaderStyle.key, language);
     setMessages(nextMessages);
     setQuestion("");
     setSelectedQuestionIntent(undefined);
@@ -471,6 +605,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
           },
           clientUserId: activeClientUserId,
           isMember: member,
+          language,
           messages: requestMessages,
           plan: currentPlan.key,
           question: trimmedQuestion,
@@ -489,11 +624,11 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
         return;
       }
       if (!res.ok || data.error || !data.answer) {
-        throw new Error(data.error || chatResponseFallbackMessage(res.status));
+        throw new Error(data.error || chatResponseFallbackMessage(res.status, language));
       }
       const answer = normalizeAnswerText(data.answer);
       if (!answer) {
-        throw new Error("星からの返答を受け取れませんでした。");
+        throw new Error(isEnglish ? "The reading did not come through. Please try again in a moment." : "星からの返答を受け取れませんでした。");
       }
       const responseIsCounted = data.counted !== false;
       if (stepTimer) clearTimeout(stepTimer);
@@ -509,7 +644,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
             createdAt: new Date().toISOString(),
             question: trimmedQuestion,
             answer,
-            chartName: requestChart.input.name || "あなた",
+            chartName: requestChart.input.name || (isEnglish ? "You" : "あなた"),
             birthDate: requestChart.input.date,
             readerStyle: activeReaderStyle.key
           },
@@ -523,7 +658,9 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
       const errorMessage =
         error instanceof Error && error.message
           ? error.message
-          : "鑑定文の生成で一時的な問題が起きました。相談回数は消費していません。少し時間をおいて、もう一度質問してみてください。";
+          : isEnglish
+            ? "A temporary issue occurred while preparing the reading. Your question credit was not used. Please try again shortly."
+            : "鑑定文の生成で一時的な問題が起きました。相談回数は消費していません。少し時間をおいて、もう一度質問してみてください。";
       const failedMessages: Message[] = [
         ...nextMessages,
         {
@@ -711,7 +848,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
     try {
       setChart(calculateChart(nextInput));
     } catch {}
-    const savedLocation = parseSavedLocation(nextInput.city);
+    const savedLocation = parseSavedLocation(nextInput.city, language);
     setPrefecture(savedLocation.prefecture);
     setMunicipality(savedLocation.municipality);
   }
@@ -778,7 +915,13 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
       isReaderStyleLocked={(key) => !readerStyleLocksDisabled && !canUseReaderStyle(key, plan)}
       lineEntry={member ? { lineLinked, connectHref: lineConnectHref, friendUrl: lineFriendUrl } : undefined}
       loading={loading}
-      loadingText={streamingAnswer ? streamingLoadingText : loadingSequence[loadingStep] ?? loadingSequence[loadingSequence.length - 1] ?? loadingStepPool[0]}
+      loadingText={
+        streamingAnswer
+          ? isEnglish
+            ? englishStreamingLoadingText
+            : streamingLoadingText
+          : loadingSequence[loadingStep] ?? loadingSequence[loadingSequence.length - 1] ?? (isEnglish ? englishLoadingStepPool[0] : loadingStepPool[0])
+      }
       messages={messages}
       onChooseRomanticInterest={(key) => chooseRomanticInterest(key)}
       onClearQuestion={() => {
@@ -796,19 +939,20 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
       onSend={(text, intent) => ask(text, intent)}
       onToggleReaderStyleExpanded={() => setReaderStyleExpanded((expanded) => !expanded)}
       pendingLoveQuestion={Boolean(pendingLoveQuestion)}
-      pricingHref="/pricing"
+      pricingHref={pricingPath}
       question={question}
       readerStyleExpanded={readerStyleExpanded}
       readerStyleGroups={readerStyleGroups}
       readerStyleNotice={readerStyleNotice}
       readerStyleUpgradePlan={readerStyleUpgradePlan}
-      requiredPlanLabelFor={(key) => `${requiredPlanForReaderStyle(key).label}で選択可能`}
-      startReadingHref="/m"
-      starterQuestions={starterQuestions}
+      requiredPlanLabelFor={(key) => (isEnglish ? `Available on ${planLabelEn(requiredPlanForReaderStyle(key).key)}` : `${requiredPlanForReaderStyle(key).label}で選択可能`)}
+      startReadingHref={mobileEntryPath}
+      starterQuestions={isEnglish ? englishStarterQuestions : starterQuestions}
       streamingAnswer={streamingAnswer}
+      language={language}
       usage={{
         plan: currentPlan.key,
-        planLabel: currentPlanLabel,
+        planLabel: isEnglish ? planStatusLabelEn(currentPlan.key, member) : currentPlanLabel,
         remaining: remainingQuota,
         used,
         freeBonusRemaining,
@@ -827,28 +971,28 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
           <div className="birth-form-summary-heading">
             <div>
               <div className="eyebrow">Birth Data</div>
-              <h2>ホロスコープは作成済みです</h2>
+              <h2>{isEnglish ? "Your horoscope is ready" : "ホロスコープは作成済みです"}</h2>
             </div>
             <button className="button" onClick={() => setBirthFormExpanded(true)} type="button">
-              出生情報を編集する
+              {isEnglish ? "Edit birth data" : "出生情報を編集する"}
             </button>
           </div>
           <div className="birth-summary compact">
             <div>
-              <span>出生地</span>
+              <span>{isEnglish ? "Birthplace" : "出生地"}</span>
               <strong>{chart.input.city}</strong>
             </div>
             <div>
-              <span>出生日時</span>
+              <span>{isEnglish ? "Birth date and time" : "出生日時"}</span>
               <strong>
-                {chart.input.date} {chart.input.time || "時刻不明"}
+                {chart.input.date} {chart.input.time || (isEnglish ? "time unknown" : "時刻不明")}
               </strong>
             </div>
           </div>
           {compact ? (
             <div className="actions compact-actions">
-              <Link className="button primary" href="/consultation">
-                この星で相談する
+              <Link className="button primary" href={consultationPath}>
+                {isEnglish ? "Consult with this chart" : "この星で相談する"}
               </Link>
             </div>
           ) : null}
@@ -859,21 +1003,29 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
       <form className={compact ? "" : "panel form-panel"} onSubmit={submitBirth}>
         <div className="form-intro">
           <div className="eyebrow">Birth Data</div>
-          <h2>{chart ? "出生情報を編集する" : "まずは、あなたの星を知るところから"}</h2>
+          <h2>{chart ? (isEnglish ? "Edit your birth data" : "出生情報を編集する") : isEnglish ? "Start by understanding your stars" : "まずは、あなたの星を知るところから"}</h2>
           <p className="small">
             {chart
-              ? "生年月日や出生地を変更すると、ホロスコープを読み直します。入力内容を確認してから反映してください。"
-              : "ホロスコープは、生まれた日と場所から「その瞬間の星の配置」を描くところから始まります。ここで入力した情報をもとに、あなたの本質や相談の土台になる星を読み取ります。"}
+              ? isEnglish
+                ? "If you change your birth date or birthplace, HOSHIYOMI will recalculate your horoscope. Please check the details before applying the change."
+                : "生年月日や出生地を変更すると、ホロスコープを読み直します。入力内容を確認してから反映してください。"
+              : isEnglish
+                ? "A horoscope begins by mapping the sky at the moment and place you were born. These details become the foundation for reading your nature and future questions."
+                : "ホロスコープは、生まれた日と場所から「その瞬間の星の配置」を描くところから始まります。ここで入力した情報をもとに、あなたの本質や相談の土台になる星を読み取ります。"}
           </p>
-          <p className="small">出生時刻がわからない場合は空欄でもOKです。その場合はASCとハウスを省略して診断します。</p>
+          <p className="small">
+            {isEnglish
+              ? "If you do not know your birth time, you can leave it blank. ASC and houses will be omitted in that case."
+              : "出生時刻がわからない場合は空欄でもOKです。その場合はASCとハウスを省略して診断します。"}
+          </p>
         </div>
         <div className="grid">
           <div className="field full">
-            <label>名前</label>
-            <input value={input.name} onChange={(e) => setInput({ ...input, name: e.target.value })} placeholder="任意で入力" />
+            <label>{isEnglish ? "Name" : "名前"}</label>
+            <input value={input.name} onChange={(e) => setInput({ ...input, name: e.target.value })} placeholder={isEnglish ? "Optional" : "任意で入力"} />
           </div>
           <div className="field">
-            <label>あなたの性別（任意）</label>
+            <label>{isEnglish ? "Your gender (optional)" : "あなたの性別（任意）"}</label>
             <select
               value={input.gender ?? "unspecified"}
               onChange={(e) => {
@@ -883,54 +1035,54 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
             >
               {genderOptions.map((option) => (
                 <option key={option.key} value={option.key}>
-                  {option.label}
+                  {isEnglish ? genderLabelEn(option.key) : option.label}
                 </option>
               ))}
             </select>
           </div>
           <div className="field">
-            <label>生年月日</label>
+            <label>{isEnglish ? "Date of birth" : "生年月日"}</label>
             <div className="birth-date-selects">
-              <select aria-label="出生年" value={birthDateParts.year} onChange={(e) => updateBirthDate("year", e.target.value)}>
+              <select aria-label={isEnglish ? "Birth year" : "出生年"} value={birthDateParts.year} onChange={(e) => updateBirthDate("year", e.target.value)}>
                 {birthYearOptions.map((year) => (
                   <option key={year} value={year}>
-                    {year}年
+                    {isEnglish ? year : `${year}年`}
                   </option>
                 ))}
               </select>
-              <select aria-label="出生月" value={birthDateParts.month} onChange={(e) => updateBirthDate("month", e.target.value)}>
+              <select aria-label={isEnglish ? "Birth month" : "出生月"} value={birthDateParts.month} onChange={(e) => updateBirthDate("month", e.target.value)}>
                 {birthMonthOptions.map((month) => (
                   <option key={month} value={month}>
-                    {month}月
+                    {isEnglish ? month : `${month}月`}
                   </option>
                 ))}
               </select>
-              <select aria-label="出生日" value={birthDateParts.day} onChange={(e) => updateBirthDate("day", e.target.value)}>
+              <select aria-label={isEnglish ? "Birth day" : "出生日"} value={birthDateParts.day} onChange={(e) => updateBirthDate("day", e.target.value)}>
                 {birthDayOptions.map((day) => (
                   <option key={day} value={day}>
-                    {day}日
+                    {isEnglish ? day : `${day}日`}
                   </option>
                 ))}
               </select>
             </div>
           </div>
           <div className="field">
-            <label>出生時刻</label>
+            <label>{isEnglish ? "Birth time" : "出生時刻"}</label>
             <input
               type="text"
               inputMode="numeric"
               value={input.time || ""}
               onChange={(e) => setInput({ ...input, time: e.target.value })}
-              placeholder="例: 14:30 / 1430"
+              placeholder={isEnglish ? "e.g. 14:30 / 1430" : "例: 14:30 / 1430"}
               aria-describedby="birth-time-help"
             />
             <span className="field-hint" id="birth-time-help">
-              わからない場合は空欄のままでOKです
+              {isEnglish ? "Leave blank if you do not know it" : "わからない場合は空欄のままでOKです"}
             </span>
           </div>
           <div className="location-picker full">
             <div className="field location-search-field">
-              <label htmlFor="birth-location-search">出生地を検索</label>
+              <label htmlFor="birth-location-search">{isEnglish ? "Search birthplace" : "出生地を検索"}</label>
               <input
                 autoComplete="off"
                 autoCorrect="off"
@@ -938,35 +1090,48 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
                 id="birth-location-search"
                 onChange={handleLocationQueryInput}
                 onInput={handleLocationQueryInput}
-                placeholder="例: 町田市 / 静岡市 / 札幌市中央区"
+                placeholder={isEnglish ? "e.g. London / New York / Paris / Singapore" : "例: 町田市 / 静岡市 / 札幌市中央区"}
                 spellCheck={false}
                 type="text"
                 value={locationQuery}
               />
               <span className="field-hint">
-                候補が複数ある場合は、該当する出生地を選んでください。
+                {isEnglish ? "Search by city, country, state, or common city name. If it is not listed, you can enter latitude and longitude manually." : "候補が複数ある場合は、該当する出生地を選んでください。"}
               </span>
               <div className="location-search-status" aria-live="polite">
-                <span>現在反映されている出生地</span>
-                <strong>{locationChoicePending ? "候補から選択してください" : selectedBirthCity}</strong>
+                <span>{isEnglish ? "Applied birthplace" : "現在反映されている出生地"}</span>
+                <strong>{locationChoicePending ? (isEnglish ? "Choose from the suggestions" : "候補から選択してください") : selectedBirthCity}</strong>
                 {locationQuery.trim() ? (
                   <small>
-                    {locationSearchMatches.some((match) => match.score <= 4)
+                    {locationSearchLoading
+                      ? isEnglish
+                        ? "Searching global city data..."
+                        : "候補を検索しています。"
+                      : locationSearchError
+                        ? locationSearchError
+                        : selectableLocationMatches.length
                       ? locationChoicePending
-                        ? "同名の市区町村があります。下の候補から選択すると反映されます。"
-                        : "候補から該当する出生地を選択できます。"
+                        ? isEnglish
+                          ? "Several cities match this search. Choose one below to apply it."
+                          : "同名の市区町村があります。下の候補から選択すると反映されます。"
+                        : isEnglish
+                          ? "You can still choose another matching city from the suggestions."
+                          : "候補から該当する出生地を選択できます。"
                       : locationSearchMatches.length
-                        ? "都道府県名だけでは反映しません。市区町村名まで入力してください。"
-                        : "一致する市区町村がありません。漢字の市区町村名で入力してください。"}
+                        ? isEnglish
+                          ? "A country alone is not enough. Please enter or choose a city as well."
+                          : "都道府県名だけでは反映しません。市区町村名まで入力してください。"
+                        : isEnglish
+                          ? "No matching city was found. You can use latitude and longitude manually."
+                          : "一致する市区町村がありません。漢字の市区町村名で入力してください。"}
                   </small>
                 ) : (
-                  <small>市区町村名を入力すると、出生地がここに反映されます。</small>
+                  <small>{isEnglish ? "Enter a city name, and the applied birthplace will appear here." : "市区町村名を入力すると、出生地がここに反映されます。"}</small>
                 )}
               </div>
-              {locationSearchMatches.some((match) => match.score <= 4) ? (
-                <div className="location-candidate-list" role="listbox" aria-label="出生地候補">
-                  {locationSearchMatches
-                    .filter((match) => match.score <= 4)
+              {selectableLocationMatches.length ? (
+                <div className="location-candidate-list" role="listbox" aria-label={isEnglish ? "Birthplace suggestions" : "出生地候補"}>
+                  {selectableLocationMatches
                     .slice(0, 8)
                     .map((match) => {
                       const isSelected = !locationChoicePending && match.prefecture === selectedLocation.location.prefecture && match.municipality.name === selectedLocation.municipality.name;
@@ -982,6 +1147,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
                         >
                           <span>{match.prefecture}</span>
                           <strong>{match.municipality.name}</strong>
+                          {match.subtitle ? <small>{match.subtitle}</small> : null}
                         </button>
                       );
                     })}
@@ -990,29 +1156,29 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
             </div>
           </div>
           <div className="birth-place-preview full">
-            <span>選択中の出生地</span>
-            <strong>{input.city === "手入力" ? "手入力" : selectedBirthCity}</strong>
+            <span>{isEnglish ? "Selected birthplace" : "選択中の出生地"}</span>
+            <strong>{input.city === "手入力" ? (isEnglish ? "Manual input" : "手入力") : selectedBirthCity}</strong>
             <small>
-              緯度 {Number(input.city === "手入力" ? input.latitude : selectedLocation.municipality.latitude).toFixed(4)} / 経度{" "}
+              {isEnglish ? "Lat." : "緯度"} {Number(input.city === "手入力" ? input.latitude : selectedLocation.municipality.latitude).toFixed(4)} / {isEnglish ? "Lng." : "経度"}{" "}
               {Number(input.city === "手入力" ? input.longitude : selectedLocation.municipality.longitude).toFixed(4)}
             </small>
           </div>
           <div className="field">
-            <label>緯度</label>
+            <label>{isEnglish ? "Latitude" : "緯度"}</label>
             <input type="number" step="0.0001" value={input.latitude} onChange={(e) => setInput({ ...input, latitude: Number(e.target.value), city: "手入力" })} />
           </div>
           <div className="field">
-            <label>経度</label>
+            <label>{isEnglish ? "Longitude" : "経度"}</label>
             <input type="number" step="0.0001" value={input.longitude} onChange={(e) => setInput({ ...input, longitude: Number(e.target.value), city: "手入力" })} />
           </div>
         </div>
         <div className="actions">
           <button className="button primary" type="submit">
-            {chart ? "変更を反映する" : "ホロスコープを作成"}
+            {chart ? (isEnglish ? "Apply changes" : "変更を反映する") : isEnglish ? "Create my horoscope" : "ホロスコープを作成"}
           </button>
           {chart ? (
             <button className="button" onClick={() => setBirthFormExpanded(false)} type="button">
-              編集を閉じる
+              {isEnglish ? "Close editing" : "編集を閉じる"}
             </button>
           ) : null}
         </div>
@@ -1035,24 +1201,24 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
             </div>
             <div className="panel reading-card">
               <div className="eyebrow">Natal Reading</div>
-              <h2>{chart.input.name || "あなた"}の星読み</h2>
+              <h2>{isEnglish ? `${chart.input.name || "Your"} natal reading` : `${chart.input.name || "あなた"}の星読み`}</h2>
               <div className="birth-summary compact">
                 <div>
-                  <span>出生地</span>
+                  <span>{isEnglish ? "Birthplace" : "出生地"}</span>
                   <strong>{chart.input.city}</strong>
                 </div>
                 <div>
-                  <span>出生日時</span>
+                  <span>{isEnglish ? "Birth date and time" : "出生日時"}</span>
                   <strong>
-                    {chart.input.date} {chart.input.time || "時刻不明"}
+                    {chart.input.date} {chart.input.time || (isEnglish ? "time unknown" : "時刻不明")}
                   </strong>
                 </div>
               </div>
               {natalProfile ? (
                 <div className="natal-profile">
                   <p className="natal-summary">{natalProfile.summary}</p>
-                  <Link className="text-link" href="/glossary">
-                    ASC・ハウス・アスペクトなどを完全ガイド・用語集で見る
+                  <Link className="text-link" href={glossaryPath}>
+                    {isEnglish ? "Open the complete guide for ASC, houses, and aspects" : "ASC・ハウス・アスペクトなどを完全ガイド・用語集で見る"}
                   </Link>
                   <div className="natal-insight-grid">
                     {natalProfile.blocks.map((block) => (
@@ -1091,11 +1257,13 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
               <div className="eyebrow">Continue Reading</div>
               <h2>ここから先は、星の文脈を記憶し、あなた専用の占い師として未来を占います</h2>
               <p>
-                今はあなたの星の配置を理解した段階です。恋愛、仕事、相性、将来の迷いなど、具体的な悩みを重ねるほど、鑑定はあなた自身の文脈に近づいていきます。
+                {isEnglish
+                  ? "Your chart has been mapped. The more you ask about love, work, compatibility, future choices, and real concerns, the more the reading can follow your own context."
+                  : "今はあなたの星の配置を理解した段階です。恋愛、仕事、相性、将来の迷いなど、具体的な悩みを重ねるほど、鑑定はあなた自身の文脈に近づいていきます。"}
               </p>
               <div className="actions compact-actions">
-                <Link className="button primary" href="/consultation">
-                  この星で相談する
+                <Link className="button primary" href={consultationPath}>
+                  {isEnglish ? "Ask about this chart" : "この星で相談する"}
                 </Link>
               </div>
             </section>
@@ -1106,7 +1274,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
           {!hideConsultation && !consultationOnly ? (
           <section className="panel memory-card">
             <div className="eyebrow">Member Memory</div>
-            <h2>あなたの星と鑑定履歴</h2>
+            <h2>{isEnglish ? "Your chart and reading history" : "あなたの星と鑑定履歴"}</h2>
             {canViewMemory ? (
               <>
                 <div className="memory-profile">
@@ -1114,10 +1282,12 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
                     <span>Profile</span>
                     <strong>{chart.input.name || "名前未設定"}</strong>
                     <p>
-                      {chart.input.date} {chart.input.time || "出生時刻不明"} / {chart.input.city}
+                      {chart.input.date} {chart.input.time || (isEnglish ? "birth time unknown" : "出生時刻不明")} / {chart.input.city}
                     </p>
                     <p>
-                      性別: {genderLabel(input.gender ?? chart.input.gender)} / 恋愛対象: {romanticInterestLabel(input.romanticInterest ?? chart.input.romanticInterest)}
+                      {isEnglish
+                        ? `Gender: ${genderLabelEn(input.gender ?? chart.input.gender)} / Romantic interest: ${romanticInterestLabelEn(input.romanticInterest ?? chart.input.romanticInterest)}`
+                        : `性別: ${genderLabel(input.gender ?? chart.input.gender)} / 恋愛対象: ${romanticInterestLabel(input.romanticInterest ?? chart.input.romanticInterest)}`}
                     </p>
                   </div>
                   <div>
@@ -1125,7 +1295,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
                     <strong>
                       太陽 {chart.planets[0].sign.name} / 月 {chart.planets[1].sign.name}
                     </strong>
-                    <p>{chart.ascendant ? `ASC ${chart.ascendant.sign.name}` : "ASCは出生時刻入力後に表示されます"}</p>
+                    <p>{chart.ascendant ? `ASC ${chart.ascendant.sign.name}` : isEnglish ? "ASC appears when birth time is entered" : "ASCは出生時刻入力後に表示されます"}</p>
                   </div>
                 </div>
                 <div className="history-list">
@@ -1143,7 +1313,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
                           <p className={expanded ? "history-full-answer" : ""}>{expanded ? answerText : `${answerText.slice(0, 180)}${answerText.length > 180 ? "..." : ""}`}</p>
                           <div className="history-actions">
                             <button className="text-button" type="button" onClick={() => setExpandedHistoryId(expanded ? null : entry.id)}>
-                              {expanded ? "全文を閉じる" : "全文を表示"}
+                              {expanded ? (isEnglish ? "Close full text" : "全文を閉じる") : isEnglish ? "Show full text" : "全文を表示"}
                             </button>
                             <button
                               className="text-button"
@@ -1156,28 +1326,30 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
                                 window.setTimeout(() => scrollToLatestMessage("auto"), 60);
                               }}
                             >
-                              この鑑定を会話に戻す
+                              {isEnglish ? "Return this reading to the chat" : "この鑑定を会話に戻す"}
                             </button>
                           </div>
                         </article>
                       );
                     })
                   ) : (
-                    <p className="small">まだ保存された鑑定履歴はありません。相談するとここに記録されます。</p>
+                    <p className="small">{isEnglish ? "No saved reading history yet. Your readings will appear here after you consult." : "まだ保存された鑑定履歴はありません。相談するとここに記録されます。"}</p>
                   )}
                 </div>
               </>
             ) : (
               <div className="memory-gate">
                 <p>
-                  会員登録すると、あなたの出生プロフィール、過去に占った相談内容、鑑定履歴を参照できます。毎回ゼロから説明しなくても、あなたの星の文脈を引き継いで相談できます。
+                  {isEnglish
+                    ? "After registration, HOSHIYOMI can refer to your birth profile and past reading history, so you do not have to explain the same context every time."
+                    : "会員登録すると、あなたの出生プロフィール、過去に占った相談内容、鑑定履歴を参照できます。毎回ゼロから説明しなくても、あなたの星の文脈を引き継いで相談できます。"}
                 </p>
                 <div className="actions">
-                  <Link className="button primary" href="/register?returnTo=/consultation">
-                    この星を記録して履歴を残す
+                  <Link className="button primary" href={registerPath}>
+                    {isEnglish ? "Save this chart and keep my history" : "この星を記録して履歴を残す"}
                   </Link>
-                  <Link className="button" href="/login?returnTo=/consultation">
-                    登録済みの方はログイン
+                  <Link className="button" href={loginPath}>
+                    {isEnglish ? "Log in if already registered" : "登録済みの方はログイン"}
                   </Link>
                 </div>
               </div>
@@ -1189,8 +1361,8 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
         consultationView
       ) : (
         <div className="panel reading-card">
-          <h2>まず出生情報を入力してください</h2>
-          <p>チャート作成後、星読みと相談欄が表示されます。</p>
+          <h2>{isEnglish ? "Enter your birth data first" : "まず出生情報を入力してください"}</h2>
+          <p>{isEnglish ? "After the chart is created, your reading and consultation area will appear." : "チャート作成後、星読みと相談欄が表示されます。"}</p>
         </div>
       )}
       {showPaywallModal ? (
@@ -1199,6 +1371,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
           currentPlanKey={plan}
           freeBonusRemaining={freeBonusRemaining}
           isMember={member}
+          language={language}
           onBuyAddOn={async () => {
             await buyAddOnPack();
             setShowPaywallModal(false);
@@ -1225,14 +1398,20 @@ function buildRequestMessagesForApi(messages: Message[], planKey: PlanKey): Mess
     .filter((message): message is Message => message !== null);
 }
 
-function chatResponseFallbackMessage(status: number) {
+function chatResponseFallbackMessage(status: number, language: Locale): string {
   if (status === 413) {
-    return "相談履歴が長くなりすぎて送信できませんでした。直近の相談だけで読み直します。もう一度送ってください。";
+    return language === "en"
+      ? "The conversation history is too long to send. Please try again using the most recent context."
+      : "相談履歴が長くなりすぎて送信できませんでした。直近の相談だけで読み直します。もう一度送ってください。";
   }
   if (status >= 500) {
-    return "鑑定文の生成で一時的な問題が起きました。相談回数は消費していません。少し時間をおいて、もう一度質問してみてください。";
+    return language === "en"
+      ? "A temporary issue occurred while preparing the reading. Your question credit was not used. Please try again shortly."
+      : "鑑定文の生成で一時的な問題が起きました。相談回数は消費していません。少し時間をおいて、もう一度質問してみてください。";
   }
-  return "星からの返答を受け取れませんでした。少し時間をおいて、もう一度送ってください。";
+  return language === "en"
+    ? "The reading did not come through. Please wait a moment and send it again."
+    : "星からの返答を受け取れませんでした。少し時間をおいて、もう一度送ってください。";
 }
 
 function LineConsultationGuide({ lineConnectHref, lineFriendUrl, lineLinked }: { lineConnectHref: string; lineFriendUrl: string; lineLinked: boolean }) {
@@ -1488,12 +1667,42 @@ function getSelectedLocation(prefecture: string, municipality: string) {
   };
 }
 
-function buildLocationSearchMatches(query: string): LocationSearchMatch[] {
+function getSelectedBirthLocation(prefecture: string, municipality: string, language: Locale, input?: BirthInput) {
+  if (language === "en" && input && input.city !== "手入力" && looksLikeWorldCityLabel(input.city) && Number.isFinite(Number(input.latitude)) && Number.isFinite(Number(input.longitude))) {
+    const [cityName] = input.city.split(",");
+    return {
+      location: { prefecture },
+      municipality: {
+        name: cityName.trim() || municipality,
+        latitude: Number(input.latitude),
+        longitude: Number(input.longitude)
+      },
+      displayLabel: input.city
+    };
+  }
+  if (language === "en") {
+    const { location, city } = findWorldLocation(prefecture, municipality);
+    const selectedMunicipality = worldCityAsMunicipality(city);
+    return {
+      location: { prefecture: location.country },
+      municipality: selectedMunicipality,
+      displayLabel: formatWorldCityLabel(location.country, city)
+    };
+  }
+  const selected = getSelectedLocation(prefecture, municipality);
+  return {
+    ...selected,
+    displayLabel: `${selected.location.prefecture} ${selected.municipality.name}`
+  };
+}
+
+function buildLocationSearchMatches(query: string, language: Locale): LocationSearchMatch[] {
   const normalizedQuery = normalizeLocationSearchText(query);
   if (!normalizedQuery) return [];
+  if (language === "en") return buildWorldLocationSearchMatches(normalizedQuery);
   const matches = japanLocations.flatMap((location) =>
     location.municipalities
-      .map((municipality) => {
+      .map((municipality): LocationSearchMatch | null => {
         const label = `${location.prefecture} ${municipality.name}`;
         const searchable = normalizeLocationSearchText(`${label} ${municipalityReading(location.prefecture, municipality)}`);
         const municipalityText = normalizeLocationSearchText(municipality.name);
@@ -1505,7 +1714,7 @@ function buildLocationSearchMatches(query: string): LocationSearchMatch[] {
         else if (municipalityText.includes(normalizedQuery)) score = 3;
         else if (searchable.includes(normalizedQuery)) score = 4;
         else if (prefectureText.includes(normalizedQuery)) score = 5;
-        return score < 99 ? { label, municipality, prefecture: location.prefecture, score } : null;
+        return score < 99 ? { label, municipality, prefecture: location.prefecture, score, source: "local" } : null;
       })
       .filter((match): match is LocationSearchMatch => Boolean(match))
   );
@@ -1514,13 +1723,110 @@ function buildLocationSearchMatches(query: string): LocationSearchMatch[] {
     .slice(0, 12);
 }
 
-function resolveAutoLocationMatch(matches: LocationSearchMatch[]) {
-  const candidates = matches.filter((match) => match.score <= 4);
+function buildWorldLocationSearchMatches(normalizedQuery: string): LocationSearchMatch[] {
+  const matches = worldLocations.flatMap((location) =>
+    location.cities
+      .map((city): LocationSearchMatch | null => {
+        const municipality = worldCityAsMunicipality(city);
+        const label = formatWorldCityLabel(location.country, city);
+        const aliasText = (city.aliases ?? []).join(" ");
+        const searchable = normalizeLocationSearchText(`${city.name} ${city.region ?? ""} ${location.country} ${aliasText} ${label}`);
+        const cityText = normalizeLocationSearchText(city.name);
+        const countryText = normalizeLocationSearchText(location.country);
+        const regionText = normalizeLocationSearchText(city.region ?? "");
+        const aliases = (city.aliases ?? []).map(normalizeLocationSearchText);
+        let score = 99;
+        if (cityText === normalizedQuery || aliases.includes(normalizedQuery) || searchable === normalizedQuery) score = 0;
+        else if (cityText.startsWith(normalizedQuery) || aliases.some((alias) => alias.startsWith(normalizedQuery))) score = 1;
+        else if (searchable.startsWith(normalizedQuery)) score = 2;
+        else if (cityText.includes(normalizedQuery) || aliases.some((alias) => alias.includes(normalizedQuery))) score = 3;
+        else if (searchable.includes(normalizedQuery)) score = 4;
+        else if (countryText.includes(normalizedQuery) || regionText.includes(normalizedQuery)) score = 5;
+        return score < 99
+          ? {
+              label,
+              municipality,
+              prefecture: location.country,
+              score,
+              subtitle: city.region ? `${city.region}, ${location.country}` : location.country,
+              source: "local"
+            }
+          : null;
+      })
+      .filter((match): match is LocationSearchMatch => Boolean(match))
+  );
+  return matches
+    .sort((a, b) => a.score - b.score || englishCollator.compare(a.label, b.label))
+    .slice(0, 16);
+}
+
+function remoteResultsToMatches(results: RemoteLocationResult[]): LocationSearchMatch[] {
+  return results
+    .map((result, index): LocationSearchMatch | null => {
+      if (!result.name || !result.country || typeof result.latitude !== "number" || typeof result.longitude !== "number") return null;
+      const label = result.label || `${result.name}, ${result.country}`;
+      return {
+        label,
+        municipality: {
+          name: result.name,
+          latitude: result.latitude,
+          longitude: result.longitude
+        },
+        prefecture: result.country,
+        score: Math.min(index, 4),
+        source: "remote",
+        subtitle: result.subtitle || result.country
+      };
+    })
+    .filter((match): match is LocationSearchMatch => Boolean(match));
+}
+
+function mergeLocationMatches(localMatches: LocationSearchMatch[], remoteMatches: LocationSearchMatch[]) {
+  const seen = new Set<string>();
+  return [...localMatches, ...remoteMatches].filter((match) => {
+    const key = `${normalizeLocationSearchText(match.prefecture)}|${normalizeLocationSearchText(match.municipality.name)}|${match.municipality.latitude.toFixed(3)}|${match.municipality.longitude.toFixed(3)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function looksLikeWorldCityLabel(value: string) {
+  return value.includes(",") && !/[ぁ-んァ-ヶ一-龠]/.test(value);
+}
+
+function resolveAutoLocationMatch(matches: LocationSearchMatch[], language: Locale) {
+  const threshold = language === "en" ? 3 : 4;
+  const candidates = matches.filter((match) => match.score <= threshold);
   if (candidates.length === 1) return candidates[0];
   const bestScore = candidates[0]?.score;
   if (bestScore === undefined) return null;
   const bestMatches = candidates.filter((match) => match.score === bestScore);
   return bestMatches.length === 1 && bestScore <= 2 ? bestMatches[0] : null;
+}
+
+function locationMatchSelectThreshold(language: Locale) {
+  return language === "en" ? 5 : 4;
+}
+
+function worldCityAsMunicipality(city: WorldCity): Municipality {
+  return {
+    name: city.name,
+    latitude: city.latitude,
+    longitude: city.longitude
+  };
+}
+
+function formatBirthLocationLabel(prefecture: string, municipality: Municipality, language: Locale) {
+  if (language === "en") {
+    const { location, city } = findWorldLocation(prefecture, municipality.name);
+    return formatWorldCityLabel(location.country, city);
+  }
+  return `${prefecture} ${municipality.name}`;
+}
+
+function formatWorldCityLabel(country: string, city: WorldCity) {
+  return `${city.name}, ${country}`;
 }
 
 function normalizeLocationSearchText(value: string) {
@@ -1644,12 +1950,24 @@ function elementTone(element: "火" | "地" | "風" | "水") {
   return tones[element];
 }
 
-function buildFollowUpQuestions(messages: Message[]) {
+function buildFollowUpQuestions(messages: Message[], language: Locale = "ja") {
   const lastUser = [...messages].reverse().find((message) => message.role === "user")?.content ?? "";
   const lastAssistant = messages[messages.length - 1]?.role === "assistant";
   if (!lastAssistant) return [];
 
   const lower = lastUser.toLowerCase();
+  if (language === "en") {
+    if (lower.includes("today") || lower.includes("luck") || lower.includes("daily")) {
+      return ["Read my love luck for today", "Read my work luck and cautions", "What should I notice tomorrow?", "Read the flow of this week"];
+    }
+    if (lower.includes("love") || lower.includes("relationship") || lower.includes("marriage") || lower.includes("reconciliation")) {
+      return ["Read the compatibility more deeply", "Show the short, middle, and long-term flow", "What pattern should I watch in love?", "What action should I take next?"];
+    }
+    if (lower.includes("work") || lower.includes("job") || lower.includes("career") || lower.includes("money") || lower.includes("income")) {
+      return ["Read my career flow in more detail", "How can I turn my talents into income?", "When should I move next?", "What should I check at work?"];
+    }
+    return ["Show the short, middle, and long-term flow", "What could change in this situation?", "What should I do next?", "Split this theme into love and work"];
+  }
   if (lastUser.includes("今日の運勢") || lastUser.includes("今日") || lastUser.includes("ラッキー")) {
     return ["今日の恋愛運をもう少し詳しく見て", "今日の仕事運と注意点を見て", "明日の運勢も見て", "今週の流れも見て"];
   }
@@ -1665,16 +1983,32 @@ function buildFollowUpQuestions(messages: Message[]) {
   return ["短期・中期・長期で詳しく見て", "今の悩みが変わる可能性を見て", "私が次に取るべき行動は？", "このテーマを恋愛と仕事に分けて見て"];
 }
 
-function buildLoadingSequence(question: string, readerStyle: ReaderStyleKey) {
-  const themeSteps = buildThemeLoadingSteps(question);
-  const readerSteps = buildReaderLoadingSteps(readerStyle);
-  const candidates = uniqueTexts([...themeSteps, ...readerSteps, ...loadingStepPool]);
-  const first = shuffleTexts([...themeSteps, ...readerSteps, ...loadingStepPool.slice(0, 4)])[0] ?? loadingStepPool[0];
+function buildLoadingSequence(question: string, readerStyle: ReaderStyleKey, language: Locale = "ja") {
+  const pool = language === "en" ? englishLoadingStepPool : loadingStepPool;
+  const themeSteps = buildThemeLoadingSteps(question, language);
+  const readerSteps = buildReaderLoadingSteps(readerStyle, language);
+  const candidates = uniqueTexts([...themeSteps, ...readerSteps, ...pool]);
+  const first = shuffleTexts([...themeSteps, ...readerSteps, ...pool.slice(0, 4)])[0] ?? pool[0];
   return [first, ...shuffleTexts(candidates.filter((step) => step !== first))].slice(0, 16);
 }
 
-function buildThemeLoadingSteps(question: string) {
+function buildThemeLoadingSteps(question: string, language: Locale = "ja") {
   const text = question.toLowerCase();
+  if (language === "en") {
+    if (text.includes("today") || text.includes("luck") || text.includes("daily")) {
+      return ["Reading today's Moon against your birth chart", "Looking for today's lucky color and number", "Sorting what to watch for today"];
+    }
+    if (text.includes("love") || text.includes("relationship") || text.includes("marriage") || text.includes("reconciliation")) {
+      return ["Reading Venus and Mars for attraction and distance", "Separating what you hope for from what gives you real safety", "Checking the Moon for repeated love patterns"];
+    }
+    if (text.includes("work") || text.includes("job") || text.includes("career")) {
+      return ["Reading the Sun and Saturn for work pressure", "Separating what is growing from what is draining you", "Sorting what needs action and what still needs checking"];
+    }
+    if (text.includes("money") || text.includes("income")) {
+      return ["Reading Venus and Jupiter for money flow", "Looking for what should be organized before growth", "Checking how your talent can become value"];
+    }
+    return ["Picking up the strongest words in your question", "Finding where your birth chart responds to this concern", "Narrowing the focus of today's sky"];
+  }
   if (question.includes("今日の運勢") || question.includes("今日") || question.includes("ラッキー")) {
     return ["今日の月と出生図の接点を見ています", "ラッキーカラーとナンバーを星から拾っています", "今日気をつける流れを整えています"];
   }
@@ -1696,7 +2030,14 @@ function buildThemeLoadingSteps(question: string) {
   return ["質問の中で一番強く響いている言葉を拾っています", "出生図のどこがこの悩みに反応しているか見ています", "今の星が照らしている焦点を絞っています"];
 }
 
-function buildReaderLoadingSteps(readerStyle: ReaderStyleKey) {
+function buildReaderLoadingSteps(readerStyle: ReaderStyleKey, language: Locale = "ja") {
+  if (language === "en") {
+    if (readerStyle === "harsh") return ["Reading with Rika Sakaki's sharper lens", "Cutting through wishful thinking and the chart's reality", "Finding the uncomfortable point that should not be softened"];
+    if (readerStyle === "direct") return ["Reading with Rei Kurose's direct lens", "Sorting the real conditions that need to be checked"];
+    if (readerStyle === "companion") return ["Reading with Shizuku Amamiya's compassionate lens", "Holding the feeling underneath the question before giving advice"];
+    if (readerStyle === "mild") return ["Reading with Madoka Shiratsuki's gentle lens", "Choosing the order that makes the answer easier to receive"];
+    return ["Reading the chart in a balanced, standard style"];
+  }
   if (readerStyle === "harsh") {
     return ["榊リカの視点で、見ないふりをしている前提を切り出しています", "甘い期待と現実のズレを星から洗い出しています", "耳に痛くても言うべき核心を絞っています", "逃げている場所を、星の配置から見ています"];
   }
@@ -1729,8 +2070,28 @@ function shuffleTexts(values: string[]) {
   return next;
 }
 
-function parseSavedLocation(city: string) {
+function parseSavedLocation(city: string, language: Locale = "ja") {
   const normalizedCity = city.trim();
+  if (language === "en") {
+    const normalizedSavedCity = normalizeLocationSearchText(normalizedCity);
+    const japaneseFallback = japaneseCityToWorldFallback(normalizedCity);
+    if (japaneseFallback) return japaneseFallback;
+    for (const location of worldLocations) {
+      for (const worldCity of location.cities) {
+        const candidates = [
+          worldCity.name,
+          `${worldCity.name}, ${location.country}`,
+          `${worldCity.name} ${location.country}`,
+          ...(worldCity.region ? [`${worldCity.name}, ${worldCity.region}, ${location.country}`, `${worldCity.name} ${worldCity.region} ${location.country}`] : []),
+          ...(worldCity.aliases ?? [])
+        ].map(normalizeLocationSearchText);
+        if (candidates.some((candidate) => candidate === normalizedSavedCity || normalizedSavedCity.includes(candidate))) {
+          return { prefecture: location.country, municipality: worldCity.name };
+        }
+      }
+    }
+    return { prefecture: "United States", municipality: "New York" };
+  }
   for (const location of japanLocations) {
     if (!normalizedCity.startsWith(location.prefecture)) continue;
     const municipalityName = normalizedCity.slice(location.prefecture.length).trim();
@@ -1743,11 +2104,81 @@ function parseSavedLocation(city: string) {
   return { prefecture: "東京都", municipality: "新宿区" };
 }
 
+function japaneseCityToWorldFallback(city: string) {
+  const rules = [
+    { needles: ["東京都", "東京"], municipality: "Tokyo" },
+    { needles: ["大阪府", "大阪市", "大阪"], municipality: "Osaka" },
+    { needles: ["京都府", "京都市", "京都"], municipality: "Kyoto" },
+    { needles: ["北海道", "札幌市", "札幌"], municipality: "Sapporo" },
+    { needles: ["福岡県", "福岡市", "福岡"], municipality: "Fukuoka" }
+  ];
+  const matched = rules.find((rule) => rule.needles.some((needle) => city.includes(needle)));
+  return matched ? { prefecture: "Japan", municipality: matched.municipality } : null;
+}
+
+function planLabelEn(planKey: PlanKey) {
+  if (planKey === "standard") return "Standard Plan";
+  if (planKey === "luxury") return "Private Plan";
+  return "Free Plan";
+}
+
+function planStatusLabelEn(planKey: PlanKey, isMember: boolean) {
+  if (planKey === "free" && !isMember) return `Guest trial (${resolvePlan("free").questionLimit} questions)`;
+  return planLabelEn(planKey);
+}
+
+function readerStyleLabelEn(styleKey: ReaderStyleKey) {
+  const labels: Record<ReaderStyleKey, string> = {
+    normal: "Standard",
+    mild: "Gentle",
+    companion: "Compassionate",
+    direct: "Direct",
+    harsh: "Sharp"
+  };
+  return labels[styleKey];
+}
+
+function readerStyleNameEn(styleKey: ReaderStyleKey) {
+  const labels: Record<ReaderStyleKey, string> = {
+    normal: "Standard Reading",
+    mild: "Madoka Shiratsuki",
+    companion: "Shizuku Amamiya",
+    direct: "Rei Kurose",
+    harsh: "Rika Sakaki"
+  };
+  return labels[styleKey];
+}
+
+function genderLabelEn(value: GenderKey | null | undefined) {
+  const labels: Record<GenderKey, string> = {
+    female: "Female",
+    male: "Male",
+    no_answer: "Prefer not to say",
+    unspecified: "Not specified"
+  };
+  return labels[value ?? "unspecified"] ?? labels.unspecified;
+}
+
+function romanticInterestLabelEn(value: RomanticInterestKey | null | undefined) {
+  const labels: Record<RomanticInterestKey, string> = {
+    both: "Both men and women",
+    men: "Men",
+    none: "No romantic target",
+    not_sure: "Still unsure",
+    no_answer: "Prefer not to say",
+    target_unknown: "I do not know their gender",
+    unspecified: "Not specified",
+    women: "Women"
+  };
+  return labels[value ?? "unspecified"] ?? labels.unspecified;
+}
+
 function PaywallModal({
   addOnCredits,
   currentPlanKey,
   freeBonusRemaining,
   isMember,
+  language,
   onBuyAddOn,
   onCheckout,
   onClose
@@ -1756,22 +2187,36 @@ function PaywallModal({
   currentPlanKey: PlanKey;
   freeBonusRemaining: number;
   isMember: boolean;
+  language: Locale;
   onBuyAddOn: () => void | Promise<void>;
   onCheckout: (nextPlan: Exclude<PlanKey, "free">) => void | Promise<void>;
   onClose: () => void;
 }) {
+  const isEnglish = language === "en";
   const isUnregisteredFree = currentPlanKey === "free" && !isMember;
-  const modalTitle = isUnregisteredFree ? "新規登録で続きを相談できます" : "ここから先は、星の文脈を保存して続きます";
+  const modalTitle = isUnregisteredFree
+    ? isEnglish
+      ? "Register to continue this reading"
+      : "新規登録で続きを相談できます"
+    : isEnglish
+      ? "Continue with your chart remembered"
+      : "ここから先は、星の文脈を保存して続きます";
   const freeMessage = isUnregisteredFree
-    ? `未登録で使える${resolvePlan("free").questionLimit}回分の相談枠を使い切りました。新規登録をすると、あなたの星を記録して初回${registeredFreeBonusLimit}回分の相談枠を受け取れます。`
+    ? isEnglish
+      ? `You have used the ${resolvePlan("free").questionLimit} guest trial questions. Register to save your chart and receive ${registeredFreeBonusLimit} first-time question credits.`
+      : `未登録で使える${resolvePlan("free").questionLimit}回分の相談枠を使い切りました。新規登録をすると、あなたの星を記録して初回${registeredFreeBonusLimit}回分の相談枠を受け取れます。`
     : isMember && freeBonusRemaining <= 0
-      ? `今日の無料相談枠を使い切りました。明日になれば無料プランでもまた3回相談できます。今すぐ続けたい場合は、相談回数と鑑定タイプを広げられます。`
-      : "今日の無料相談枠を使い切りました。明日また3回相談できます。今すぐ続きを読みたい場合だけ、下のプランから選べます。";
+      ? isEnglish
+        ? "Today's free questions have been used. You can ask again tomorrow on the Free Plan, or continue now with more credits and reader styles."
+        : `今日の無料相談枠を使い切りました。明日になれば無料プランでもまた3回相談できます。今すぐ続けたい場合は、相談回数と鑑定タイプを広げられます。`
+      : isEnglish
+        ? "Today's free questions have been used. If you want to continue now, choose an add-on or plan below."
+        : "今日の無料相談枠を使い切りました。明日また3回相談できます。今すぐ続きを読みたい場合だけ、下のプランから選べます。";
 
   return (
     <div className="pricing-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="pricing-modal-title">
       <div className="pricing-modal">
-        <button className="modal-close" type="button" onClick={onClose} aria-label="閉じる">
+        <button className="modal-close" type="button" onClick={onClose} aria-label={isEnglish ? "Close" : "閉じる"}>
           ×
         </button>
         <div className="pricing-modal-heading">
@@ -1781,15 +2226,15 @@ function PaywallModal({
         </div>
         {isUnregisteredFree ? (
           <div className="actions compact-actions">
-            <Link className="button primary" href="/register?returnTo=/consultation">
-              新規登録して続きを相談する
+            <Link className="button primary" href={`${localizedPath("/register", language)}?returnTo=${encodeURIComponent(localizedPath("/consultation", language))}`}>
+              {isEnglish ? "Register and continue" : "新規登録して続きを相談する"}
             </Link>
-            <Link className="button" href="/pricing">
-              有料プランを見る
+            <Link className="button" href={localizedPath("/pricing", language)}>
+              {isEnglish ? "View plans" : "有料プランを見る"}
             </Link>
           </div>
         ) : (
-          <PricingPanel addOnCredits={addOnCredits} currentPlanKey={currentPlanKey} isMember={isMember} onBuyAddOn={onBuyAddOn} onCheckout={onCheckout} />
+          <PricingPanel addOnCredits={addOnCredits} currentPlanKey={currentPlanKey} isMember={isMember} language={language} onBuyAddOn={onBuyAddOn} onCheckout={onCheckout} />
         )}
       </div>
     </div>

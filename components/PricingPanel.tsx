@@ -5,6 +5,7 @@ import { buildAuthHeaders } from "@/lib/authRegistrationClient";
 import { checkoutLoginHref, clearPendingCheckoutIntent, readPendingCheckoutIntent, writePendingCheckoutIntent } from "@/lib/checkoutIntent";
 import { ensureClientUserId } from "@/lib/clientIdentity";
 import { addOnPack, PlanKey, planStatusLabel, readAddOnCredits, readPlanFromStorage, resolvePlan, servicePlans, writeAddOnCredits } from "@/lib/plans";
+import { Locale } from "@/lib/i18n";
 
 type PricingPanelProps = {
   addOnCredits?: number;
@@ -12,9 +13,11 @@ type PricingPanelProps = {
   isMember?: boolean;
   onBuyAddOn?: () => void | Promise<void>;
   onCheckout?: (nextPlan: Exclude<PlanKey, "free">) => void | Promise<void>;
+  language?: Locale;
 };
 
-export function PricingPanel({ addOnCredits, currentPlanKey, isMember, onBuyAddOn, onCheckout }: PricingPanelProps) {
+export function PricingPanel({ addOnCredits, currentPlanKey, isMember, onBuyAddOn, onCheckout, language = "ja" }: PricingPanelProps) {
+  const english = language === "en";
   const [activePlanKey, setActivePlanKey] = useState<PlanKey>(currentPlanKey ?? "free");
   const [activeMember, setActiveMember] = useState(isMember ?? false);
   const [activeAddOnCredits, setActiveAddOnCredits] = useState(addOnCredits ?? 0);
@@ -161,7 +164,7 @@ export function PricingPanel({ addOnCredits, currentPlanKey, isMember, onBuyAddO
       return { data: await res.json().catch(() => ({})), res };
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
-        throw new Error("決済画面の準備に時間がかかっています。Stripeの環境変数とPrice IDを確認して、もう一度お試しください。");
+        throw new Error(english ? "Preparing the checkout page is taking too long. Please check the Stripe settings and try again." : "決済画面の準備に時間がかかっています。Stripeの環境変数とPrice IDを確認して、もう一度お試しください。");
       }
       throw error;
     } finally {
@@ -171,7 +174,7 @@ export function PricingPanel({ addOnCredits, currentPlanKey, isMember, onBuyAddO
 
   function redirectToLoginForCheckout(intent: { kind: "plan"; plan: Exclude<PlanKey, "free"> } | { kind: "addOn"; product: typeof addOnPack.key }) {
     writePendingCheckoutIntent(intent);
-    setCheckoutMessage("決済に進むにはログインが必要です。ログイン後に、同じプランの決済画面を開きます。");
+    setCheckoutMessage(english ? "Please log in to continue to checkout. After login, the same checkout will open again." : "決済に進むにはログインが必要です。ログイン後に、同じプランの決済画面を開きます。");
     window.location.assign(checkoutLoginHref());
   }
 
@@ -179,7 +182,7 @@ export function PricingPanel({ addOnCredits, currentPlanKey, isMember, onBuyAddO
     <div className="plan-panel pricing-panel">
       <div className="plan-panel-heading">
         <span>Plans</span>
-        <strong>現在の状態: {planStatusLabel(resolvePlan(activePlanKey), activeMember)}</strong>
+        <strong>{english ? `Current status: ${planStatusLabelEn(activePlanKey, activeMember)}` : `現在の状態: ${planStatusLabel(resolvePlan(activePlanKey), activeMember)}`}</strong>
       </div>
       {checkoutMessage ? <p className="form-status error">{checkoutMessage}</p> : null}
       <div className="plan-grid">
@@ -189,24 +192,24 @@ export function PricingPanel({ addOnCredits, currentPlanKey, isMember, onBuyAddO
           return (
             <article className={`plan-card ${isCurrent ? "active" : ""}`} key={plan.key}>
               <div>
-                <span>{plan.label}</span>
-                <strong>{plan.priceLabel}</strong>
-                {plan.renewalPriceLabel ? <small>{plan.renewalPriceLabel}</small> : null}
+                <span>{english ? planLabelEn(plan.key) : plan.label}</span>
+                <strong>{english ? planPriceEn(plan.key) : plan.priceLabel}</strong>
+                {plan.renewalPriceLabel ? <small>{english ? planRenewalEn(plan.key) : plan.renewalPriceLabel}</small> : null}
                 <small>
-                  {plan.usagePeriod === "day" ? `1日${plan.questionLimit}回` : `月${plan.questionLimit}回`} / {plan.answerDisplay}
+                  {english ? `${plan.usagePeriod === "day" ? `${plan.questionLimit} per day` : `${plan.questionLimit} per month`} / ${planAnswerDisplayEn(plan.key)}` : `${plan.usagePeriod === "day" ? `1日${plan.questionLimit}回` : `月${plan.questionLimit}回`} / ${plan.answerDisplay}`}
                 </small>
               </div>
-              <p>{plan.answerPolicy}</p>
+              <p>{english ? planPolicyEn(plan.key) : plan.answerPolicy}</p>
               <ul>
-                {plan.regulations.map((item) => (
+                {(english ? planRegulationsEn(plan.key) : plan.regulations).map((item) => (
                   <li key={item}>{item}</li>
                 ))}
               </ul>
               {isCurrent ? (
-                <em>{activePlanKey === "free" && !activeMember ? "未登録" : "利用中"}</em>
+                <em>{english ? (activePlanKey === "free" && !activeMember ? "Guest trial" : "Current") : activePlanKey === "free" && !activeMember ? "未登録" : "利用中"}</em>
               ) : canCheckout ? (
                 <button className="button primary" disabled={checkoutLoading === plan.key} type="button" onClick={() => checkout(plan.key as Exclude<PlanKey, "free">)}>
-                  {checkoutLoading === plan.key ? "決済画面を開いています" : plan.ctaLabel}
+                  {checkoutLoading === plan.key ? (english ? "Opening checkout" : "決済画面を開いています") : english ? planCtaEn(plan.key) : plan.ctaLabel}
                 </button>
               ) : null}
             </article>
@@ -214,21 +217,71 @@ export function PricingPanel({ addOnCredits, currentPlanKey, isMember, onBuyAddO
         })}
         <article className="plan-card add-on-card">
           <div>
-            <span>{addOnPack.label}</span>
+            <span>{english ? "100-question add-on" : addOnPack.label}</span>
             <strong>{addOnPack.priceLabel}</strong>
-            <small>{addOnPack.credits}回追加 / 使い切り</small>
+            <small>{english ? `${addOnPack.credits} extra questions / one-time pack` : `${addOnPack.credits}回追加 / 使い切り`}</small>
           </div>
-          <p>{addOnPack.description}</p>
+          <p>{english ? "Continue in packs of 100 questions after your monthly questions are used." : addOnPack.description}</p>
           <ul>
-            <li>100回ごとに1,500円で追加できます</li>
-            <li>月の相談回数を使い切った後に消費します</li>
-            <li>残り追加回数: {activeAddOnCredits}回</li>
+            <li>{english ? "Add 100 questions for ¥1,500" : "100回ごとに1,500円で追加できます"}</li>
+            <li>{english ? "Used after your plan questions are spent" : "月の相談回数を使い切った後に消費します"}</li>
+            <li>{english ? `Remaining add-on questions: ${activeAddOnCredits}` : `残り追加回数: ${activeAddOnCredits}回`}</li>
           </ul>
           <button className="button primary" disabled={checkoutLoading === addOnPack.key} type="button" onClick={buyAddOnPack}>
-            {checkoutLoading === addOnPack.key ? "決済画面を開いています" : addOnPack.ctaLabel}
+            {checkoutLoading === addOnPack.key ? (english ? "Opening checkout" : "決済画面を開いています") : english ? "Add 100 questions" : addOnPack.ctaLabel}
           </button>
         </article>
       </div>
     </div>
   );
+}
+
+function planLabelEn(planKey: PlanKey) {
+  if (planKey === "standard") return "Standard Plan";
+  if (planKey === "luxury") return "Private Plan";
+  return "Free Plan";
+}
+
+function planStatusLabelEn(planKey: PlanKey, isMember: boolean) {
+  if (planKey === "free" && !isMember) return `Guest trial (${resolvePlan("free").questionLimit} questions)`;
+  return planLabelEn(planKey);
+}
+
+function planPriceEn(planKey: PlanKey) {
+  if (planKey === "standard") return "First month ¥480";
+  if (planKey === "luxury") return "¥2,980/month";
+  return "¥0";
+}
+
+function planRenewalEn(planKey: PlanKey) {
+  if (planKey === "standard") return "¥980/month from the second month";
+  return "";
+}
+
+function planAnswerDisplayEn(planKey: PlanKey) {
+  if (planKey === "standard") return "Detailed reading";
+  if (planKey === "luxury") return "Deep private reading";
+  return "Essential reading";
+}
+
+function planPolicyEn(planKey: PlanKey) {
+  if (planKey === "standard") return "A fuller reading with chart evidence, timing, and next actions.";
+  if (planKey === "luxury") return "A deeper reading that can look at contradictions, change, and sharper decision criteria.";
+  return "A focused reading that keeps the essential chart points clear.";
+}
+
+function planRegulationsEn(planKey: PlanKey) {
+  if (planKey === "standard") {
+    return ["Start with the first month at ¥480", "50 questions per month", "Gentle and Direct reader styles", "Birth profile and reading history can be referenced"];
+  }
+  if (planKey === "luxury") {
+    return ["200 questions per month", "All reader styles, including Compassionate and Sharp", "Deeper reference to past conversations", "Longer readings with clearer decision criteria"];
+  }
+  return ["10 first-time questions after registration", "After the bonus, 3 free questions per day", "Standard reader style only", "Answers focus on the essentials"];
+}
+
+function planCtaEn(planKey: PlanKey) {
+  if (planKey === "standard") return "Start Standard for ¥480";
+  if (planKey === "luxury") return "Choose Private Plan";
+  return "Current plan";
 }

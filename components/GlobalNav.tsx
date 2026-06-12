@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { BrandLogo } from "@/components/BrandLogo";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { isEnglishPath, localizedPath, stripLocalePrefix } from "@/lib/i18n";
 
 type GlobalNavActive = "chart" | "consultation" | "glossary" | "account" | "support";
 
@@ -23,10 +25,22 @@ const navItems = [
   { key: "support", label: "問い合わせ", href: "/contact" }
 ] as const;
 
+const navItemsEn = [
+  { key: "chart", label: "My Chart", href: "/m" },
+  { key: "consultation", label: "Reading", href: "/consultation" },
+  { key: "glossary", label: "Guide", href: "/glossary" },
+  { key: "account", label: "Account", href: "/account" },
+  { key: "review", label: "Review Reward", href: "/account#review" },
+  { key: "referral", label: "Referral Code", href: "/account#referral" },
+  { key: "support", label: "Contact", href: "/contact" }
+] as const;
+
 export function GlobalNav({ active, brandLabel = "HOSHIYOMI" }: GlobalNavProps) {
   const pathname = usePathname();
   const [visible, setVisible] = useState(false);
+  const english = isEnglishPath(pathname);
   const resolvedActive = active ?? resolveActiveNav(pathname);
+  const items = english ? navItemsEn : navItems;
 
   useEffect(() => {
     let frame = 0;
@@ -66,16 +80,16 @@ export function GlobalNav({ active, brandLabel = "HOSHIYOMI" }: GlobalNavProps) 
     };
   }, [pathname]);
 
-  if (pathname?.startsWith("/lp")) return null;
+  if (stripLocalePrefix(pathname)?.startsWith("/lp")) return null;
 
   return (
     <nav className={`topbar global-topbar ${visible ? "is-visible" : "is-hidden"}`}>
       <div className="global-topbar-inner">
-        <Link className="brand" href="/">
+        <Link className="brand" href={english ? "/en" : "/"}>
           <BrandLogo label={brandLabel} />
         </Link>
         <details className="global-menu">
-          <summary className="global-menu-button" aria-label="メニューを開く">
+          <summary className="global-menu-button" aria-label={english ? "Open menu" : "メニューを開く"}>
             <span className="hamburger-lines" aria-hidden="true">
               <span />
               <span />
@@ -83,12 +97,13 @@ export function GlobalNav({ active, brandLabel = "HOSHIYOMI" }: GlobalNavProps) 
             </span>
             <span>Menu</span>
           </summary>
-          <div className="global-nav-links" aria-label="主要ナビゲーション">
-            {navItems.map((item) => (
+          <div className="global-nav-links" aria-label={english ? "Primary navigation" : "主要ナビゲーション"}>
+            <LanguageSwitcher />
+            {items.map((item) => (
               <Link
                 aria-current={resolvedActive === item.key ? "page" : undefined}
                 className={`global-nav-link ${resolvedActive === item.key ? "active" : ""}`}
-                href={item.href}
+                href={english ? localizedPath(item.href, "en") : item.href}
                 key={item.key}
               >
                 {item.label}
@@ -103,6 +118,7 @@ export function GlobalNav({ active, brandLabel = "HOSHIYOMI" }: GlobalNavProps) 
 
 function resolveActiveNav(pathname: string | null): GlobalNavActive | undefined {
   if (!pathname) return undefined;
+  pathname = stripLocalePrefix(pathname);
   if (pathname === "/m" || pathname === "/dashboard" || pathname.startsWith("/reading")) return "chart";
   if (pathname === "/consultation" || pathname.startsWith("/pricing") || pathname.startsWith("/checkout")) return "consultation";
   if (pathname.startsWith("/glossary") || pathname.startsWith("/about")) return "glossary";
