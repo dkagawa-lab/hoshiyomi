@@ -88,6 +88,16 @@ create index if not exists non_billable_events_key_created_idx on non_billable_e
 
 create index if not exists non_billable_events_created_idx on non_billable_events(created_at desc);
 
+create table if not exists line_birth_registration_sessions (
+  line_user_id text primary key,
+  step text not null check (step in ('date', 'time', 'place', 'confirm')),
+  payload jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now(),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists line_birth_registration_sessions_updated_idx on line_birth_registration_sessions(updated_at desc);
+
 create table if not exists user_reviews (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null unique references users(id) on delete cascade,
@@ -134,6 +144,7 @@ alter table referral_redemptions enable row level security;
 alter table stripe_events enable row level security;
 alter table chat_messages enable row level security;
 alter table non_billable_events enable row level security;
+alter table line_birth_registration_sessions enable row level security;
 alter table user_reviews enable row level security;
 alter table contact_inquiries enable row level security;
 

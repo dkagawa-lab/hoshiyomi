@@ -1,13 +1,41 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { NextResponse } from "next/server";
 import { calculateChart, calculateTransits } from "@/lib/astrology";
+import type { BirthInput } from "@/lib/astrology";
+import { japanLocations } from "@/lib/japanLocations";
+import type { Municipality } from "@/lib/japanLocations";
+import { municipalityReadings } from "@/lib/municipalityReadings.generated";
 import { buildChartContext, buildTransitContext, demoAnswer, systemPrompt } from "@/lib/prompt";
 import { canUseReaderStyle, resolvePlan, usageLimitsDisabled } from "@/lib/plans";
 import { classifyQuestionBilling, NonBillableQuestionKind, QuestionBilling } from "@/lib/questionBilling";
 import { ReaderStyleKey, resolveReaderStyle } from "@/lib/readerStyles";
 import { resolveQuestionIntent } from "@/lib/questionIntents";
 import { buildConversationContext, generateAstrologyAnswer, isAnthropicApiError, isAnthropicRateLimitError, isProductionAiConfigured, mergeConversationMessages, normalizeChatMessages } from "@/lib/aiRuntime";
-import { birthInputFromStoredUser, checkNonBillableRateLimit, consumeQuota, countLifetimeUserMessages, getQuotaState, getUsageSnapshot, getUserByLineUserId, insertChatTurn, isServerStoreConfigured, listChatMessages, NonBillableRateLimitResult, StoredUser, UsageSnapshot } from "@/lib/serverStore";
+import {
+  birthInputFromStoredUser,
+  checkNonBillableRateLimit,
+  consumeQuota,
+  countLifetimeUserMessages,
+  deleteLineBirthRegistrationSession,
+  getLineBirthRegistrationSession,
+  getQuotaState,
+  getUsageSnapshot,
+  getUserByLineUserId,
+  insertChatTurn,
+  isServerStoreConfigured,
+  LineBirthPlaceCandidate,
+  LineBirthRegistrationPayload,
+  LineBirthRegistrationSession,
+  listChatMessages,
+  NonBillableRateLimitResult,
+  registerLineUser,
+  StoredUser,
+  upsertLineBirthRegistrationSession,
+  upsertUserForLineChart,
+  UsageSnapshot
+} from "@/lib/serverStore";
+import { worldLocations } from "@/lib/worldLocations";
+import type { WorldCity } from "@/lib/worldLocations";
 
 type LineWebhookBody = {
   events?: LineEvent[];
@@ -79,8 +107,9 @@ async function handleLineEvent(event: LineEvent) {
 
 async function handleLineEventCore(event: LineEvent, replyToken: string, lineUserId: string) {
   if (event.type === "follow") {
+    await safeLineStore("register line follower", () => registerLineUser({ clientUserId: lineClientUserId(lineUserId), lineUserId }));
     await replyLineText(replyToken, [
-      "HOSHIYOMIを追加してくれてありがとうございます。\n\nWebで星を読んでLINE登録・友だち追加まで済ませると、このトーク画面からそのまま相談できます。\n\n登録済みの方は、いつもの言葉で質問を送ってください。"
+      "HOSHIYOMIを追加してくれてありがとうございます。\n\nこのトーク画面でも星を登録できます。生年月日、出生時刻、出生地を順番に聞いていきます。\n\n始める場合は「星を登録」と送ってください。登録中は相談回数を消費しません。"
     ]);
     return;
   }
@@ -90,7 +119,16 @@ async function handleLineEventCore(event: LineEvent, replyToken: string, lineUse
   if (!question) return;
   const billing = classifyQuestionBilling(question);
 
-  const user = await getUserByLineUserId(lineUserId);
+  let user = await getUserByLineUserId(lineUserId);
+  const activeBirthRegistration = await safeLineStore("read line birth registration", () => getLineBirthRegistrationSession(lineUserId));
+  if (activeBirthRegistration || shouldStartLineBirthRegistration(question, user, billing)) {
+    if (!user) {
+      user = await safeLineStore("register line user for birth registration", () => registerLineUser({ clientUserId: lineClientUserId(lineUserId), lineUserId }));
+    }
+    await handleLineBirthRegistration({ lineUserId, question, replyToken, session: activeBirthRegistration, user });
+    return;
+  }
+
   if (!user) {
     if (!billing.countable) {
       const rateLimit = await checkNonBillableRateLimit({
@@ -105,9 +143,7 @@ async function handleLineEventCore(event: LineEvent, replyToken: string, lineUse
       await replyLineText(replyToken, [buildNonBillableLineReply(billing, null)]);
       return;
     }
-    await replyLineText(replyToken, [
-      `LINEから相談するには、先にHOSHIYOMIで会員登録とLINE登録・友だち追加が必要です。\n\n登録済みの場合も、アカウント画面からLINE登録をもう一度行うと、このLINEと鑑定履歴がつながります。\n${appUrl("/login?returnTo=/consultation")}`
-    ]);
+    await startLineBirthRegistration(replyToken, lineUserId);
     return;
   }
 
@@ -127,9 +163,7 @@ async function handleLineEventCore(event: LineEvent, replyToken: string, lineUse
 
   const birth = birthInputFromStoredUser(user);
   if (!birth) {
-    await replyLineText(replyToken, [
-      `まだ出生情報が保存されていません。\n\nWebで「星を読む」から生年月日・出生地を登録すると、LINEでもあなたの星の文脈を使って相談できます。\n${appUrl("/#app")}`
-    ]);
+    await startLineBirthRegistration(replyToken, lineUserId);
     return;
   }
 
@@ -195,6 +229,445 @@ async function handleLineEventCore(event: LineEvent, replyToken: string, lineUse
   await replyLineText(replyToken, [answer, statusFooter]);
 }
 
+type LineBirthRegistrationInput = {
+  lineUserId: string;
+  question: string;
+  replyToken: string;
+  session: LineBirthRegistrationSession | null;
+  user: StoredUser | null;
+};
+
+type ParsedBirthTime = { ok: true; value: string } | { ok: false };
+
+type RemoteLocationResult = {
+  country?: string;
+  latitude?: number;
+  longitude?: number;
+  name?: string;
+  region?: string;
+  subtitle?: string;
+};
+
+type RemoteLocationResponse = {
+  results?: RemoteLocationResult[];
+};
+
+const japanesePlaceCollator = new Intl.Collator("ja-JP", { numeric: true, sensitivity: "base", usage: "sort" });
+const englishPlaceCollator = new Intl.Collator("en-US", { numeric: true, sensitivity: "base", usage: "sort" });
+
+function shouldStartLineBirthRegistration(question: string, user: StoredUser | null, billing: QuestionBilling) {
+  if (isLineBirthRegistrationIntent(question)) return true;
+  if (!billing.countable) return false;
+  if (!user) return true;
+  return !birthInputFromStoredUser(user);
+}
+
+async function handleLineBirthRegistration(input: LineBirthRegistrationInput) {
+  if (isLineBirthRegistrationCancel(input.question)) {
+    await safeLineStore("cancel line birth registration", () => deleteLineBirthRegistrationSession(input.lineUserId));
+    await replyLineText(input.replyToken, [
+      `星の登録を中止しました。\n\nもう一度始める場合は「星を登録」と送ってください。この操作では相談回数を消費していません。`
+    ]);
+    return;
+  }
+
+  if (!input.session || isLineBirthRegistrationRestart(input.question)) {
+    await startLineBirthRegistration(input.replyToken, input.lineUserId, input.user, input.session ? "登録を最初からやり直します。" : undefined);
+    return;
+  }
+
+  const payload = input.session.payload ?? {};
+  if (input.session.step === "date") {
+    const birthDate = parseLineBirthDate(input.question);
+    if (!birthDate) {
+      await replyLineText(input.replyToken, [
+        `生年月日をうまく読み取れませんでした。\n\n例のように送ってください。\n1989-05-25\n1989/5/25\n1989年5月25日\n\n登録中は相談回数を消費していません。`
+      ]);
+      return;
+    }
+    const saved = await saveLineBirthRegistrationStep(input.replyToken, input.lineUserId, "time", { ...payload, birthDate });
+    if (!saved) return;
+    await replyLineText(input.replyToken, [
+      `生年月日を受け取りました。\n\n次に、出生時刻を24時間表記で送ってください。\n例: 14:30 / 9時05分\n\nわからない場合は「不明」と送ってください。`
+    ]);
+    return;
+  }
+
+  if (input.session.step === "time") {
+    const birthTime = parseLineBirthTime(input.question);
+    if (!birthTime.ok) {
+      await replyLineText(input.replyToken, [
+        `出生時刻をうまく読み取れませんでした。\n\n例: 14:30 / 9時05分\nわからない場合は「不明」と送ってください。\n\n登録中は相談回数を消費していません。`
+      ]);
+      return;
+    }
+    const saved = await saveLineBirthRegistrationStep(input.replyToken, input.lineUserId, "place", { ...payload, birthTime: birthTime.value });
+    if (!saved) return;
+    await replyLineText(input.replyToken, [
+      `出生時刻を受け取りました。\n\n最後に、出生地の市区町村を送ってください。\n例: 東京都 町田市 / 大阪府 大阪市 / New York\n\n都道府県だけだと星の位置が粗くなるため、市区町村まで送ってください。`
+    ]);
+    return;
+  }
+
+  if (input.session.step === "place") {
+    const selectedCandidate = pickLineBirthPlaceCandidate(input.question, payload.candidates);
+    if (selectedCandidate) {
+      await confirmLineBirthPlace(input.replyToken, input.lineUserId, payload, selectedCandidate);
+      return;
+    }
+
+    if (isJapanPrefectureOnly(input.question)) {
+      const examples = buildPrefectureCityExamples(input.question);
+      await replyLineText(input.replyToken, [
+        `都道府県までは受け取れました。\n\n出生地は市区町村まで必要です。\n${examples}\n\nもう一度、市区町村まで入れて送ってください。`
+      ]);
+      return;
+    }
+
+    const candidates = await buildLineBirthPlaceCandidates(input.question);
+    if (candidates.length === 0) {
+      await replyLineText(input.replyToken, [
+        `出生地を見つけられませんでした。\n\n市区町村まで入れて、もう一度送ってください。\n例: 東京都 町田市 / 京都府 京都市 / Fukuoka / London\n\n候補が出ない場合は「緯度,経度 市区町村名」の形でも登録できます。\n例: 35.5466,139.4386 町田市`
+      ]);
+      return;
+    }
+    if (candidates.length === 1) {
+      await confirmLineBirthPlace(input.replyToken, input.lineUserId, payload, candidates[0]);
+      return;
+    }
+
+    await saveLineBirthRegistrationStep(input.replyToken, input.lineUserId, "place", { ...payload, candidates });
+    await replyLineText(input.replyToken, [
+      `候補が複数あります。出生地に近いものを番号で送ってください。\n\n${candidates.map((candidate, index) => `${index + 1}. ${candidate.label}`).join("\n")}\n\n例: 1\n\n登録中は相談回数を消費していません。`
+    ]);
+    return;
+  }
+
+  if (input.session.step === "confirm") {
+    if (isLineBirthRegistrationReject(input.question)) {
+      await startLineBirthRegistration(input.replyToken, input.lineUserId, input.user, "内容を修正します。最初から登録し直してください。");
+      return;
+    }
+    if (!isLineBirthRegistrationApprove(input.question)) {
+      await replyLineText(input.replyToken, [
+        `${buildLineBirthRegistrationSummary(payload)}\n\nこの内容で登録する場合は「はい」、修正する場合は「修正」と送ってください。\n\n登録中は相談回数を消費していません。`
+      ]);
+      return;
+    }
+
+    const birth = buildBirthInputFromLinePayload(payload, input.user);
+    if (!birth) {
+      await startLineBirthRegistration(input.replyToken, input.lineUserId, input.user, "登録内容が不足していました。もう一度最初から確認します。");
+      return;
+    }
+
+    const saveResult = await safeLineStoreResult("save line birth chart", () =>
+      upsertUserForLineChart({
+        chart: calculateChart(birth),
+        clientUserId: lineClientUserId(input.lineUserId),
+        isMember: true,
+        lineUserId: input.lineUserId
+      })
+    );
+    if (!saveResult.ok) {
+      await replyLineText(input.replyToken, [buildLineBirthRegistrationUnavailableReply()]);
+      return;
+    }
+    await safeLineStore("finish line birth registration", () => deleteLineBirthRegistrationSession(input.lineUserId));
+    await replyLineText(input.replyToken, [
+      `星の登録が完了しました。\n\nここからは、この星の文脈をもとにLINEで相談できます。\n登録中のやりとりでは相談回数を消費していません。\n\nいま知りたいことを、そのまま送ってください。`
+    ]);
+  }
+}
+
+async function startLineBirthRegistration(replyToken: string, lineUserId: string, user?: StoredUser | null, prefix?: string) {
+  const saved = await saveLineBirthRegistrationStep(replyToken, lineUserId, "date", {});
+  if (!saved) return;
+  const intro = prefix ? `${prefix}\n\n` : "";
+  const registeredText = user ? "" : "LINEのアカウントを登録用に準備しました。\n\n";
+  await replyLineText(replyToken, [
+    `${intro}${registeredText}このトーク画面で、あなたの星を登録できます。\n\nまず、生年月日を送ってください。\n例: 1989-05-25\n例: 1989年5月25日\n\nこの登録中は相談回数を消費しません。中止する場合は「キャンセル」と送ってください。`
+  ]);
+}
+
+async function saveLineBirthRegistrationStep(
+  replyToken: string,
+  lineUserId: string,
+  step: LineBirthRegistrationSession["step"],
+  payload: LineBirthRegistrationPayload
+) {
+  const result = await safeLineStoreResult("save line birth registration", () => upsertLineBirthRegistrationSession({ lineUserId, payload, step }));
+  if (!result.ok) {
+    await replyLineText(replyToken, [buildLineBirthRegistrationUnavailableReply()]);
+    return null;
+  }
+  return result.value;
+}
+
+async function confirmLineBirthPlace(replyToken: string, lineUserId: string, payload: LineBirthRegistrationPayload, candidate: LineBirthPlaceCandidate) {
+  const nextPayload: LineBirthRegistrationPayload = {
+    ...payload,
+    birthCity: candidate.label,
+    candidates: undefined,
+    latitude: candidate.latitude,
+    longitude: candidate.longitude
+  };
+  const saved = await saveLineBirthRegistrationStep(replyToken, lineUserId, "confirm", nextPayload);
+  if (!saved) return;
+  await replyLineText(replyToken, [
+    `${buildLineBirthRegistrationSummary(nextPayload)}\n\nこの内容で星を登録しますか？\n「はい」で登録します。\n修正する場合は「修正」と送ってください。`
+  ]);
+}
+
+function buildLineBirthRegistrationSummary(payload: LineBirthRegistrationPayload) {
+  return [
+    "登録内容の確認",
+    "",
+    `生年月日: ${payload.birthDate || "未入力"}`,
+    `出生時刻: ${payload.birthTime ? payload.birthTime : "不明"}`,
+    `出生地: ${payload.birthCity || "未入力"}`
+  ].join("\n");
+}
+
+function buildBirthInputFromLinePayload(payload: LineBirthRegistrationPayload, user: StoredUser | null): BirthInput | null {
+  const latitude = Number(payload.latitude);
+  const longitude = Number(payload.longitude);
+  if (!payload.birthDate || !payload.birthCity || !Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  return {
+    city: payload.birthCity,
+    date: payload.birthDate,
+    gender: user?.gender || undefined,
+    latitude,
+    longitude,
+    name: user?.name || "あなた",
+    romanticInterest: user?.romantic_interest || undefined,
+    time: payload.birthTime || ""
+  };
+}
+
+function parseLineBirthDate(value: string) {
+  const normalized = toHalfWidthDigits(value)
+    .replace(/[年月./]/g, "-")
+    .replace(/[日\s]/g, "")
+    .replace(/--+/g, "-")
+    .trim();
+  const compact = normalized.match(/^(\d{4})(\d{2})(\d{2})$/);
+  const dashed = compact ? compact.slice(1, 4) : normalized.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/)?.slice(1, 4);
+  if (!dashed) return null;
+  const [yearText, monthText, dayText] = dashed;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (year < 1900 || year > 2100) return null;
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+  const dateText = `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  if (dateText > currentJstDateString()) return null;
+  return dateText;
+}
+
+function parseLineBirthTime(value: string): ParsedBirthTime {
+  const normalized = toHalfWidthDigits(value).trim().toLowerCase();
+  if (/^(不明|わからない|分からない|不詳|なし|無し|未入力|スキップ|skip|unknown)$/.test(normalized)) return { ok: true, value: "" };
+  const colon = normalized.match(/^(\d{1,2}):(\d{1,2})$/);
+  const japanese = normalized.match(/^(\d{1,2})時(?:(\d{1,2})分?)?$/);
+  const parts = colon ? [colon[1], colon[2]] : japanese ? [japanese[1], japanese[2] ?? "0"] : null;
+  if (!parts) return { ok: false };
+  const hour = Number(parts[0]);
+  const minute = Number(parts[1]);
+  if (!Number.isInteger(hour) || !Number.isInteger(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) return { ok: false };
+  return { ok: true, value: `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}` };
+}
+
+async function buildLineBirthPlaceCandidates(query: string) {
+  const manual = parseManualBirthPlace(query);
+  if (manual) return [manual];
+  const localMatches = [...buildJapanBirthPlaceCandidates(query), ...buildWorldBirthPlaceCandidates(query)];
+  const remoteMatches = localMatches.some((candidate) => normalizePlaceSearchText(candidate.label) === normalizePlaceSearchText(query))
+    ? []
+    : await fetchRemoteBirthPlaceCandidates(query);
+  return mergeBirthPlaceCandidates([...localMatches, ...remoteMatches]).slice(0, 6);
+}
+
+function parseManualBirthPlace(query: string): LineBirthPlaceCandidate | null {
+  const normalized = toHalfWidthDigits(query).trim();
+  const matched = normalized.match(/(-?\d+(?:\.\d+)?)\s*[,，]\s*(-?\d+(?:\.\d+)?)(?:\s+(.+))?/);
+  if (!matched) return null;
+  const latitude = Number(matched[1]);
+  const longitude = Number(matched[2]);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return null;
+  const label = (matched[3] || "指定した出生地").trim();
+  return { city: label, label, latitude, longitude };
+}
+
+function buildJapanBirthPlaceCandidates(query: string) {
+  const normalizedQuery = normalizePlaceSearchText(query);
+  if (!normalizedQuery || isJapanPrefectureOnly(query)) return [];
+  const matches = japanLocations.flatMap((location) =>
+    location.municipalities
+      .map((municipality): (LineBirthPlaceCandidate & { score: number }) | null => {
+        const label = `${location.prefecture} ${municipality.name}`;
+        const searchable = normalizePlaceSearchText(`${label} ${municipalityReading(location.prefecture, municipality)}`);
+        const municipalityText = normalizePlaceSearchText(municipality.name);
+        const prefectureText = normalizePlaceSearchText(location.prefecture);
+        let score = 99;
+        if (searchable === normalizedQuery || municipalityText === normalizedQuery) score = 0;
+        else if (searchable.startsWith(normalizedQuery) || municipalityText.startsWith(normalizedQuery)) score = 1;
+        else if (searchable.includes(normalizedQuery) || municipalityText.includes(normalizedQuery)) score = 2;
+        else if (prefectureText && normalizedQuery.includes(prefectureText) && searchable.includes(normalizedQuery.replace(prefectureText, ""))) score = 3;
+        else if (prefectureText.includes(normalizedQuery)) score = 8;
+        return score < 99 ? { city: municipality.name, label, latitude: municipality.latitude, longitude: municipality.longitude, score } : null;
+      })
+      .filter((match): match is LineBirthPlaceCandidate & { score: number } => Boolean(match))
+  );
+  return matches
+    .sort((a, b) => a.score - b.score || japanesePlaceCollator.compare(municipalityReading(labelPrefecture(a.label), { name: a.city, latitude: a.latitude, longitude: a.longitude }), municipalityReading(labelPrefecture(b.label), { name: b.city, latitude: b.latitude, longitude: b.longitude })))
+    .slice(0, 8)
+    .map(({ score, ...candidate }) => candidate);
+}
+
+function buildWorldBirthPlaceCandidates(query: string) {
+  const normalizedQuery = normalizePlaceSearchText(query);
+  if (!normalizedQuery) return [];
+  const matches = worldLocations.flatMap((location) =>
+    location.cities
+      .map((city): (LineBirthPlaceCandidate & { score: number }) | null => {
+        const label = formatWorldCandidateLabel(location.country, city);
+        const aliasText = (city.aliases ?? []).join(" ");
+        const searchable = normalizePlaceSearchText(`${city.name} ${city.region ?? ""} ${location.country} ${aliasText} ${label}`);
+        const cityText = normalizePlaceSearchText(city.name);
+        const aliases = (city.aliases ?? []).map(normalizePlaceSearchText);
+        let score = 99;
+        if (cityText === normalizedQuery || aliases.includes(normalizedQuery) || searchable === normalizedQuery) score = 0;
+        else if (cityText.startsWith(normalizedQuery) || aliases.some((alias) => alias.startsWith(normalizedQuery))) score = 1;
+        else if (searchable.includes(normalizedQuery)) score = 4;
+        return score < 99 ? { city: city.name, label, latitude: city.latitude, longitude: city.longitude, score } : null;
+      })
+      .filter((match): match is LineBirthPlaceCandidate & { score: number } => Boolean(match))
+  );
+  return matches
+    .sort((a, b) => a.score - b.score || englishPlaceCollator.compare(a.label, b.label))
+    .slice(0, 8)
+    .map(({ score, ...candidate }) => candidate);
+}
+
+async function fetchRemoteBirthPlaceCandidates(query: string) {
+  const cleaned = query.replace(/\s+/g, " ").trim().slice(0, 80);
+  if (cleaned.length < 2) return [];
+  const searchUrl = new URL("https://geocoding-api.open-meteo.com/v1/search");
+  searchUrl.searchParams.set("name", cleaned);
+  searchUrl.searchParams.set("count", "8");
+  searchUrl.searchParams.set("language", "en");
+  searchUrl.searchParams.set("format", "json");
+  try {
+    const response = await fetch(searchUrl, { headers: { accept: "application/json" }, cache: "no-store" });
+    if (!response.ok) return [];
+    const data = (await response.json()) as RemoteLocationResponse;
+    return (data.results ?? [])
+      .filter((item) => typeof item.name === "string" && typeof item.country === "string" && typeof item.latitude === "number" && typeof item.longitude === "number")
+      .map((item): LineBirthPlaceCandidate => {
+        const label = `${item.name}, ${item.country}`;
+        return {
+          city: item.name || label,
+          label,
+          latitude: Number(item.latitude),
+          longitude: Number(item.longitude)
+        };
+      });
+  } catch {
+    return [];
+  }
+}
+
+function pickLineBirthPlaceCandidate(question: string, candidates?: LineBirthPlaceCandidate[]) {
+  if (!candidates?.length) return null;
+  const normalized = toHalfWidthDigits(question).trim();
+  const number = Number(normalized);
+  if (Number.isInteger(number) && number >= 1 && number <= candidates.length) return candidates[number - 1];
+  const text = normalizePlaceSearchText(normalized);
+  return candidates.find((candidate) => normalizePlaceSearchText(candidate.label) === text || normalizePlaceSearchText(candidate.city) === text) ?? null;
+}
+
+function mergeBirthPlaceCandidates(candidates: LineBirthPlaceCandidate[]) {
+  const seen = new Set<string>();
+  return candidates.filter((candidate) => {
+    const key = `${normalizePlaceSearchText(candidate.label)}|${candidate.latitude.toFixed(3)}|${candidate.longitude.toFixed(3)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function isJapanPrefectureOnly(value: string) {
+  const normalized = normalizePlaceSearchText(value);
+  return japanLocations.some((location) => normalizePlaceSearchText(location.prefecture) === normalized);
+}
+
+function buildPrefectureCityExamples(value: string) {
+  const normalized = normalizePlaceSearchText(value);
+  const location = japanLocations.find((item) => normalizePlaceSearchText(item.prefecture) === normalized);
+  const examples = (location?.municipalities ?? []).slice(0, 2);
+  if (!location || examples.length === 0) return "例: 東京都 町田市\n例: 大阪府 大阪市";
+  return examples.map((municipality) => `例: ${location.prefecture} ${municipality.name}`).join("\n");
+}
+
+function isLineBirthRegistrationIntent(question: string) {
+  return /(星|出生|生年月日|ホロスコープ|プロフィール).*(登録|確認|変更|修正)|登録したい|星を登録|星の登録/.test(question);
+}
+
+function isLineBirthRegistrationRestart(question: string) {
+  return /^(やり直し|最初から|リセット|修正)$/.test(question.trim());
+}
+
+function isLineBirthRegistrationCancel(question: string) {
+  return /^(キャンセル|中止|やめる|登録しない)$/.test(question.trim());
+}
+
+function isLineBirthRegistrationApprove(question: string) {
+  return /^(はい|ok|OK|オーケー|大丈夫|登録|これで|お願いします|よい|良い)$/.test(question.trim());
+}
+
+function isLineBirthRegistrationReject(question: string) {
+  return /^(いいえ|違う|修正|やり直し|最初から)$/.test(question.trim());
+}
+
+function buildLineBirthRegistrationUnavailableReply() {
+  return `LINE内で星を登録する準備が一時的に整っていません。\n\n相談回数は消費していません。少し時間をおいて「星を登録」と送るか、Webの星の登録ページから登録してください。\n${appUrl("/#app")}`;
+}
+
+function lineClientUserId(lineUserId: string) {
+  return `line:${lineUserId}`;
+}
+
+function normalizePlaceSearchText(value: string) {
+  return toHalfWidthDigits(value).replace(/\s+/g, "").replace(/[　,，]/g, "").trim().toLowerCase();
+}
+
+function toHalfWidthDigits(value: string) {
+  return value.replace(/[０-９]/g, (char) => String.fromCharCode(char.charCodeAt(0) - 0xfee0));
+}
+
+function currentJstDateString() {
+  return new Intl.DateTimeFormat("en-CA", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: "Asia/Tokyo",
+    year: "numeric"
+  }).format(new Date());
+}
+
+function municipalityReading(prefecture: string, municipality: Municipality) {
+  return municipalityReadings[`${prefecture}|${municipality.name}`] ?? municipality.name;
+}
+
+function labelPrefecture(label: string) {
+  return label.split(/\s+/)[0] || "";
+}
+
+function formatWorldCandidateLabel(country: string, city: WorldCity) {
+  return city.region ? `${city.name}, ${city.region}, ${country}` : `${city.name}, ${country}`;
+}
+
 function parseLinePayload(body: string): LineWebhookBody {
   try {
     return JSON.parse(body) as LineWebhookBody;
@@ -225,10 +698,10 @@ function buildNonBillableLineReply(billing: QuestionBilling, usage: UsageSnapsho
     return `占い師タイプは、通常・マイルド・はっきり厳しめ・寄り添い系・辛辣から選べます。\n\nLINEでは「辛辣: 復縁を見て」のように、占い師タイプを先頭につけて送れます。無料プランでは通常、通常プランではマイルドとはっきり厳しめ、プライベートプランでは全タイプが使えます。${usageText}${noCount}`;
   }
   if (kind === "line") {
-    return `LINEでは、登録済みの星と鑑定履歴を引き継いで相談できます。\n\n連携状態や登録情報はWebの登録情報ページで確認できます。\n${appUrl("/account")}${usageText}${noCount}`;
+    return `LINEでは、登録済みの星と鑑定履歴を引き継いで相談できます。\n\nまだ星を登録していない場合は、このトークで「星を登録」と送ってください。生年月日、出生時刻、出生地を順番に聞いていきます。\n\n連携状態や登録情報はWebの登録情報ページでも確認できます。\n${appUrl("/account")}${usageText}${noCount}`;
   }
   if (kind === "account") {
-    return `登録情報、ログイン状態、出生情報、鑑定履歴はWebの登録情報ページで確認できます。\n${appUrl("/account")}${usageText}${noCount}`;
+    return `登録情報、ログイン状態、出生情報、鑑定履歴はWebの登録情報ページで確認できます。\n\n出生情報だけなら、LINEで「星を登録」と送ってこのまま登録することもできます。\n${appUrl("/account")}${usageText}${noCount}`;
   }
   if (kind === "legal") {
     return `利用規約、プライバシーポリシー、特定商取引法に基づく表記はこちらから確認できます。\n${appUrl("/terms")}\n${appUrl("/privacy")}\n${appUrl("/legal/commercial-disclosure")}${noCount}`;

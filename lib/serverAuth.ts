@@ -37,6 +37,17 @@ export async function getAuthenticatedRequestUser(req: Request): Promise<Authent
   return null;
 }
 
+export function getLineSessionRequestUser(req: Request): AuthenticatedRequestUser | null {
+  const lineSession = verifyLineSessionValue(parseCookieHeader(req.headers.get("cookie"))[lineAuthSessionCookieName]);
+  if (!lineSession) return null;
+  return {
+    clientUserId: lineSession.clientUserId,
+    email: null,
+    lineUserId: lineSession.lineUserId,
+    provider: "line"
+  };
+}
+
 export function authenticatedClientUserId(reqUser: AuthenticatedRequestUser | null, fallback?: unknown) {
   return reqUser?.clientUserId ?? normalizeClientUserId(fallback);
 }

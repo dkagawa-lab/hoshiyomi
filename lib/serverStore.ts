@@ -97,6 +97,30 @@ export type PublicReviewSnapshot = {
   rating: number;
 };
 
+export type LineBirthPlaceCandidate = {
+  city: string;
+  label: string;
+  latitude: number;
+  longitude: number;
+};
+
+export type LineBirthRegistrationPayload = {
+  birthCity?: string;
+  birthDate?: string;
+  birthTime?: string;
+  candidates?: LineBirthPlaceCandidate[];
+  latitude?: number;
+  longitude?: number;
+};
+
+export type LineBirthRegistrationSession = {
+  created_at: string;
+  line_user_id: string;
+  payload: LineBirthRegistrationPayload;
+  step: "date" | "time" | "place" | "confirm";
+  updated_at: string;
+};
+
 export type ContactInquiryInput = {
   category: string;
   email: string;
@@ -254,7 +278,7 @@ export async function registerLineUser(input: { clientUserId?: string | null; li
 
   if (existingByLine) {
     const updated = await updateUser(existingByLine.id, {
-      client_user_id: clientUserId ?? existingByLine.client_user_id,
+      client_user_id: resolveLineLinkedClientUserId(existingByLine, clientUserId),
       is_member: true,
       line_user_id: lineUserId,
       free_bonus_remaining: existingByLine.is_member ? existingByLine.free_bonus_remaining : registeredFreeBonusLimit
@@ -284,6 +308,14 @@ export async function registerLineUser(input: { clientUserId?: string | null; li
     })
   });
   return ensureReferralCodeForUser(users[0]);
+}
+
+function resolveLineLinkedClientUserId(existing: StoredUser, nextClientUserId: string | null) {
+  if (!nextClientUserId) return existing.client_user_id;
+  if (nextClientUserId.startsWith("line:") && existing.client_user_id && !existing.client_user_id.startsWith("line:")) {
+    return existing.client_user_id;
+  }
+  return nextClientUserId;
 }
 
 export async function mergeClientUserRecords(input: { sourceClientUserId?: string | null; targetClientUserId: string }) {
@@ -479,6 +511,44 @@ export async function getUserByLineUserId(lineUserId: string) {
   if (!normalized) return null;
   const users = await supabaseJson<StoredUser[]>(`users?line_user_id=eq.${encodeURIComponent(normalized)}&select=*&limit=1`);
   return users[0] ?? null;
+}
+
+export async function getLineBirthRegistrationSession(lineUserId: string) {
+  const normalized = normalizeLineUserId(lineUserId);
+  if (!normalized) return null;
+  const sessions = await supabaseJson<LineBirthRegistrationSession[]>(
+    `line_birth_registration_sessions?line_user_id=eq.${encodeURIComponent(normalized)}&select=*&limit=1`
+  );
+  return sessions[0] ?? null;
+}
+
+export async function upsertLineBirthRegistrationSession(input: {
+  lineUserId: string;
+  payload: LineBirthRegistrationPayload;
+  step: LineBirthRegistrationSession["step"];
+}) {
+  const lineUserId = normalizeLineUserId(input.lineUserId);
+  if (!lineUserId) throw new Error("lineUserId is required");
+  const sessions = await supabaseJson<LineBirthRegistrationSession[]>("line_birth_registration_sessions?on_conflict=line_user_id&select=*", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+    body: JSON.stringify({
+      line_user_id: lineUserId,
+      payload: input.payload,
+      step: input.step,
+      updated_at: new Date().toISOString()
+    })
+  });
+  return sessions[0] ?? null;
+}
+
+export async function deleteLineBirthRegistrationSession(lineUserId: string) {
+  const normalized = normalizeLineUserId(lineUserId);
+  if (!normalized) return;
+  await supabaseJson(`line_birth_registration_sessions?line_user_id=eq.${encodeURIComponent(normalized)}`, {
+    method: "DELETE",
+    headers: { Prefer: "return=minimal" }
+  });
 }
 
 export class ReferralCodeError extends Error {

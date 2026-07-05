@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { BirthInput, calculateChart } from "@/lib/astrology";
-import { getAuthenticatedRequestUser } from "@/lib/serverAuth";
+import { getAuthenticatedRequestUser, getLineSessionRequestUser } from "@/lib/serverAuth";
 import { getUsageSnapshot, isServerStoreConfigured, registerClientUser, registerLineUser, upsertUserForChart, upsertUserForLineChart } from "@/lib/serverStore";
 
 type RegisterRequest = {
@@ -23,13 +23,26 @@ export async function POST(req: Request) {
   }
 
   const clientUserId = authUser.clientUserId;
+  const lineSession = getLineSessionRequestUser(req);
+  const verifiedLineUserId = lineSession && (!body.lineClientUserId || body.lineClientUserId === lineSession.clientUserId) ? lineSession.lineUserId : undefined;
   const user =
     authUser.provider === "line" && authUser.lineUserId
       ? body.birth
         ? await upsertUserForLineChart({ chart: calculateChart(body.birth), clientUserId, isMember: true, lineUserId: authUser.lineUserId })
         : await registerLineUser({ clientUserId, lineUserId: authUser.lineUserId })
-      : body.birth
-        ? await upsertUserForChart({ chart: calculateChart(body.birth), clientUserId, isMember: true })
-        : await registerClientUser(clientUserId);
+      : await registerSupabaseUser({ birth: body.birth, clientUserId, lineUserId: verifiedLineUserId });
   return NextResponse.json({ ok: true, usage: await getUsageSnapshot(user) });
+}
+
+async function registerSupabaseUser(input: { birth?: BirthInput; clientUserId: string; lineUserId?: string }) {
+  if (input.lineUserId) {
+    await registerLineUser({ clientUserId: input.clientUserId, lineUserId: input.lineUserId });
+  }
+  if (input.birth) {
+    return upsertUserForChart({ chart: calculateChart(input.birth), clientUserId: input.clientUserId, isMember: true });
+  }
+  if (input.lineUserId) {
+    return registerLineUser({ clientUserId: input.clientUserId, lineUserId: input.lineUserId });
+  }
+  return registerClientUser(input.clientUserId);
 }

@@ -4,8 +4,11 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   AuthFlowMode,
+  authClientUserId,
   buildRegistrationCompleteUrl,
   completeClientRegistration,
+  getSupabaseAuthClient,
+  readAuthMethod,
   readPendingReferralCode,
   readStoredBirth,
   resolveReturnTo
@@ -30,10 +33,11 @@ export function LineAuthCompleteClient() {
         setTimeout(() => router.replace(`${fallbackPath}?returnTo=${encodeURIComponent(returnTo)}`), 1200);
         return;
       }
+      const activeAuth = await readActiveSupabaseAuth();
       await completeClientRegistration({
-        authMethod: "line",
+        authMethod: activeAuth.authMethod || "line",
         birth: readStoredBirth(),
-        clientUserId: lineClientUserId,
+        clientUserId: activeAuth.clientUserId || lineClientUserId,
         lineClientUserId,
         referralCode
       });
@@ -48,6 +52,20 @@ export function LineAuthCompleteClient() {
   }, [flow, router, searchParams]);
 
   return <p className="form-status">{message}</p>;
+}
+
+async function readActiveSupabaseAuth() {
+  const supabase = getSupabaseAuthClient();
+  if (!supabase) return { authMethod: "" as const, clientUserId: "" };
+  const { data } = await supabase.auth.getSession();
+  const user = data.session?.user;
+  if (!user?.id) return { authMethod: "" as const, clientUserId: "" };
+  const provider = typeof user.app_metadata?.provider === "string" ? user.app_metadata.provider : "";
+  const storedMethod = readAuthMethod();
+  return {
+    authMethod: provider === "google" ? ("google" as const) : storedMethod === "google" || storedMethod === "mail" ? storedMethod : ("mail" as const),
+    clientUserId: authClientUserId(user.id)
+  };
 }
 
 async function readLineSessionClientUserId() {
