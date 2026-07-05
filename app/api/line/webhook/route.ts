@@ -375,7 +375,7 @@ async function handleLineBirthRegistration(input: LineBirthRegistrationInput) {
     }
     await safeLineStore("finish line birth registration", () => deleteLineBirthRegistrationSession(input.lineUserId));
     await replyLineText(input.replyToken, [
-      `星の登録が完了しました。\n\nここからは、この星の文脈をもとにLINEで相談できます。\n登録中のやりとりでは相談回数を消費していません。\n\nいま知りたいことを、そのまま送ってください。`
+      `星の登録が完了しました。\n\nここからは、この星の文脈をもとにLINEで相談できます。\n登録中のやりとりでは相談回数を消費していません。\n\n最初に送ってくれた相談内容は、登録を始めるために使っています。あらためて、占いたい内容をもう一度送ってください。\n例: 今日の運勢を占って / 恋愛について見て / 仕事の流れを知りたい`
     ]);
   }
 }
