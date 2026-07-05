@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { localeCookieName, shouldPreferEnglish } from "@/lib/i18n";
+import { localeCookieName, localizedPath, shouldPreferEnglish } from "@/lib/i18n";
 
 const PUBLIC_FILE = /\.(.*)$/;
 
@@ -16,13 +16,12 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (pathname !== "/") return NextResponse.next();
-
   const savedLocale = request.cookies.get(localeCookieName)?.value;
   if (savedLocale === "ja") return NextResponse.next();
+  if (pathname === "/en" || pathname.startsWith("/en/")) return NextResponse.next();
   if (savedLocale === "en" || shouldPreferEnglish(request.headers.get("accept-language"))) {
     const url = request.nextUrl.clone();
-    url.pathname = "/en";
+    url.pathname = localizedPath(pathname, "en");
     return NextResponse.redirect(url);
   }
 

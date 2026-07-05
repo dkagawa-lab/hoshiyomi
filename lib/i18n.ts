@@ -32,6 +32,8 @@ export function shouldPreferEnglish(acceptLanguage: string | null) {
     })
     .filter((item) => Number.isFinite(item.quality))
     .sort((a, b) => b.quality - a.quality);
-  const firstSupported = candidates.find((item) => item.tag.startsWith("en") || item.tag.startsWith("ja"));
-  return firstSupported ? firstSupported.tag.startsWith("en") : false;
+  const first = candidates[0]?.tag;
+  if (!first) return false;
+  if (first.startsWith("ja")) return false;
+  return true;
 }
