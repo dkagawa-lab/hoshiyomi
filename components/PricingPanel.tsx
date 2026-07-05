@@ -272,7 +272,7 @@ function planPolicyEn(planKey: PlanKey) {
 
 function planRegulationsEn(planKey: PlanKey) {
   if (planKey === "standard") {
-    return ["Start with the first month at ¥480", "50 questions per month", "Gentle and Direct reader styles", "Birth profile and reading history can be referenced"];
+    return ["Start with the first month at ¥480", "50 questions per month", "Gentle and Direct reader styles", "Birth profile and star memory can be referenced"];
   }
   if (planKey === "luxury") {
     return ["200 questions per month", "All reader styles, including Compassionate and Sharp", "Deeper reference to past conversations", "Longer readings with clearer decision criteria"];

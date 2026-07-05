@@ -195,6 +195,23 @@ export function buildConversationContext(messages: ChatRuntimeMessage[], planKey
     .join("\n");
 }
 
+export function buildConsultationMemoryContext(memory: string | null | undefined, planKey: PlanKey) {
+  const plan = resolvePlan(planKey);
+  const normalized = sanitizeMessageContent(memory || "");
+  return [
+    "星読みカルテ（長期文脈）:",
+    normalized || "まだ蓄積なし",
+    normalized
+      ? "上記は過去相談から抽出した継続テーマと読み筋。断定材料ではなく、相談者が同じ説明を繰り返さなくて済むための補助文脈として扱う。"
+      : "今回の相談から、今後引き継げる文脈を丁寧に拾う。",
+    plan.key === "luxury"
+      ? "プライベートプランでは、このカルテを強めに活かし、過去の相談と今回の悩みのつながりを自然に示す。"
+      : plan.key === "standard"
+        ? "通常プランでは、このカルテを参考にしつつ、今回の質問への答えを中心に組み立てる。"
+        : "無料プランでは、今回の質問を優先し、カルテは軽く参照する。"
+  ].join("\n");
+}
+
 export async function generateAstrologyAnswer(input: GenerateAnswerInput): Promise<GenerateAnswerResult> {
   const plan = resolvePlan(input.planKey);
   const model = resolveAnthropicModel({

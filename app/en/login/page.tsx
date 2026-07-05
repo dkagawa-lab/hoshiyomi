@@ -9,7 +9,7 @@ export default function EnglishLoginPage() {
         <h1>Log in</h1>
         <p className="auth-lead">
           <span>Log in with your registered email address, Google, or LINE.</span>
-          <span>After login, you can check your saved chart and reading history from Account.</span>
+          <span>After login, you can check your saved chart and star memory from Account.</span>
         </p>
         <RegisterActions mode="login" />
         <div className="register-sub-actions">

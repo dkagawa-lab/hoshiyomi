@@ -5,7 +5,7 @@ export default function EnglishAccountPage() {
     <main className="shell">
       <section className="panel account-english-note">
         <div className="eyebrow">Account</div>
-        <h1>Account, chart, rewards, and reading history</h1>
+        <h1>Account, chart, rewards, and star memory</h1>
         <p>The account tools below use the same saved profile and credits as the Japanese version.</p>
       </section>
       <AccountPanel />

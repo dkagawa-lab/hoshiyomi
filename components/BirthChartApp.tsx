@@ -82,6 +82,8 @@ type ServerProfile = {
   birthCity?: string | null;
   birthDate?: string | null;
   birthTime?: string | null;
+  consultationMemory?: string | null;
+  consultationMemoryUpdatedAt?: string | null;
   gender?: GenderKey | null;
   latitude?: number | null;
   lineLinked?: boolean | null;
@@ -210,6 +212,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
   const [municipality, setMunicipality] = useState(initialLocation.municipality);
   const [messages, setMessages] = useState<Message[]>([]);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [consultationMemory, setConsultationMemory] = useState("");
   const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
   const [question, setQuestion] = useState("");
   const [selectedQuestionIntent, setSelectedQuestionIntent] = useState<QuestionIntentKey | undefined>();
@@ -831,6 +834,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
   }
 
   function applyServerProfile(profile: ServerProfile) {
+    setConsultationMemory(typeof profile.consultationMemory === "string" ? profile.consultationMemory : "");
     if (!profile.birthDate || !profile.birthCity || typeof profile.latitude !== "number" || typeof profile.longitude !== "number") return;
     const savedProfile = readStoredBirth();
     const nextInput: BirthInput = {
@@ -1274,7 +1278,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
           {!hideConsultation && !consultationOnly ? (
           <section className="panel memory-card">
             <div className="eyebrow">Member Memory</div>
-            <h2>{isEnglish ? "Your chart and reading history" : "あなたの星と鑑定履歴"}</h2>
+            <h2>{isEnglish ? "Your chart and star memory" : "あなたの星と星読みカルテ"}</h2>
             {canViewMemory ? (
               <>
                 <div className="memory-profile">
@@ -1297,6 +1301,21 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
                     </strong>
                     <p>{chart.ascendant ? `ASC ${chart.ascendant.sign.name}` : isEnglish ? "ASC appears when birth time is entered" : "ASCは出生時刻入力後に表示されます"}</p>
                   </div>
+                </div>
+                <div className="consultation-memory-summary">
+                  <span>{isEnglish ? "Star memory" : "星読みカルテ"}</span>
+                  <strong>{isEnglish ? "The context that grows as you consult" : "相談を重ねるほど育つ、あなた専用の文脈"}</strong>
+                  <p>
+                    {consultationMemory
+                      ? consultationMemory
+                          .split("\n")
+                          .filter((line) => line.trim() && line.trim() !== "星読みカルテ")
+                          .slice(0, 8)
+                          .join("\n")
+                      : isEnglish
+                        ? "After your first saved consultation, recurring themes and reading cues will be summarized here."
+                        : "鑑定後、繰り返し出ている相談テーマや引き継ぐ読み筋がここに蓄積されます。"}
+                  </p>
                 </div>
                 <div className="history-list">
                   {history.length ? (
@@ -1333,7 +1352,7 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
                       );
                     })
                   ) : (
-                    <p className="small">{isEnglish ? "No saved reading history yet. Your readings will appear here after you consult." : "まだ保存された鑑定履歴はありません。相談するとここに記録されます。"}</p>
+                    <p className="small">{isEnglish ? "No saved readings yet. Your readings will appear here after you consult." : "まだ保存された鑑定はありません。相談するとここに記録されます。"}</p>
                   )}
                 </div>
               </>
@@ -1341,8 +1360,8 @@ export function BirthChartApp({ compact = false, consultationOnly = false, hideC
               <div className="memory-gate">
                 <p>
                   {isEnglish
-                    ? "After registration, HOSHIYOMI can refer to your birth profile and past reading history, so you do not have to explain the same context every time."
-                    : "会員登録すると、あなたの出生プロフィール、過去に占った相談内容、鑑定履歴を参照できます。毎回ゼロから説明しなくても、あなたの星の文脈を引き継いで相談できます。"}
+                    ? "After registration, HOSHIYOMI can keep a growing star memory from your birth profile and past readings, so you do not have to explain the same context every time."
+                    : "会員登録すると、出生プロフィールと過去の相談から、あなた専用の星読みカルテが育ちます。毎回ゼロから説明しなくても、同じ星の文脈を引き継いで相談できます。"}
                 </p>
                 <div className="actions">
                   <Link className="button primary" href={registerPath}>
@@ -1422,7 +1441,7 @@ function LineConsultationGuide({ lineConnectHref, lineFriendUrl, lineLinked }: {
         <strong>{lineLinked ? "メッセージで、そのまま星に質問できます" : "LINEで登録・友だち追加すると、Webの記憶をLINEに引き継げます"}</strong>
         <p>
           {lineLinked
-            ? "登録済みのあなたの星と鑑定履歴を使いながら、LINEのメッセージで質問できます。気になった瞬間に、ここでの相談の続きを送れます。"
+            ? "登録済みのあなたの星と星読みカルテを使いながら、LINEのメッセージで質問できます。気になった瞬間に、ここでの相談の続きを送れます。"
             : "LINE認証の流れで公式アカウントの友だち追加も行い、保存した星の位置や相談履歴を引き継いだままLINEからも質問できるようにします。"}
         </p>
       </div>

@@ -10,7 +10,7 @@ export default function LoginPage() {
         <p className="auth-lead">
           <span>登録済みのメールアドレス、</span>
           <span>Google、LINEでログインできます。</span>
-          <span>保存した星の情報や鑑定履歴は、</span>
+          <span>保存した星の情報や星読みカルテは、</span>
           <span>ログイン後に登録情報ページから確認できます。</span>
         </p>
         <RegisterActions mode="login" />

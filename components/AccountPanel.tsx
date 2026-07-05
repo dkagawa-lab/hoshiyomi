@@ -571,12 +571,12 @@ function buildAccountNextStepLinks(account: AccountState, lineFriendUrl: string)
     links.push({
       href: "/register?returnTo=/account",
       title: "新規登録して星を記録する",
-      description: "出生情報と鑑定履歴を保存して、次回以降も同じ文脈で相談できます。"
+      description: "出生情報と星読みカルテを保存して、次回以降も同じ文脈で相談できます。"
     });
     links.push({
       href: "/login?returnTo=/account",
       title: "ログインして登録情報を読み込む",
-      description: "登録済みの方は、保存している星の情報や鑑定履歴を確認できます。"
+      description: "登録済みの方は、保存している星の情報や星読みカルテを確認できます。"
     });
   } else if (!account.lineLinked) {
     links.push({
@@ -588,7 +588,7 @@ function buildAccountNextStepLinks(account: AccountState, lineFriendUrl: string)
     links.push({
       href: lineFriendUrl,
       title: "LINEで相談する",
-      description: "登録済みの星と鑑定履歴を引き継いだまま、LINEのメッセージで相談できます。"
+      description: "登録済みの星と星読みカルテを引き継いだまま、LINEのメッセージで相談できます。"
     });
   }
   links.push({
@@ -639,7 +639,7 @@ function LineFriendGuideCard({ account, lineConnectHref, lineFriendUrl }: { acco
         {account.lineLinked ? (
           <p>
             LINE登録の流れで公式アカウントの友だち追加画面が表示されます。
-            保存したあなたの星と鑑定履歴を引き継いだまま、LINEのメッセージで相談できます。
+            保存したあなたの星と星読みカルテを引き継いだまま、LINEのメッセージで相談できます。
           </p>
         ) : (
           <p>

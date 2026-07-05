@@ -14,7 +14,7 @@ export function LineCtaCard({ compact = false }: LineCtaCardProps) {
         <div className="eyebrow">LINE相談</div>
         <h2>LINEでも、この星のまま相談できます</h2>
         <p>
-          Webで登録した出生図と鑑定履歴を引き継いで、気になった瞬間にLINEのメッセージから相談できます。恋愛、仕事、今日の運勢も、同じ星の文脈で続けられます。
+          Webで登録した出生図と星読みカルテを引き継いで、気になった瞬間にLINEのメッセージから相談できます。恋愛、仕事、今日の運勢も、同じ星の文脈で続けられます。
         </p>
       </div>
       <div className="line-cta-actions">

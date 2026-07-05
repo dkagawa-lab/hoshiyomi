@@ -5,9 +5,9 @@ import { ReaderStyleKey, resolveReaderStyle } from "@/lib/readerStyles";
 import { PlanKey, resolvePlan, usageLimitsDisabled } from "@/lib/plans";
 import { classifyQuestionBilling, NonBillableQuestionKind, QuestionBilling } from "@/lib/questionBilling";
 import { QuestionIntentKey, resolveQuestionIntent } from "@/lib/questionIntents";
-import { buildConversationContext, generateAstrologyAnswer, isAnthropicApiError, isAnthropicRateLimitError, isProductionAiConfigured, mergeConversationMessages, normalizeChatMessages } from "@/lib/aiRuntime";
+import { buildConsultationMemoryContext, buildConversationContext, generateAstrologyAnswer, isAnthropicApiError, isAnthropicRateLimitError, isProductionAiConfigured, mergeConversationMessages, normalizeChatMessages } from "@/lib/aiRuntime";
 import { anonymousSessionCookieName, getAuthenticatedRequestUser, getOrCreateAnonymousRequestUser } from "@/lib/serverAuth";
-import { birthInputFromStoredUser, checkNonBillableRateLimit, consumeQuota, countLifetimeUserMessages, getQuotaState, getUsageSnapshot, insertChatTurn, isServerStoreConfigured, listChatMessages, normalizeClientUserId, NonBillableRateLimitResult, StoredUser, upsertUserForChart, upsertUserForLineChart } from "@/lib/serverStore";
+import { birthInputFromStoredUser, checkNonBillableRateLimit, consumeQuota, countLifetimeUserMessages, getQuotaState, getUsageSnapshot, insertChatTurn, isServerStoreConfigured, listChatMessages, normalizeClientUserId, NonBillableRateLimitResult, StoredUser, updateConsultationMemory, upsertUserForChart, upsertUserForLineChart } from "@/lib/serverStore";
 
 type ChatRequest = {
   chart: Chart;
@@ -168,6 +168,7 @@ export async function POST(req: Request) {
       readerStyle,
       system: [
         systemPrompt(readerStyle, plan.key, questionIntent, body.question, language),
+        buildConsultationMemoryContext(storedUser?.consultation_memory, plan.key),
         buildConversationContext(conversationMessages, plan.key),
         `${language === "en" ? "Birth chart data" : "出生図データ"}:\n${buildChartContext(effectiveChart, language)}`,
         `${language === "en" ? "Current transit data" : "現在のトランジットデータ"}:\n${buildTransitContext(transits, language)}`
@@ -259,8 +260,12 @@ async function persistChatTurnAndQuota(input: {
   if (!input.storedUser) return null;
   return safeServerStore("persist chat turn and quota", async () => {
     await insertChatTurn({ answer: input.answer, question: input.question, userId: input.storedUser.id });
-    if (input.quotaDisabled) return getUsageSnapshot(input.storedUser);
-    const updatedUser = await consumeQuota(input.storedUser, input.quota);
+    const memoryUser = await updateConsultationMemory({ answer: input.answer, question: input.question, user: input.storedUser }).catch((error) => {
+      console.warn("Consultation memory update skipped", { message: error instanceof Error ? error.message : "Unknown error" });
+      return input.storedUser;
+    });
+    if (input.quotaDisabled) return getUsageSnapshot(memoryUser);
+    const updatedUser = await consumeQuota(memoryUser, input.quota);
     return getUsageSnapshot(updatedUser);
   });
 }
@@ -329,8 +334,8 @@ function buildNonBillableChatAnswer(billing: QuestionBilling, usage: DisplayUsag
     return `LINEで相談するには、登録情報とLINEをつなぎます。LINE登録を進めると、公式アカウントの友だち追加までできます。\n\n登録情報ページから「LINEで登録・友だち追加」を選んでください。\n/account${usageText}${noCount}`;
   }
   if (kind === "account") {
-    if (english) return `You can check your registration, login status, birth data, and reading history on the Account page.\n/account${usageText}${noCount}`;
-    return `登録情報、ログイン状態、出生情報、鑑定履歴は登録情報ページで確認できます。\n/account${usageText}${noCount}`;
+    if (english) return `You can check your registration, login status, birth data, and star memory on the Account page.\n/account${usageText}${noCount}`;
+    return `登録情報、ログイン状態、出生情報、星読みカルテは登録情報ページで確認できます。\n/account${usageText}${noCount}`;
   }
   if (kind === "legal") {
     if (english) return `Terms, privacy policy, and legal disclosure are available here.\n\n/terms\n/privacy\n/legal/commercial-disclosure${noCount}`;

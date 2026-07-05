@@ -23,6 +23,8 @@ export type StoredUser = {
   referred_by_user_id: string | null;
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
+  consultation_memory: string | null;
+  consultation_memory_updated_at: string | null;
 };
 
 export type UsageSnapshot = {
@@ -56,6 +58,8 @@ export type PublicUserSnapshot = {
   birthCity: string | null;
   birthDate: string | null;
   birthTime: string | null;
+  consultationMemory: string | null;
+  consultationMemoryUpdatedAt: string | null;
   gender: GenderKey | null;
   isMember: boolean;
   latitude: number | null;
@@ -410,6 +414,15 @@ export async function listChatMessages(userId: string, limit = 60) {
     `chat_messages?user_id=eq.${encodeURIComponent(userId)}&select=id,user_id,role,content,created_at&order=created_at.desc&limit=${limit}`
   );
   return messages.reverse();
+}
+
+export async function updateConsultationMemory(input: { answer: string; question: string; user: StoredUser }) {
+  const nextMemory = buildUpdatedConsultationMemory(input.user.consultation_memory, input.question, input.answer);
+  if (!nextMemory || nextMemory === normalizeConsultationMemory(input.user.consultation_memory)) return input.user;
+  return updateUser(input.user.id, {
+    consultation_memory: nextMemory,
+    consultation_memory_updated_at: new Date().toISOString()
+  });
 }
 
 export async function countLifetimeUserMessages(userId: string) {
@@ -987,12 +1000,97 @@ function buildStoredHistory(messages: StoredChatMessage[], user: StoredUser) {
   return entries.slice(0, 30);
 }
 
+function buildUpdatedConsultationMemory(previousMemory: string | null, question: string, answer: string) {
+  const previous = normalizeConsultationMemory(previousMemory);
+  const themes = uniqueMemoryItems([...extractMemoryItems(previous, "継続テーマ"), ...detectConsultationThemes(question)], 8);
+  const questions = uniqueMemoryItems([...extractMemoryItems(previous, "最近の相談"), cleanMemoryText(question, 90)], 8);
+  const notes = uniqueMemoryItems([...extractMemoryItems(previous, "引き継ぐ読み筋"), summarizeAnswerForMemory(answer)], 6);
+
+  const lines = [
+    "星読みカルテ",
+    "継続テーマ:",
+    ...(themes.length ? themes : ["まだ蓄積中"]).map((item) => `- ${item}`),
+    "最近の相談:",
+    ...(questions.length ? questions : ["まだ蓄積中"]).map((item) => `- ${item}`),
+    "引き継ぐ読み筋:",
+    ...(notes.length ? notes : ["まだ蓄積中"]).map((item) => `- ${item}`)
+  ];
+  return lines.join("\n").slice(0, 3600);
+}
+
+function normalizeConsultationMemory(value: string | null | undefined) {
+  return String(value || "").replace(/\r/g, "").trim();
+}
+
+function extractMemoryItems(memory: string, heading: string) {
+  if (!memory) return [];
+  const items: string[] = [];
+  let active = false;
+  for (const rawLine of memory.split("\n")) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    if (line === `${heading}:`) {
+      active = true;
+      continue;
+    }
+    if (active && /^[^-].+:$/.test(line)) break;
+    if (active && line.startsWith("- ")) {
+      const item = cleanMemoryText(line.slice(2), 180);
+      if (item && item !== "まだ蓄積中") items.push(item);
+    }
+  }
+  return items;
+}
+
+function detectConsultationThemes(question: string) {
+  const text = String(question || "");
+  const detectors = [
+    { label: "今日の運勢・日々の流れ", pattern: /(今日|本日|明日|運勢|ラッキー|気をつける|過ごし方)/ },
+    { label: "恋愛・相性", pattern: /(恋愛|恋|好き|彼|彼女|相手|復縁|片思い|結婚|出会い|デート|相性)/ },
+    { label: "仕事・キャリア", pattern: /(仕事|転職|職場|キャリア|上司|同僚|会社|独立|起業|働き方)/ },
+    { label: "お金・才能の活かし方", pattern: /(金運|お金|収入|副業|稼|才能|強み|適職|価値)/ },
+    { label: "人生の転機・選択", pattern: /(人生|転機|選択|迷い|決断|将来|未来|タイミング|変化)/ },
+    { label: "感情・自己理解", pattern: /(不安|しんどい|つらい|モヤモヤ|自分|性格|本質|自己理解|気持ち)/ },
+    { label: "人間関係", pattern: /(人間関係|友人|家族|親|子|距離|関係|コミュニケーション)/ }
+  ];
+  return detectors.filter((item) => item.pattern.test(text)).map((item) => item.label);
+}
+
+function summarizeAnswerForMemory(answer: string) {
+  const cleaned = cleanMemoryText(answer.replace(/https?:\/\/\S+/g, ""), 260);
+  if (!cleaned) return "";
+  const sentence = cleaned.match(/^(.{24,220}?[。.!！?？])/);
+  return sentence ? sentence[1].trim() : cleaned.slice(0, 180);
+}
+
+function cleanMemoryText(value: string, maxLength: number) {
+  return String(value || "")
+    .replace(/[#*_`>{}[\]]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, maxLength);
+}
+
+function uniqueMemoryItems(items: string[], limit: number) {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const item of items) {
+    const normalized = cleanMemoryText(item, 180);
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    result.push(normalized);
+  }
+  return result.slice(-limit);
+}
+
 function toPublicUserSnapshot(user: StoredUser): PublicUserSnapshot {
   return {
     addOnCredits: Number(user.add_on_credits || 0),
     birthCity: user.birth_city,
     birthDate: user.birth_date,
     birthTime: user.birth_time,
+    consultationMemory: normalizeConsultationMemory(user.consultation_memory),
+    consultationMemoryUpdatedAt: user.consultation_memory_updated_at,
     gender: user.gender,
     isMember: user.is_member,
     latitude: user.latitude === null ? null : Number(user.latitude),
@@ -1061,7 +1159,9 @@ function buildMergedUserPayload(source: StoredUser, target: StoredUser, targetCl
     referral_code: target.referral_code ?? source.referral_code,
     referred_by_user_id: target.referred_by_user_id ?? source.referred_by_user_id,
     stripe_customer_id: target.stripe_customer_id ?? source.stripe_customer_id,
-    stripe_subscription_id: target.stripe_subscription_id ?? source.stripe_subscription_id
+    stripe_subscription_id: target.stripe_subscription_id ?? source.stripe_subscription_id,
+    consultation_memory: target.consultation_memory ?? source.consultation_memory,
+    consultation_memory_updated_at: target.consultation_memory_updated_at ?? source.consultation_memory_updated_at
   };
 }
 

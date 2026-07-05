@@ -19,6 +19,8 @@ create table if not exists users (
   referred_by_user_id uuid references users(id),
   stripe_customer_id text,
   stripe_subscription_id text,
+  consultation_memory text,
+  consultation_memory_updated_at timestamptz,
   updated_at timestamptz not null default now(),
   created_at timestamptz not null default now()
 );
@@ -34,6 +36,8 @@ alter table users add column if not exists referral_code text;
 alter table users add column if not exists referred_by_user_id uuid references users(id);
 alter table users add column if not exists stripe_customer_id text;
 alter table users add column if not exists stripe_subscription_id text;
+alter table users add column if not exists consultation_memory text;
+alter table users add column if not exists consultation_memory_updated_at timestamptz;
 alter table users add column if not exists updated_at timestamptz not null default now();
 
 create unique index if not exists users_client_user_id_idx on users(client_user_id) where client_user_id is not null;

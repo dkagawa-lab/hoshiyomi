@@ -10,7 +10,7 @@ import { canUseReaderStyle, resolvePlan, usageLimitsDisabled } from "@/lib/plans
 import { classifyQuestionBilling, NonBillableQuestionKind, QuestionBilling } from "@/lib/questionBilling";
 import { ReaderStyleKey, resolveReaderStyle } from "@/lib/readerStyles";
 import { resolveQuestionIntent } from "@/lib/questionIntents";
-import { buildConversationContext, generateAstrologyAnswer, isAnthropicApiError, isAnthropicRateLimitError, isProductionAiConfigured, mergeConversationMessages, normalizeChatMessages } from "@/lib/aiRuntime";
+import { buildConsultationMemoryContext, buildConversationContext, generateAstrologyAnswer, isAnthropicApiError, isAnthropicRateLimitError, isProductionAiConfigured, mergeConversationMessages, normalizeChatMessages } from "@/lib/aiRuntime";
 import {
   birthInputFromStoredUser,
   checkNonBillableRateLimit,
@@ -30,6 +30,7 @@ import {
   NonBillableRateLimitResult,
   registerLineUser,
   StoredUser,
+  updateConsultationMemory,
   upsertLineBirthRegistrationSession,
   upsertUserForLineChart,
   UsageSnapshot
@@ -207,6 +208,7 @@ async function handleLineEventCore(event: LineEvent, replyToken: string, lineUse
         system: [
           systemPrompt(readerStyle, plan.key, intent, normalizedQuestion),
           "LINEでの相談です。返信は自然な手紙調にしつつ、星の根拠・現在の流れ・次に聞ける問いを省略しないでください。",
+          buildConsultationMemoryContext(user.consultation_memory, plan.key),
           buildConversationContext(conversationMessages, plan.key),
           `出生図データ:\n${buildChartContext(chart)}`,
           `現在のトランジットデータ:\n${buildTransitContext(transits)}`
@@ -698,10 +700,10 @@ function buildNonBillableLineReply(billing: QuestionBilling, usage: UsageSnapsho
     return `占い師タイプは、通常・マイルド・はっきり厳しめ・寄り添い系・辛辣から選べます。\n\nLINEでは「辛辣: 復縁を見て」のように、占い師タイプを先頭につけて送れます。無料プランでは通常、通常プランではマイルドとはっきり厳しめ、プライベートプランでは全タイプが使えます。${usageText}${noCount}`;
   }
   if (kind === "line") {
-    return `LINEでは、登録済みの星と鑑定履歴を引き継いで相談できます。\n\nまだ星を登録していない場合は、このトークで「星を登録」と送ってください。生年月日、出生時刻、出生地を順番に聞いていきます。\n\n連携状態や登録情報はWebの登録情報ページでも確認できます。\n${appUrl("/account")}${usageText}${noCount}`;
+    return `LINEでは、登録済みの星と星読みカルテを引き継いで相談できます。\n\nまだ星を登録していない場合は、このトークで「星を登録」と送ってください。生年月日、出生時刻、出生地を順番に聞いていきます。\n\n連携状態や登録情報はWebの登録情報ページでも確認できます。\n${appUrl("/account")}${usageText}${noCount}`;
   }
   if (kind === "account") {
-    return `登録情報、ログイン状態、出生情報、鑑定履歴はWebの登録情報ページで確認できます。\n\n出生情報だけなら、LINEで「星を登録」と送ってこのまま登録することもできます。\n${appUrl("/account")}${usageText}${noCount}`;
+    return `登録情報、ログイン状態、出生情報、星読みカルテはWebの登録情報ページで確認できます。\n\n出生情報だけなら、LINEで「星を登録」と送ってこのまま登録することもできます。\n${appUrl("/account")}${usageText}${noCount}`;
   }
   if (kind === "legal") {
     return `利用規約、プライバシーポリシー、特定商取引法に基づく表記はこちらから確認できます。\n${appUrl("/terms")}\n${appUrl("/privacy")}\n${appUrl("/legal/commercial-disclosure")}${noCount}`;
@@ -818,7 +820,9 @@ async function persistLineChatTurnAndQuota(input: {
   user: StoredUser;
 }) {
   const historyResult = await safeLineStoreResult("insert line chat turn", () => insertChatTurn({ answer: input.answer, question: input.normalizedQuestion, userId: input.user.id }));
-  const quotaResult = input.quotaDisabled ? { ok: true as const, value: input.user } : await safeLineStoreResult("consume line quota", () => consumeQuota(input.user, input.quota));
+  const memoryResult = await safeLineStoreResult("update line consultation memory", () => updateConsultationMemory({ answer: input.answer, question: input.normalizedQuestion, user: input.user }));
+  const quotaBaseUser = memoryResult.ok ? memoryResult.value : input.user;
+  const quotaResult = input.quotaDisabled ? { ok: true as const, value: quotaBaseUser } : await safeLineStoreResult("consume line quota", () => consumeQuota(quotaBaseUser, input.quota));
   const usageUser = quotaResult.ok ? quotaResult.value : input.user;
   const usageResult = await safeLineStoreResult("read usage after line reply", () => getUsageSnapshot(usageUser));
 

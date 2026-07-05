@@ -123,7 +123,7 @@ export default function EnglishHome() {
             </div>
             <div>
               <strong>Remember</strong>
-              <span>With registration, your chart and reading history can be carried forward.</span>
+              <span>With registration, your chart and star memory can be carried forward.</span>
             </div>
             <div>
               <strong>Consult</strong>

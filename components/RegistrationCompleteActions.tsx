@@ -52,7 +52,7 @@ export function RegistrationCompleteActions() {
       <h1>{flow === "login" ? "ログインしました" : "登録が完了しました"}</h1>
       <p>
         {flow === "login"
-          ? "保存されている星の情報を読み込みました。続きの相談や鑑定履歴は、同じ星の文脈で確認できます。"
+          ? "保存されている星の情報を読み込みました。続きの相談や星読みカルテは、同じ星の文脈で確認できます。"
           : "あなたの星の情報を保存できるようになりました。相談を重ねるほど、同じ星の文脈を引き継いで読み解けます。"}
       </p>
       <div className="completion-actions">
@@ -77,7 +77,7 @@ export function RegistrationCompleteActions() {
         <strong>{isLineMethod ? "LINEから、そのまま相談できます。" : "LINEでも相談したい場合は、LINEで登録・友だち追加できます。"}</strong>
         <p>
           {isLineMethod
-            ? "LINE登録の流れの中で公式アカウントの友だち追加画面が表示されます。登録済みの星と鑑定履歴を引き継いだまま、LINEのメッセージで質問できます。"
+            ? "LINE登録の流れの中で公式アカウントの友だち追加画面が表示されます。登録済みの星と星読みカルテを引き継いだまま、LINEのメッセージで質問できます。"
             : "メール・Googleで登録した場合も、LINE登録・友だち追加を済ませると、あなたの星の記憶をLINEに引き継げます。"}
         </p>
         {!isLineMethod && lineConnectHref ? (

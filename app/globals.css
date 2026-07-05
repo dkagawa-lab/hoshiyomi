@@ -3035,8 +3035,21 @@ textarea:focus {
   background: rgba(5, 8, 18, 0.36);
 }
 
+.consultation-memory-summary {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(226, 190, 103, 0.3);
+  border-radius: 8px;
+  padding: 14px;
+  background:
+    linear-gradient(135deg, rgba(226, 190, 103, 0.13), rgba(255, 255, 255, 0.035)),
+    rgba(5, 8, 18, 0.44);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.18);
+}
+
 .memory-profile span,
-.history-entry span {
+.history-entry span,
+.consultation-memory-summary span {
   color: var(--gold);
   font-size: 0.78rem;
   letter-spacing: 0.12em;
@@ -3044,14 +3057,21 @@ textarea:focus {
 }
 
 .memory-profile strong,
-.history-entry strong {
+.history-entry strong,
+.consultation-memory-summary strong {
   color: var(--text);
   font-weight: 500;
 }
 
 .memory-profile p,
-.history-entry p {
+.history-entry p,
+.consultation-memory-summary p {
   margin: 0;
+}
+
+.consultation-memory-summary p {
+  line-height: 1.75;
+  white-space: pre-line;
 }
 
 .history-full-answer {

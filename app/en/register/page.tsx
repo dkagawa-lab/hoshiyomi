@@ -8,7 +8,7 @@ export default function EnglishRegisterPage() {
         <div className="eyebrow">Membership</div>
         <h1>Create account</h1>
         <p className="auth-lead">
-          <span>Register with email, Google, or LINE to save your birth chart and reading history.</span>
+          <span>Register with email, Google, or LINE to save your birth chart and star memory.</span>
           <span>After registration, your first 10 consultations are available as a starting bonus.</span>
         </p>
         <div className="notice-box">

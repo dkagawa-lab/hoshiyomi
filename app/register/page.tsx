@@ -9,7 +9,7 @@ export default function RegisterPage() {
         <h1>新規登録</h1>
         <p className="auth-lead">
           <span>メール・Google・LINEで新規登録すると、</span>
-          <span>出生図と鑑定履歴を保存できます。</span>
+          <span>出生図と星読みカルテを保存できます。</span>
           <span>LINE登録では、公式アカウントの友だち追加も</span>
           <span>同じ流れで行えます。</span>
           <span>最初の10回まで無料で相談でき、</span>
@@ -41,7 +41,7 @@ export default function RegisterPage() {
             登録済みの方はログインへ
           </Link>
           <Link className="text-link" href="/account">
-            登録情報・鑑定履歴を見る
+            登録情報・星読みカルテを見る
           </Link>
           <Link className="text-link" href="/dashboard">
             星の確認へ戻る
